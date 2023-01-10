@@ -1,0 +1,15 @@
+matplotlib
+seaborn
+pandas
+tables
+autopep8
+jupyter
+jupyter-contrib-nbextensions
+
+numpy
+scipy
+scikit-learn
+imbalanced-learn
+xgboost
+lightgbm
+hmmlearn

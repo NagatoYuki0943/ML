@@ -1,3 +1,6 @@
+pillow
+tqdm
+
 matplotlib
 seaborn
 pandas
@@ -10,6 +13,7 @@ numpy
 scipy
 scikit-learn
 imbalanced-learn
+# hmmlearn
 xgboost
 lightgbm
-hmmlearn
+catboost

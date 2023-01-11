@@ -58,9 +58,9 @@ from sklearn.datasets import make_blobs # 为聚类产生数据集，产生一�
 from sklearn.cluster import (
     KMeans,
     MiniBatchKMeans,
-    BisectingKMeans,
+    BisectingKMeans,            # 二分kmeans聚类算法
     DBSCAN,                     # 基于密度的聚类算法
-    OPTICS,
+    OPTICS,                     # 基于密度的聚类算法
     AffinityPropagation,        # 亲和力传播
     AgglomerativeClustering,    # 层次聚类
     Birch,
@@ -84,6 +84,7 @@ from sklearn.svm import SVC
 
 from xgboost import XGBRegressor, XGBClassifier
 from lightgbm import LGBMRegressor, LGBMClassifier
+from catboost import CatBoostRegressor, CatBoostClassifier
 
 from sklearn.metrics import log_loss
 from sklearn.metrics import mean_absolute_error

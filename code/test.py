@@ -24,6 +24,7 @@ from sklearn.model_selection import (
     train_test_split,                                       # 分割数据
     StratifiedShuffleSplit,                                 # 分割数据
     GridSearchCV,                                           # 网格搜索+交叉验证
+    RandomizedSearchCV,                                     # 随机搜索+交叉验证
 )
 
 # 贝叶斯
@@ -79,8 +80,8 @@ from sklearn.metrics.cluster import (
     homogeneity_completeness_v_measure, # bigger is better
 )
 
-# SVM
-from sklearn.svm import SVC
+# SVM                   分类,回归
+from sklearn.svm import SVC, SVR
 
 from xgboost import XGBRegressor, XGBClassifier
 from lightgbm import LGBMRegressor, LGBMClassifier

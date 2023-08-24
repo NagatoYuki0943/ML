@@ -47,6 +47,9 @@ from sklearn.linear_model import (
     RidgeCV,
 )
 
+# KNN
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+
 # 树
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.tree import export_graphviz

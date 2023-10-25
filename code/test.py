@@ -10,6 +10,7 @@ from sklearn.preprocessing import (
     MinMaxScaler,                                           # MinMax
     StandardScaler,                                         # 特征数据标准化StandardScaler
     LabelEncoder,                                           # 标签转换为数字
+    PolynomialFeatures                                      # 多项式回归
 )
 
 # 类别不平衡
@@ -45,6 +46,8 @@ from sklearn.linear_model import (
     LogisticRegressionCV,
     Ridge,                  # 岭回归
     RidgeCV,
+    Lasso,                  # Lasso回归
+    LassoCV,
 )
 
 # KNN
@@ -90,9 +93,22 @@ from xgboost import XGBRegressor, XGBClassifier
 from lightgbm import LGBMRegressor, LGBMClassifier
 from catboost import CatBoostRegressor, CatBoostClassifier
 
-from sklearn.metrics import log_loss
-from sklearn.metrics import mean_absolute_error
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import (
+    log_loss,
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+    accuracy_score,
+    precision_score,
+    average_precision_score,
+    recall_score,
+    precision_recall_curve, # 精确率召回率曲线
+    roc_curve,              # 根据 y_true, y_score 得到roc曲线
+                            # x: 假正类率 (false postive rate, FPR); y: Recall(true postive rate, TPR)
+    auc,                    # 根据 x,y 坐标得到roc曲线下的面积
+    roc_auc_score,          # 根据 y_true,y_score 得到roc曲线下的面积
+                            # roc_auc_score = roc_curve + auc
+)
 
 from joblib import dump # 保存模型
 from joblib import load # 加载模型

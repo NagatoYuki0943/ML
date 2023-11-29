@@ -1,2 +1,3 @@
 *.pdf
 !.gitignore
+code/pickle/pickle.pkl

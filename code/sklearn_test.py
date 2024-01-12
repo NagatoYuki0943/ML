@@ -24,8 +24,10 @@ from sklearn.decomposition import PCA                       # PCA
 from sklearn.model_selection import (
     train_test_split,                                       # 分割数据
     StratifiedShuffleSplit,                                 # 分割数据
+    # https://zhuanlan.zhihu.com/p/642920484
     GridSearchCV,                                           # 网格搜索+交叉验证
     RandomizedSearchCV,                                     # 随机搜索+交叉验证
+    HalvingGridSearchCV,                                    # 减半网格搜索+交叉验证 使用一小部分数据对所有的参数组合进行快速评估，然后仅保留表现最好的一部分参数组合，对其使用更多的数据进行进一步的评估
     KFold,
     cross_validate,     # cross_val_score与cross_validate的区别就是：cross_validate能够输出训练集分数
     cross_val_score,

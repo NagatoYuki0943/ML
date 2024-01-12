@@ -26,6 +26,10 @@ from sklearn.model_selection import (
     StratifiedShuffleSplit,                                 # 分割数据
     GridSearchCV,                                           # 网格搜索+交叉验证
     RandomizedSearchCV,                                     # 随机搜索+交叉验证
+    KFold,
+    cross_validate,     # cross_val_score与cross_validate的区别就是：cross_validate能够输出训练集分数
+    cross_val_score,
+    cross_val_predict,
 )
 
 # 贝叶斯
@@ -58,6 +62,7 @@ from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.tree import export_graphviz
 
 # 随机森林
+# https://zhuanlan.zhihu.com/p/648898531
 from sklearn.ensemble import (
     RandomForestClassifier,
     RandomForestRegressor,

@@ -58,7 +58,17 @@ from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.tree import export_graphviz
 
 # 随机森林
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    RandomForestRegressor,
+    ExtraTreesClassifier,   # 极端随机森林
+    ExtraTreesRegressor,    # 1.对于每个决策树的训练集，RF采用的是随机采样bootstrap来选择采样集作为每个决策树的训练集。
+                            # 而extra trees一般不采用随机采样，即每个决策树采用原始训练集。
+                            # 2.在选定了划分特征后，RF的决策树会基于基尼系数，均方差之类的原则，选择一个最优的特征值划分点，这和传统的决策树相同。
+                            # 但是extra trees比较的激进，他会随机的选择一个特征值来划分决策树。
+    BaggingClassifier,
+    BaggingRegressor,
+)
 
 # 聚类
 from sklearn.datasets import make_blobs # 为聚类产生数据集，产生一个数据集和相应的标签

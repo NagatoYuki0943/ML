@@ -1,3 +1,5 @@
+# https://zhuanlan.zhihu.com/p/641201586
+
 from sklearn.datasets import load_iris
 from sklearn.datasets import make_classification            # 准备类别不平衡数据
 
@@ -8,7 +10,13 @@ from sklearn.feature_extraction.text import TfidfVectorizer # 文本特征抽取
 from sklearn.preprocessing import (
     OneHotEncoder,                                          # one-hot
     MinMaxScaler,                                           # MinMax
-    StandardScaler,                                         # 特征数据标准化StandardScaler
+    StandardScaler,                                         # 特征数据标准化
+    normalize,                                              # 是按照向量空间模型（Vector Space Model）对特征向量进行转换，
+                                                            # 使得每个特征向量的欧几里得长度（L2范数）等于1，或者每个元素的
+                                                            # 绝对值之和（L1范数）等于1。换句话说：和标准化不同，
+                                                            # Scikit-learn中的归一化特指将单个样本（一行数据）放缩为单位范数
+                                                            # （1范数或者2范数为单位范数）的过程，该操作常见于核方法或者衡量样
+                                                            # 本之间相似性的过程中。
     LabelEncoder,                                           # 标签转换为数字
     PolynomialFeatures                                      # 多项式回归
 )
@@ -126,6 +134,10 @@ from sklearn.metrics import (
     roc_auc_score,          # 根据 y_true,y_score 得到roc曲线下的面积
                             # roc_auc_score = roc_curve + auc
 )
+
+# 管道
+from sklearn.pipeline import Pipeline
+
 
 from joblib import dump # 保存模型
 from joblib import load # 加载模型

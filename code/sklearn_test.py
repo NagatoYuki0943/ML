@@ -32,6 +32,9 @@ from sklearn.decomposition import PCA                       # PCA
 from sklearn.model_selection import (
     train_test_split,                                       # 分割数据
     StratifiedShuffleSplit,                                 # 分割数据
+    ShuffleSplit,                                           # 分割数据
+    TimeSeriesSplit,                                        # 时间序列分割
+    # https://zhuanlan.zhihu.com/p/642060346
     # https://zhuanlan.zhihu.com/p/642920484
     GridSearchCV,                                           # 网格搜索+交叉验证
     RandomizedSearchCV,                                     # 随机搜索+交叉验证

@@ -24,7 +24,16 @@ from sklearn.preprocessing import (
                                                             # （1范数或者2范数为单位范数）的过程，该操作常见于核方法或者衡量样
                                                             # 本之间相似性的过程中。
     LabelEncoder,                                           # 标签转换为数字
-    PolynomialFeatures                                      # 多项式回归
+    PolynomialFeatures,                                     # 多项式回归
+    Binarizer,                                              # 二值化
+    KBinsDiscretizer,                                       # 分箱
+)
+
+from sklearn.impute import (
+    SimpleImputer,                                          # 缺失值填充,支持均值,中位数,众数,常量
+    IterativeImputer,                                       # 差值填充
+    KNNImputer,                                             # K近邻填充
+    MissingIndicator,                                       # 缺失值标记
 )
 
 # 类别不平衡

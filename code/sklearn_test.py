@@ -1,7 +1,13 @@
 # https://zhuanlan.zhihu.com/p/641201586
 
 from sklearn.datasets import load_iris
-from sklearn.datasets import make_classification            # 准备类别不平衡数据
+from sklearn.datasets import (
+    make_blobs,         # 生成由聚类组成的非线性数据集
+    make_classification,# 准备类别不平衡数据
+    make_moons,         # 生成形状类似于月牙的数据集的函数
+    make_regression,    # 生成回归数据
+    make_s_curve,       # 生成形状类似于曲线的数据集
+)
 
 from sklearn.feature_extraction import DictVectorizer       # 字典特征抽取
 from sklearn.feature_extraction.text import CountVectorizer # 文本特征抽取

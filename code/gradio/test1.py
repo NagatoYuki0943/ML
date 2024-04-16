@@ -17,5 +17,8 @@ chatbox = gr.Chatbot()
 demo = gr.Interface(fn=chat, inputs=[textbox], outputs=[chatbox])
 # 设置队列启动，队列最大长度为 100
 demo.queue(max_size=100)
-# demo.launch(server_name="127.0.0.1", server_port=7860)
-demo.launch()
+
+
+if __name__ == "__main__":
+    # demo.launch(server_name="127.0.0.1", server_port=7860)
+    demo.launch()

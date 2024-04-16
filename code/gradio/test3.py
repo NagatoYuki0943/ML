@@ -4,6 +4,8 @@
 # 导入必要的库
 import gradio as gr
 import numpy as np
+from typing import Generator, Any
+import time
 
 
 def chat(
@@ -14,7 +16,7 @@ def chat(
     top_k: int = 40,
     temperature: float = 0.8,
     regenerate: str = "" # 是regen按钮的value,字符串,点击就传送,否则为空字符串
-) -> list:
+) -> Generator[Any, Any, Any]:
     """聊天"""
     history = [] if history is None else history
     # 重新生成时要把最后的query和response弹出,重用query
@@ -23,22 +25,31 @@ def chat(
         if len(history) > 0:
             query, _ = history.pop(-1)
         else:
-            return history
+            yield history
+            return # 这样写管用,但不理解
     else:
         query = query.replace(' ', '')
         if query == None or len(query) < 1:
-            return history
+            print("history: ", history)
+            yield history
+            return
 
     print(
         {
             "max_new_tokens":  max_new_tokens,
             "top_p": top_p,
             "top_k": top_k,
-            "temperature": temperature}
+            "temperature": temperature
+        }
     )
 
-    history.append([query, str(np.random.randint(1, 100, 10))])
-    return history
+    print(f"query: {query}; response: ", end="", flush=True)
+    number = np.random.randint(1, 100, 10)
+    for i in range(10):
+        time.sleep(0.1)
+        print(number[i], end=" ", flush=True)
+        yield history + [[query, str(number[:i+1])]]
+    print("\n")
 
 
 def revocery(history: list | None) -> list:

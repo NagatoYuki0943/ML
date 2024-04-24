@@ -16,9 +16,12 @@ def chat(
     top_p: float = 0.8,
     top_k: int = 40,
     temperature: float = 0.8,
+    language1: str = "ZH",
+    language2: str = "ZH",
     regenerate: str = "" # 是regen按钮的value,字符串,点击就传送,否则为空字符串
 ) -> list:
-    """聊天"""
+    print(f"{language1 = }, {language2 = }")
+
     history = [] if history is None else history
     # 重新生成时要把最后的query和response弹出,重用query
     if regenerate:
@@ -60,8 +63,8 @@ def main():
     with block as demo:
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
-                gr.Markdown("""<h1><center>🦙 LLaMA 2</center></h1>
-                    <center>🦙 LLaMA 2 Chatbot 💬</center>
+                gr.Markdown("""<h1><center>🦙 LLaMA 3</center></h1>
+                    <center>🦙 LLaMA 3 Chatbot 💬</center>
                     """)
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
 
@@ -72,13 +75,17 @@ def main():
 
                 with gr.Row():
                     # 创建一个文本框组件，用于输入 prompt。
-                    query = gr.Textbox(label="Prompt/问题", placeholder="请输入你的问题，按 Enter 或者右边的按钮提交，按 Shift + Enter 可以换行")
+                    query = gr.Textbox(label="Prompt/问题", placeholder="Enter 发送; Shift + Enter 换行 / Enter to send; Shift + Enter to wrap")
                     # 创建提交按钮。
                     # variant https://www.gradio.app/docs/button
                     # scale https://www.gradio.app/guides/controlling-layout
                     submit = gr.Button("💬 Chat", variant="primary", scale=0)
 
                 with gr.Row():
+                    # 单选框
+                    language1 = gr.Radio(choices=[("中文", "ZH"), ("English", "EN")], value="ZH", label="Language", type="value", interactive=True)
+                    # 下拉框
+                    language2 = gr.Dropdown(choices=[("中文", "ZH"), ("English", "EN")], value="ZH", label="Language", type="value", interactive=True)
                     # 创建一个重新生成按钮，用于重新生成当前对话内容。
                     regen = gr.Button("🔄 Retry", variant="secondary")
                     undo = gr.Button("↩️ Undo", variant="secondary")
@@ -120,7 +127,7 @@ def main():
             # 回车提交
             query.submit(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language1, language2],
                 outputs=[chatbot]
             )
 
@@ -134,7 +141,7 @@ def main():
             # 按钮提交
             submit.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language1, language2],
                 outputs=[chatbot]
             )
 
@@ -148,7 +155,7 @@ def main():
             # 重新生成
             regen.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, regen],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language1, language2, regen],
                 outputs=[chatbot]
             )
 

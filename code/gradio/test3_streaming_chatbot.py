@@ -79,7 +79,7 @@ def main():
         with gr.Row():
             with gr.Column(scale=4):
                 # 创建聊天框
-                chatbot = gr.Chatbot(height=500, show_copy_button=True)
+                chatbot = gr.Chatbot(height=500, show_copy_button=True, placeholder="内容由 AI 大模型生成，不构成专业医疗意见或诊断。")
 
                 with gr.Row():
                     # 创建一个文本框组件，用于输入 prompt。
@@ -175,7 +175,7 @@ def main():
             )
 
         gr.Markdown("""提醒：<br>
-        1. 使用中如果出现异常，将会在文本输入框进行展示，请不要惊慌。<br>
+        1. 内容由 AI 大模型生成，请仔细甄别。<br>
         """)
 
     # threads to consume the request

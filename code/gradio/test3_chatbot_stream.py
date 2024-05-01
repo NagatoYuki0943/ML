@@ -11,7 +11,7 @@ import time
 print("gradio version: ", gr.__version__)
 
 
-def chat(
+def chat_stream(
     query: str,
     history: list | None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
     max_new_tokens: int = 1024,
@@ -39,14 +39,12 @@ def chat(
             yield history
             return
 
-    print(
-        {
+    print({
             "max_new_tokens":  max_new_tokens,
             "top_p": top_p,
             "top_k": top_k,
             "temperature": temperature
-        }
-    )
+    })
 
     print(f"query: {query}; response: ", end="", flush=True)
     number = np.random.randint(1, 100, 10)
@@ -134,7 +132,7 @@ def main():
 
             # 回车提交
             query.submit(
-                chat,
+                chat_stream,
                 inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language1, language2],
                 outputs=[chatbot]
             )
@@ -148,7 +146,7 @@ def main():
 
             # 按钮提交
             submit.click(
-                chat,
+                chat_stream,
                 inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language1, language2],
                 outputs=[chatbot]
             )
@@ -162,7 +160,7 @@ def main():
 
             # 重新生成
             regen.click(
-                chat,
+                chat_stream,
                 inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language1, language2, regen],
                 outputs=[chatbot]
             )

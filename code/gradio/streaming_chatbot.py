@@ -1,25 +1,29 @@
-# https://www.gradio.app/playground
+"""
+https://www.gradio.app/docs/gradio/chatinterface
+https://www.gradio.app/guides/creating-a-chatbot-fast
 
-import time
+"""
+
 import gradio as gr
 
 
-def slow_echo(query, history):
-    query = query.replace(' ', '')
-    if query == None or len(query) < 1:
-        for i in range(1):
-            yield None
-
-    print("message: ", query)
-    print("history: ", history)
-
-    for i in range(len(query)):
-        time.sleep(0.1)
-        yield "You typed: " + query[: i + 1]
+def yes_man(message, history):
+    if message.endswith("?"):
+        return "Yes"
+    else:
+        return "Ask me anything!"
 
 
-demo = gr.ChatInterface(slow_echo).queue()
-
-
-if __name__ == "__main__":
-    demo.launch()
+gr.ChatInterface(
+    yes_man,
+    chatbot=gr.Chatbot(height=300),
+    textbox=gr.Textbox(placeholder="Ask me a yes or no question", container=False, scale=7),
+    title="Yes Man",
+    description="Ask Yes Man any question",
+    theme="soft",
+    examples=["Hello", "Am I cool?", "Are tomatoes vegetables?"],
+    cache_examples=True,
+    retry_btn="Retry",
+    undo_btn="Delete Previous",
+    clear_btn="Clear",
+).launch()

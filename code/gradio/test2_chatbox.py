@@ -4,9 +4,10 @@
 # 导入必要的库
 import gradio as gr
 import numpy as np
+from loguru import logger
 
 
-print("gradio version: ", gr.__version__)
+logger.info(f"gradio version: {gr.__version__}")
 
 
 def chat(
@@ -27,15 +28,16 @@ def chat(
     if query == None or len(query) < 1:
         return history
 
-    print({
+    logger.info({
             "max_new_tokens":  max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
     })
 
+    logger.info(f"query: {query}")
     response = str(np.random.randint(1, 100, 10))
-    print(response + "\n")
+    logger.info(f"response: {response}")
     history.append([query, response])
     return history
 

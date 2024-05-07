@@ -4,9 +4,10 @@ import numpy as np
 from typing import Generator, Any
 import time
 from PIL import Image
+from loguru import logger
 
 
-print("gradio version: ", gr.__version__)
+logger.info(f"gradio version: {gr.__version__}")
 
 
 def chat_stream_with_image(
@@ -25,7 +26,7 @@ def chat_stream_with_image(
         yield history, image
         return
 
-    print({
+    logger.info({
             "max_new_tokens":  max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
@@ -33,7 +34,7 @@ def chat_stream_with_image(
     })
 
     if isinstance(image, Image.Image):
-        print({
+        logger.info({
             "height": image.height,
             "width": image.width,
             "mode": image.mode
@@ -41,13 +42,13 @@ def chat_stream_with_image(
         # 转换RGB2BGR
         image = Image.fromarray(np.array(image)[..., ::-1])
 
-    print(f"query: {query}; response: ", end="", flush=True)
+    logger.info(f"query: {query}")
     number = np.random.randint(1, 100, 10)
     for i in range(10):
         time.sleep(0.1)
-        print(number[i], end=" ", flush=True)
+        logger.info(number[i])
         yield history + [[query, str(number[:i+1])]], image
-    print("\n")
+    logger.info(f"response: {number}")
 
 
 def regenerate(

@@ -3,6 +3,10 @@
 
 import numpy as np
 import gradio as gr
+from loguru import logger
+
+
+logger.info(f"gradio version: {gr.__version__}")
 
 
 def flip_text(x):

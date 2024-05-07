@@ -6,9 +6,10 @@ import gradio as gr
 import numpy as np
 from typing import Generator, Any
 import time
+from loguru import logger
 
 
-print("gradio version: ", gr.__version__)
+logger.info(f"gradio version: {gr.__version__}")
 
 
 def chat_stream(
@@ -30,20 +31,20 @@ def chat_stream(
         yield history
         return
 
-    print({
+    logger.info({
             "max_new_tokens":  max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
     })
 
-    print(f"query: {query}; response: ", end="", flush=True)
+    logger.info(f"query: {query}")
     number = np.random.randint(1, 100, 10)
     for i in range(10):
         time.sleep(0.1)
-        print(number[i], end=" ", flush=True)
+        logger.info(number[i])
         yield history + [[query, str(number[:i+1])]]
-    print("\n")
+    logger.info(f"response: {number}")
 
 
 def regenerate(

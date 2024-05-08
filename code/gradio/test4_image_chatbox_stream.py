@@ -44,7 +44,7 @@ def chat_stream_with_image(
 
     logger.info(f"query: {query}")
     number = np.random.randint(1, 100, 10)
-    for i in range(10):
+    for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])
         yield history + [[query, str(number[:i+1])]], image

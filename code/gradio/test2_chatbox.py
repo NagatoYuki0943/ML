@@ -199,7 +199,7 @@ def main():
     # 设置队列启动，队列最大长度为 100
     demo.queue(max_size=100)
 
-    # demo.launch(server_name="127.0.0.1", server_port=7860)
+    # demo.launch(server_name = "127.0.0.1", server_port = 7860, share = True)
     demo.launch()
 
 

@@ -4,7 +4,7 @@
 # 导入必要的库
 import gradio as gr
 import numpy as np
-from typing import Generator, Any
+from typing import Generator, Sequence
 import time
 from loguru import logger
 
@@ -14,15 +14,15 @@ logger.info(f"gradio version: {gr.__version__}")
 
 def chat_stream(
     query: str,
-    history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+    history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
     max_new_tokens: int = 1024,
     temperature: float = 0.8,
     top_p: float = 0.8,
     top_k: int = 40,
     language1: str = "ZH",
     language2: str = "ZH",
-) -> Generator[Any, Any, Any]:
-    history = [] if history is None else history
+) -> Generator[Sequence, None, None]:
+    history = [] if history is None else list(history)
 
     print(f"{language1 = }, {language2 = }")
 
@@ -49,15 +49,15 @@ def chat_stream(
 
 def regenerate(
     query: str,
-    history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+    history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
     max_new_tokens: int = 1024,
     temperature: float = 0.8,
     top_p: float = 0.8,
     top_k: int = 40,
     language1: str = "ZH",
     language2: str = "ZH",
-) -> Generator[Any, Any, Any]:
-    history = [] if history is None else history
+) -> Generator[Sequence, None, None]:
+    history = [] if history is None else list(history)
 
     # 重新生成时要把最后的query和response弹出,重用query
     if len(history) > 0:
@@ -76,9 +76,9 @@ def regenerate(
         yield history
 
 
-def revocery(history: list | None) -> tuple[str, list]:
+def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
     """恢复到上一轮对话"""
-    history = [] if history is None else history
+    history = [] if history is None else list(history)
     query = ""
     if len(history) > 0:
         query, _ = history.pop(-1)

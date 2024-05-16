@@ -83,7 +83,7 @@ from sklearn.linear_model import (
 )
 
 # KNN
-from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier, kneighbors_graph
 
 # 树
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier

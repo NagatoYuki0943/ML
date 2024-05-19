@@ -2,12 +2,18 @@
 import gradio as gr
 import numpy as np
 from typing import Generator, Sequence
+from threading import Lock
 import time
 from PIL import Image
 from loguru import logger
 
 
 logger.info(f"gradio version: {gr.__version__}")
+
+
+class InterFace:
+    global_session_id: int = 0
+    lock = Lock()
 
 
 def chat_stream_with_image(
@@ -18,8 +24,11 @@ def chat_stream_with_image(
     top_p: float = 0.8,
     top_k: int = 40,
     image: Image.Image | None = None,
+    state_session_id: int = 0,
 ) -> Generator[tuple[Sequence, Image.Image], None, None]:
     history = [] if history is None else list(history)
+
+    print(f"{state_session_id = }")
 
     query = query.strip()
     if query == None or len(query) < 1:
@@ -59,6 +68,7 @@ def regenerate(
     top_p: float = 0.8,
     top_k: int = 40,
     image: Image.Image | None = None,
+    state_session_id: int = 0,
 ) -> Generator[tuple[Sequence, Image.Image], None, None]:
     history = [] if history is None else list(history)
 
@@ -73,6 +83,7 @@ def regenerate(
             top_p = top_p,
             top_k = top_k,
             image = image,
+            state_session_id = state_session_id,
         )
     else:
         yield history, image
@@ -90,6 +101,8 @@ def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
 def main():
     block = gr.Blocks()
     with block as demo:
+        state_session_id = gr.State(0)
+
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
                 gr.Markdown("""<h1><center>🦙 LLaMA 3</center></h1>
@@ -171,7 +184,7 @@ def main():
             # 回车提交
             query.submit(
                 chat_stream_with_image,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, image],
+                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, image, state_session_id],
                 outputs=[chatbot, image]
             )
 
@@ -185,7 +198,7 @@ def main():
             # 按钮提交
             submit.click(
                 chat_stream_with_image,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, image],
+                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, image, state_session_id],
                 outputs=[chatbot, image]
             )
 
@@ -199,7 +212,7 @@ def main():
             # 重新生成
             regen.click(
                 regenerate,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, image],
+                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, image, state_session_id],
                 outputs=[chatbot, image]
             )
 
@@ -213,6 +226,15 @@ def main():
         gr.Markdown("""提醒：<br>
         1. 内容由 AI 大模型生成，请仔细甄别。<br>
         """)
+
+        # 初始化session_id
+        def init():
+            with InterFace.lock:
+                InterFace.global_session_id += 1
+            new_session_id = InterFace.global_session_id
+            return new_session_id
+
+        demo.load(init, inputs=None, outputs=[state_session_id])
 
     # threads to consume the request
     gr.close_all()

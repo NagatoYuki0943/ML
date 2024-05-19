@@ -2,7 +2,7 @@
 import gradio as gr
 import numpy as np
 from typing import Generator, Sequence
-from threading import Lock
+import threading
 import time
 from PIL import Image
 from loguru import logger
@@ -13,7 +13,7 @@ logger.info(f"gradio version: {gr.__version__}")
 
 class InterFace:
     global_session_id: int = 0
-    lock = Lock()
+    lock = threading.Lock()
 
 
 def chat_stream_with_image(
@@ -52,7 +52,7 @@ def chat_stream_with_image(
         image = Image.fromarray(np.array(image)[..., ::-1])
 
     logger.info(f"query: {query}")
-    number = np.random.randint(1, 100, 10)
+    number = np.random.randint(1, 100, 20)
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])

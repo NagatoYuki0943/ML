@@ -5,7 +5,7 @@
 import gradio as gr
 import numpy as np
 from typing import Sequence
-from threading import Lock
+import threading
 from loguru import logger
 
 
@@ -14,7 +14,7 @@ logger.info(f"gradio version: {gr.__version__}")
 
 class InterFace:
     global_session_id: int = 0
-    lock = Lock()
+    lock = threading.Lock()
 
 
 def chat(
@@ -45,7 +45,7 @@ def chat(
     })
 
     logger.info(f"query: {query}")
-    response = str(np.random.randint(1, 100, 10))
+    response = str(np.random.randint(1, 100, 20))
     logger.info(f"response: {response}")
     history.append([query, response])
     return history

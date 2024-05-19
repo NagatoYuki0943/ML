@@ -5,7 +5,7 @@
 import gradio as gr
 import numpy as np
 from typing import Generator, Sequence
-from threading import Lock
+import threading
 import time
 from loguru import logger
 
@@ -15,7 +15,7 @@ logger.info(f"gradio version: {gr.__version__}")
 
 class InterFace:
     global_session_id: int = 0
-    lock = Lock()
+    lock = threading.Lock()
 
 
 def chat_stream(
@@ -48,7 +48,7 @@ def chat_stream(
     })
 
     logger.info(f"query: {query}")
-    number = np.random.randint(1, 100, 50)
+    number = np.random.randint(1, 100, 20)
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])
@@ -225,7 +225,7 @@ def main():
         1. 内容由 AI 大模型生成，请仔细甄别。<br>
         """)
 
-    # 初始化session_id
+        # 初始化session_id
         def init():
             with InterFace.lock:
                 InterFace.global_session_id += 1

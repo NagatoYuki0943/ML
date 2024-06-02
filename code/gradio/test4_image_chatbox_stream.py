@@ -57,6 +57,8 @@ def chat_stream_with_image(
         time.sleep(0.1)
         logger.info(number[i])
         yield history + [[query, str(number[:i+1])]], image
+        # 在聊天记录中显示图片,需要是图片url,不能是 image 对象
+        # yield history + [[("image url",), None], [query, str(number[:i+1])]], image
     logger.info(f"response: {number}")
 
 

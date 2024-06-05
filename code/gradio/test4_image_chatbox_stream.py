@@ -115,7 +115,7 @@ def main():
         with gr.Row():
             with gr.Column(scale=4):
                 with gr.Row():
-                    image = gr.Image(image_mode="RGB", type="pil", interactive=True)
+                    image = gr.Image(sources=["upload", "webcam", "clipboard"], image_mode="RGB", type="pil", interactive=True)
 
                     with gr.Column(scale=2):
                         # 创建聊天框

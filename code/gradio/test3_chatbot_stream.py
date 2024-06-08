@@ -31,9 +31,9 @@ def chat_stream(
 ) -> Generator[Sequence, None, None]:
     history = [] if history is None else list(history)
 
-    print(f"{language1 = }, {language2 = }")
+    logger.info(f"{language1 = }, {language2 = }")
 
-    print(f"{state_session_id = }")
+    logger.info(f"{state_session_id = }")
 
     query = query.strip()
     if query == None or len(query) < 1:

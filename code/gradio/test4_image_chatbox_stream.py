@@ -40,7 +40,7 @@ def chat_stream_with_image(
 
     query = query.strip()
     if query == None or len(query) < 1:
-        yield history, image, current_img
+        yield history, current_img
         return
 
     logger.info({

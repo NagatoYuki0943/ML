@@ -40,7 +40,7 @@ def chat_stream_with_image(
 
     query = query.strip()
     if query == None or len(query) < 1:
-        yield history, image
+        yield history, image, current_img
         return
 
     logger.info({
@@ -56,6 +56,7 @@ def chat_stream_with_image(
         new_img_hash = hash_image(image)
         logger.info(f"{new_img_hash = }")
 
+        # 新图片
         if new_img_hash != current_img:
             logger.warning(f"update image hash")
             logger.info({
@@ -66,9 +67,16 @@ def chat_stream_with_image(
             # 转换RGB2BGR
             # image = Image.fromarray(np.array(image)[..., ::-1])
             current_img = new_img_hash
+        else:
+            # 图片和之前相同设置为 None
+            image = None
+    else:
+        # 不是 PIL.Image.Image 设置为 None
+        image = None
+    logger.info(f"updated image: {image}")
 
     logger.info(f"query: {query}")
-    number = np.random.randint(1, 100, 20)
+    number: np.ndarray = np.random.randint(1, 100, 20)
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])
@@ -186,7 +194,7 @@ def main():
                     regen = gr.Button("🔄 Retry", variant="secondary")
                     undo = gr.Button("↩️ Undo", variant="secondary")
                     # 创建一个清除按钮，用于清除聊天机器人组件的内容。
-                    clear = gr.ClearButton(components=[chatbot, image], value="🗑️ Clear", variant="stop")
+                    clear = gr.ClearButton(components=[chatbot, image, current_img], value="🗑️ Clear", variant="stop")
 
                 # 折叠
                 with gr.Accordion("Advanced Options", open=False):

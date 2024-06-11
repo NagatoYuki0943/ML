@@ -7,9 +7,12 @@ import time
 from PIL import Image
 from loguru import logger
 import hashlib
+from pathlib import Path
 
 
 logger.info(f"gradio version: {gr.__version__}")
+save_path = Path("images")
+save_path.mkdir(parents=True, exist_ok=True)
 
 
 class InterFace:
@@ -50,23 +53,40 @@ def chat_stream_with_image(
     })
 
     logger.info(f"{image = }")
+    use_image: bool = False
     if isinstance(image, Image.Image):
+        use_image = True
+        image = image.convert('RGB')
+
         logger.info({
             "height": image.height,
             "width": image.width,
             "mode": image.mode
         })
-        # 转换RGB2BGR
-        image = Image.fromarray(np.array(image)[..., ::-1])
+
+        image_array: np.ndarray = np.array(image)
+        # 随机生成5000个椒盐噪声
+        rows, cols, dims = image_array.shape
+        for i in range(5000):
+            x = np.random.randint(0, rows)
+            y = np.random.randint(0, cols)
+            new_color: np.ndarray = np.random.randint(0, 255, 3)
+            image_array[x, y] = new_color
+        image = Image.fromarray(image_array)
+
+        image_path = save_path / f"{hash_image(image)}.png"
+        image.save(image_path)
 
     logger.info(f"query: {query}")
     number: np.ndarray = np.random.randint(1, 100, 20)
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])
-        yield history + [[query, str(number[:i+1])]], image
-        # 在聊天记录中显示图片,需要是图片url,不能是 image 对象
-        # yield history + [[("image url",), None], [query, str(number[:i+1])]], image
+        if not use_image:
+            yield history + [[query, str(number[:i+1])]], image
+        else:
+            # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
+            yield history + [[(image_path, "alt_text"), None], [query, str(number[:i+1])]], image
     logger.info(f"response: {number}")
 
 

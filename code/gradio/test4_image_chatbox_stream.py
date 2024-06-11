@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 logger.info(f"gradio version: {gr.__version__}")
-save_path = Path("images")
+save_path = Path("upload")
 save_path.mkdir(parents=True, exist_ok=True)
 
 

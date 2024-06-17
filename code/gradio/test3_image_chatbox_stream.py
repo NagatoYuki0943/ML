@@ -35,7 +35,7 @@ def chat_stream_with_image(
     top_k: int = 40,
     image: Image.Image | None = None,
     state_session_id: int = 0,
-) -> Generator[tuple[Sequence, Image.Image], None, None]:
+) -> Generator[tuple[Sequence, Image.Image | None], None, None]:
     history = [] if history is None else list(history)
 
     logger.info(f"{state_session_id = }")
@@ -93,7 +93,6 @@ def chat_stream_with_image(
 
 
 def regenerate(
-    query: str,
     history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
     max_new_tokens: int = 1024,
     temperature: float = 0.8,
@@ -101,7 +100,7 @@ def regenerate(
     top_k: int = 40,
     image: Image.Image | None = None,
     state_session_id: int = 0,
-) -> Generator[tuple[Sequence, Image.Image], None, None]:
+) -> Generator[tuple[Sequence, Image.Image | None], None, None]:
     history = [] if history is None else list(history)
 
     # 重新生成时要把最后的query和response弹出,重用query
@@ -223,8 +222,8 @@ def main():
             # 清空query
             query.submit(
                 lambda: gr.Textbox(value=""),
-                [],
-                [query],
+                inputs=[],
+                outputs=[query],
             )
 
             # 按钮提交
@@ -237,14 +236,14 @@ def main():
             # 清空query
             submit.click(
                 lambda: gr.Textbox(value=""),
-                [],
-                [query],
+                inputs=[],
+                outputs=[query],
             )
 
             # 重新生成
             regen.click(
                 regenerate,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, image, state_session_id],
+                inputs=[chatbot, max_new_tokens, temperature, top_p, top_k, image, state_session_id],
                 outputs=[chatbot, image]
             )
 

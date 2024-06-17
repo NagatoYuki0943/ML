@@ -47,6 +47,8 @@ def chat_stream(
             "top_k": top_k,
     })
 
+    yield history + [[query, None]]
+    time.sleep(1)
     logger.info(f"query: {query}")
     number = np.random.randint(1, 100, 20)
     for i in range(len(number)):

@@ -6,6 +6,7 @@ import gradio as gr
 import numpy as np
 from typing import Sequence
 import threading
+import time
 from loguru import logger
 
 
@@ -45,6 +46,7 @@ def chat(
     })
 
     logger.info(f"query: {query}")
+    time.sleep(3)
     response = str(np.random.randint(1, 100, 20))
     logger.info(f"response: {response}")
     history.append([query, response])

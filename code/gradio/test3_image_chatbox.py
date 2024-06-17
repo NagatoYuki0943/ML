@@ -77,6 +77,7 @@ def chat_stream_with_image(
         image.save(image_path)
 
     logger.info(f"query: {query}")
+    time.sleep(3)
     response = str(np.random.randint(1, 100, 20))
     logger.info(f"query: {response}")
     if not use_image:

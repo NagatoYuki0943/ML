@@ -42,8 +42,7 @@ def chat_stream_with_image(
 
     query = query.strip()
     if query == None or len(query) < 1:
-        yield history, image
-        return
+        return history, image
 
     logger.info({
             "max_new_tokens":  max_new_tokens,
@@ -78,16 +77,13 @@ def chat_stream_with_image(
         image.save(image_path)
 
     logger.info(f"query: {query}")
-    number: np.ndarray = np.random.randint(1, 100, 20)
-    for i in range(len(number)):
-        time.sleep(0.1)
-        logger.info(number[i])
-        if not use_image:
-            yield history + [[query, str(number[:i+1])]], image
-        else:
-            # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
-            yield history + [[(image_path, "alt_text"), None], [query, str(number[:i+1])]], image
-    logger.info(f"response: {number}")
+    response = str(np.random.randint(1, 100, 20))
+    logger.info(f"query: {response}")
+    if not use_image:
+        return history + [[query, response]], image
+    else:
+        # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
+        return history + [[(image_path, "alt_text"), None], [query, response]], image
 
 
 def regenerate(

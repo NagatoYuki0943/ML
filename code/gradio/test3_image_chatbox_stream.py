@@ -77,7 +77,11 @@ def chat_stream_with_image(
         image_path = save_path / f"{hash_image(image)}.png"
         image.save(image_path)
 
-    yield history + [[query, None]], image
+    if use_image:
+        yield history + [[(image_path, "alt_text"), None], [query, None]], image
+    else:
+        yield history + [[query, None]], image
+
     time.sleep(1)
     logger.info(f"query: {query}")
     number: np.ndarray = np.random.randint(1, 100, 20)

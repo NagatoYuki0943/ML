@@ -177,8 +177,8 @@ def fit_circle_by_least_square_filter(
         n_sigma = err_std * sigma
         # 先找忽略的，再找保留的，因为保留的数据会覆盖原数据
         # 要使用 or 不用 not
-        ignore_circle: np.ndarray = fit_circle[np.bitwise_or(radii_err <= -n_sigma, radii_err >= n_sigma)]
-        fit_circle: np.ndarray = fit_circle[np.bitwise_and(radii_err > -n_sigma, radii_err < n_sigma)]
+        ignore_circle: np.ndarray = fit_circle[np.bitwise_or(radii_err <= err_avg - n_sigma, radii_err >= err_avg + n_sigma)]
+        fit_circle: np.ndarray = fit_circle[np.bitwise_and(radii_err > err_avg - n_sigma, radii_err < err_avg + n_sigma)]
         points_num: int = fit_circle.shape[0]
         if points_num >= 3:
             # print(f">>> {len(fit_circle) = }")

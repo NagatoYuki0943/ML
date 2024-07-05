@@ -1,4 +1,6 @@
 import numpy as np
+from loguru import logger
+
 from fit_circle_by_least_square import fit_circle_by_least_square
 
 
@@ -72,9 +74,8 @@ def split_circles(
     group_circles = []
     # 输出分组结果
     for i, group_index in enumerate(group_indexes):
-        # print(f"同心圆半径 {radius} 包含的id: {group_index}")
         if len(group_index) < min_group_size:
-            print(f"ignore {len(group_index)} points")
+            logger.info(f"ignore {len(group_index)} points")
             continue
         group_circles.append(points[group_index])
     return group_circles
@@ -109,7 +110,7 @@ def split_circles_adaptive(
         group_circles = split_circles(points, circle_nums, threshold_range, min_group_size, momentum)
         # 检测到的圆环数量
         detect_circle_nums = len(group_circles)
-        print(f"try time {i + 1}: {threshold_range = }, {detect_circle_nums = }")
+        logger.info(f"try time {i + 1}: {threshold_range = }, {detect_circle_nums = }")
         if detect_circle_nums == circle_nums:
             # 数量相等,就返回
             return group_circles

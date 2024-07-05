@@ -1,5 +1,6 @@
 import numpy as np
 from copy import deepcopy
+from loguru import logger
 
 
 def fit_circle_by_least_square0(points: list | np.ndarray) -> tuple[float, float, float, float, float, float, float, np.ndarray]:
@@ -168,7 +169,6 @@ def fit_circle_by_least_square_filter(
     fit_circle: list | np.ndarray = deepcopy(points)
 
     ignore_circle = None
-    # print(f">>> {len(fit_circle) = }")
     for i, sigma in enumerate(sigmas):
         if sigma <= 0:
             # sigma <= 0,代表不过滤
@@ -181,10 +181,9 @@ def fit_circle_by_least_square_filter(
         fit_circle: np.ndarray = fit_circle[np.bitwise_and(radii_err > err_avg - n_sigma, radii_err < err_avg + n_sigma)]
         points_num: int = fit_circle.shape[0]
         if points_num >= 3:
-            # print(f">>> {len(fit_circle) = }")
             center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err = fit_circle_by_least_square(fit_circle)
         else:
-            print(f"用于拟合的圆的数量为{points_num}，无法过滤，跳过过滤步骤")
+            logger.error(f"用于拟合的圆的数量为{points_num}，无法过滤，跳过过滤步骤")
             break
 
     return center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err, fit_circle, ignore_circle

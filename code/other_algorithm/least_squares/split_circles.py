@@ -124,3 +124,5 @@ def split_circles_adaptive(
         # 如果阈值小于等于0，就直接返回最后一次的检测结果
         if threshold_range <= 0:
             return group_circles
+
+    raise ValueError(f"找不到 {circle_nums = } 数量的圆环")

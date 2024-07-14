@@ -99,7 +99,7 @@ def revocery(query: dict, history: Sequence | None = None) -> tuple[str, Sequenc
 
 
 def combine_chatbot_and_query(
-    query: str,
+    query: dict,
     history: Sequence | None = None,
 ) -> Sequence:
     history = [] if history is None else list(history)

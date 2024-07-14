@@ -1,4 +1,3 @@
-# 导入必要的库
 import gradio as gr
 import numpy as np
 from typing import Generator, Sequence
@@ -6,8 +5,9 @@ import threading
 import time
 from PIL import Image
 from loguru import logger
-import hashlib
 from pathlib import Path
+
+from utils import hash_image
 
 
 logger.info(f"gradio version: {gr.__version__}")
@@ -18,12 +18,6 @@ save_path.mkdir(parents=True, exist_ok=True)
 class InterFace:
     global_session_id: int = 0
     lock = threading.Lock()
-
-
-def hash_image(image: Image.Image) -> str:
-    md5 = hashlib.md5()
-    md5.update(image.tobytes())
-    return md5.hexdigest()
 
 
 def chat_with_image(

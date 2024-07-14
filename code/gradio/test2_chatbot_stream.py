@@ -48,6 +48,7 @@ def chat_stream(
     time.sleep(1)
     logger.info(f"query: {query}")
     number = np.random.randint(1, 100, 20)
+    logger.info(f"history: {history + [[query, str(number)]]}")
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])

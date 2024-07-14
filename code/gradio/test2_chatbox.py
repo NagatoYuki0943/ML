@@ -48,6 +48,7 @@ def chat(
     response = str(np.random.randint(1, 100, 20))
     logger.info(f"response: {response}")
     history.append([query, response])
+    logger.info(f"history: {history}")
     return history
 
 

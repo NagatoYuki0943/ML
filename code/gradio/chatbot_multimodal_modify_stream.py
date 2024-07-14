@@ -51,6 +51,7 @@ def multimodal_chat(
     time.sleep(1)
     number: np.ndarray = np.random.randint(1, 100, 20)
     logger.info(f"{number = }")
+    logger.info(f"history: {history + [[query_text, str(number)]]}")
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])

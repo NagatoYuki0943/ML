@@ -49,6 +49,7 @@ def multimodal_chat(
     time.sleep(3)
     response = str(np.random.randint(1, 100, 20))
     logger.info(f"{response = }")
+    logger.info(f"history: {history + [[query_text, response]]}")
     return history + [[query_text, response]]
 
 

@@ -128,15 +128,6 @@ def main():
                         # scale https://www.gradio.app/guides/controlling-layout
                         submit = gr.Button("💬 Chat", variant="primary", scale=0)
 
-                gr.Examples(
-                    examples=[
-                        ["你是谁"],
-                        ["你可以帮我做什么"],
-                    ],
-                    inputs=[query],
-                    label="示例问题 / Example questions"
-                )
-
                 with gr.Row():
                     # 单选框
                     language1 = gr.Radio(choices=[("中文", "ZH"), ("英文", "EN")], value="ZH", label="Language", type="value", interactive=True)
@@ -179,6 +170,15 @@ def main():
                             step=1,
                             label='Top_k'
                         )
+
+                gr.Examples(
+                    examples=[
+                        ["你是谁"],
+                        ["你可以帮我做什么"],
+                    ],
+                    inputs=[query],
+                    label="示例问题 / Example questions"
+                )
 
             # 回车提交
             query.submit(

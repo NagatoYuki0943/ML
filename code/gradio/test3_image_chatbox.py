@@ -170,15 +170,6 @@ def main():
                         # scale https://www.gradio.app/guides/controlling-layout
                         submit = gr.Button("💬 Chat", variant="primary", scale=0)
 
-                gr.Examples(
-                    examples=[
-                        ["你是谁"],
-                        ["你可以帮我做什么"],
-                    ],
-                    inputs=[query],
-                    label="示例问题 / Example questions"
-                )
-
                 with gr.Row():
                     # 创建一个重新生成按钮，用于重新生成当前对话内容。
                     regen = gr.Button("🔄 Retry", variant="secondary")
@@ -217,6 +208,15 @@ def main():
                             step=1,
                             label='Top_k'
                         )
+
+                gr.Examples(
+                    examples=[
+                        ["你是谁"],
+                        ["你可以帮我做什么"],
+                    ],
+                    inputs=[query],
+                    label="示例问题 / Example questions"
+                )
 
             # 回车提交
             query.submit(

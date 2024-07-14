@@ -39,18 +39,17 @@ def chat_stream_with_image(
     history = [] if history is None else list(history)
 
     logger.info(f"{state_session_id = }")
-
-    query = query.strip()
-    if query == None or len(query) < 1:
-        yield history, image
-        return
-
     logger.info({
             "max_new_tokens":  max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
     })
+
+    if query is None or len(query.strip()) < 1:
+        yield history, image
+        return
+    query = query.strip()
 
     logger.info(f"{image = }")
     use_image: bool = False
@@ -173,7 +172,7 @@ def main():
                     regen = gr.Button("🔄 Retry", variant="secondary")
                     undo = gr.Button("↩️ Undo", variant="secondary")
                     # 创建一个清除按钮，用于清除聊天机器人组件的内容。
-                    clear = gr.ClearButton(components=[chatbot, image], value="🗑️ Clear", variant="stop")
+                    clear = gr.ClearButton(components=[chatbot, query, image], value="🗑️ Clear", variant="stop")
 
                 # 折叠
                 with gr.Accordion("Advanced Options", open=False):

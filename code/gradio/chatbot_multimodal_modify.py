@@ -42,7 +42,8 @@ def multimodal_chat(
         logger.info(f"{file = }")
         history.append([(file,), None])
     query_text = query["text"]
-    if query_text is None or len(query_text.strip()) == 0:
+    # if query_text is None or len(query_text.strip()) == 0:
+    if query_text is None:
         return history
     query_text = query_text.strip()
 

@@ -43,7 +43,7 @@ def multimodal_chat(
         history.append([(file,), None])
     query_text = query["text"]
     # if query_text is None or len(query_text.strip()) == 0:
-    if query_text is None:
+    if query_text is None or (len(query_text.strip()) == 0 and len(query["files"]) == 0):
         yield history
         return
     query_text = query_text.strip()
@@ -51,8 +51,9 @@ def multimodal_chat(
 
     time.sleep(1)
     number: np.ndarray = np.random.randint(1, 100, 20)
-    logger.info(f"{number = }")
+    logger.info(f"number: {number}")
     logger.info(f"history: {history + [[query_text, str(number)]]}")
+
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])

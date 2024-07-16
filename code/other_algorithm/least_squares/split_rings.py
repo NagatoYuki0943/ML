@@ -4,9 +4,9 @@ from loguru import logger
 from fit_circle_by_least_square import fit_circle_by_least_square
 
 
-def split_circles(
+def split_rings(
     points: np.ndarray,
-    circle_nums: int,
+    rings_nums: int,
     threshold_range: float = 0.5,
     min_group_size: int = 0,
     momentum: float = 0.9,
@@ -16,7 +16,7 @@ def split_circles(
 
     Args:
         points (np.ndarray): xy坐标 [[x1, y1], [x2, y2], ...]
-        circle_nums (int, optional): 圆环数量.
+        rings_nums (int, optional): 圆环数量.
         threshold_range (float, optional): 设置阈值，这里我们取相邻同心圆半径差的一半. Defaults to 0.5.
         min_group_size (int, optional): 分组时每个类别的最小数量，会过滤掉分组数小于这个值的坐标，如果不想过滤，将这个值调整为<=0即可. Defaults to 0.
         momentum (float, optional): 通过动量动态更新⚪的半径. Defaults to 0.9.
@@ -42,7 +42,7 @@ def split_circles(
     distances_range = distances.max() - distances.min()
 
     # 设置阈值，这里我们取相邻同心圆半径差的一半，例如(10-9)/2 = 0.5
-    threshold = distances_range / (circle_nums - 1) * threshold_range
+    threshold = distances_range / (rings_nums - 1) * threshold_range
 
     # 用于存储每个分组的半径
     group_radii = []
@@ -71,19 +71,19 @@ def split_circles(
             # 存储的是距离排序的id,对应没有排序前的id
             group_indexes.append([distances_sort_index[i]])
 
-    group_circles = []
+    group_rings = []
     # 输出分组结果
     for i, group_index in enumerate(group_indexes):
         if len(group_index) < min_group_size:
             logger.info(f"ignore {len(group_index)} points")
             continue
-        group_circles.append(points[group_index])
-    return group_circles
+        group_rings.append(points[group_index])
+    return group_rings
 
 
-def split_circles_adaptive(
+def split_rings_adaptive(
     points: np.ndarray,
-    circle_nums: int,
+    rings_nums: int,
     min_group_size: int = 0,
     momentum: float = 0.9,
     init_threshold_range: float = 0.5,
@@ -94,7 +94,7 @@ def split_circles_adaptive(
 
     Args:
         points (np.ndarray): xy坐标 [[x1, y1], [x2, y2], ...]
-        circle_nums (int, optional): 圆环数量.
+        rings_nums (int, optional): 圆环数量.
         min_group_size (int, optional): 分组时每个类别的最小数量，会过滤掉分组数小于这个值的坐标，如果不想过滤，将这个值调整为<=0即可. Defaults to 0.
         init_threshold_range (float, optional): 初始设置阈值，这里我们取相邻同心圆半径差的一半. Defaults to 0.5.
         range_change (float, optional): 每次变换阈值的步长. Defaults to 0.01
@@ -107,22 +107,22 @@ def split_circles_adaptive(
     threshold_range = init_threshold_range
     for i in range(times):
         # 检测圆环
-        group_circles = split_circles(points, circle_nums, threshold_range, min_group_size, momentum)
+        group_rings = split_rings(points, rings_nums, threshold_range, min_group_size, momentum)
         # 检测到的圆环数量
-        detect_circle_nums = len(group_circles)
-        logger.info(f"try time {i + 1}: {threshold_range = }, {detect_circle_nums = }")
-        if detect_circle_nums == circle_nums:
+        detect_rings_nums = len(group_rings)
+        logger.info(f"try time {i + 1}: {threshold_range = }, {detect_rings_nums = }")
+        if detect_rings_nums == rings_nums:
             # 数量相等,就返回
-            return group_circles
-        elif detect_circle_nums > circle_nums:
+            return group_rings
+        elif detect_rings_nums > rings_nums:
             # 检测圆环数量多，提高阈值
             threshold_range += range_change
-        elif detect_circle_nums < circle_nums:
+        elif detect_rings_nums < rings_nums:
             # 检测圆环数量少，降低阈值
             threshold_range -= range_change
 
         # 如果阈值小于等于0，就直接返回最后一次的检测结果
         if threshold_range <= 0:
-            return group_circles
+            return group_rings
 
-    raise ValueError(f"找不到 {circle_nums = } 数量的圆环")
+    raise ValueError(f"找不到 {rings_nums = } 数量的圆环")

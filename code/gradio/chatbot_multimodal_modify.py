@@ -194,6 +194,7 @@ def main():
                 gr.Examples(
                     examples=[
                         {'text': "你是谁", 'files': []},
+                        {'text': "这张图片展示的什么内容?", 'files': ['images/0001.jpg']},
                         {'text': "这2张图片展示的什么内容?", 'files': ['images/0001.jpg', 'images/0002.jpg']},
                     ],
                     inputs=[query],

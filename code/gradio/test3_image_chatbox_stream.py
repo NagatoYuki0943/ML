@@ -44,6 +44,7 @@ def chat_stream_with_image(
         yield history, image
         return
     query = query.strip()
+    logger.info(f"query: {query}")
 
     logger.info(f"{image = }")
     use_image: bool = False
@@ -76,7 +77,6 @@ def chat_stream_with_image(
         yield history + [[query, None]], image
 
     time.sleep(1)
-    logger.info(f"query: {query}")
     number: np.ndarray = np.random.randint(1, 100, 20)
     for i in range(len(number)):
         time.sleep(0.1)
@@ -87,6 +87,10 @@ def chat_stream_with_image(
             # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
             yield history + [[(image_path, "alt_text"), None], [query, str(number[:i+1])]], image
     logger.info(f"response: {number}")
+    if not use_image:
+        logger.info(f"history: {history + [[query, str(number[:i+1])]]}")
+    else:
+        logger.info(f"history: {history + [[(image_path, "alt_text"), None], [query, str(number[:i+1])]]}")
 
 
 def regenerate(
@@ -114,6 +118,7 @@ def regenerate(
             state_session_id = state_session_id,
         )
     else:
+        logger.warning(f"no history, can't regenerate")
         yield history, image
 
 

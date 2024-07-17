@@ -43,6 +43,7 @@ def chat_with_image(
     if query is None or len(query.strip()) < 1:
         return history, image
     query = query.strip()
+    logger.info(f"query: {query}")
 
     logger.info(f"{image = }")
     use_image: bool = False
@@ -69,14 +70,15 @@ def chat_with_image(
         image_path = save_path / f"{hash_image(image)}.png"
         image.save(image_path)
 
-    logger.info(f"query: {query}")
     time.sleep(3)
     response = str(np.random.randint(1, 100, 20))
-    logger.info(f"query: {response}")
+    logger.info(f"response: {response}")
     if not use_image:
+        logger.info(f"history: {history + [[query, response]]}")
         return history + [[query, response]], image
     else:
         # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
+        logger.info(f"history: {history + [[(image_path, "alt_text"), None], [query, response]]}")
         return history + [[(image_path, "alt_text"), None], [query, response]], image
 
 
@@ -105,6 +107,7 @@ def regenerate(
             state_session_id = state_session_id,
         )
     else:
+        logger.warning(f"no history, can't regenerate")
         return history, image
 
 

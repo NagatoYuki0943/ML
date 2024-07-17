@@ -37,44 +37,22 @@ def multimodal_chat(
             "top_k": top_k,
     })
 
-    logger.info(f"{query = }")
+    logger.info(f"query : {query }")
     for file in query["files"]:
         logger.info(f"{file = }")
         history.append([(file,), None])
     query_text = query["text"]
     # if query_text is None or len(query_text.strip()) == 0:
     if query_text is None or (len(query_text.strip()) == 0 and len(query["files"]) == 0):
+        logger.warning(f"query is None, return history")
         return history
     query_text = query_text.strip()
 
     time.sleep(3)
-    response = str(np.random.randint(1, 100, 20))
-    logger.info(f"{response = }")
+    response = str(object=np.random.randint(1, 100, 20))
+    logger.info(f"response: {response}")
     history.append([query_text, response])
     logger.info(f"history: {history}")
-    # from
-    [
-        ['你是谁', '我是你的小助手'],
-        [('./images/0001.jpg',), None],
-        ['', '这张图片中有一只猫'],
-        [('./images/0002.jpg',), None],
-        ['这张图片展示的什么内容?', '这张图片中也有一只猫'],
-        [('./images/0003.jpg',), None],
-        [('./images/0004.jpg',), None],
-        ['这2张图片展示的什么内容?', '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
-        [('./images/0005.jpg',), None],
-        [('./images/0006.jpg',), None],
-        ['', '这两张图片显示了雪山上的景色']
-    ]
-
-    # to
-    [
-        ['你是谁', '我是你的小助手'],
-        [('', './images/0001.jpg'), '这张图片中有一只猫'],
-        [('这张图片展示的什么内容?', './images/0002.jpg',), '这张图片中也有一只猫'],
-        [('这2张图片展示的什么内容?', ['./images/0003.jpg', './images/0004.jpg']), '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
-        [('', ['./images/0005.jpg','./images/0006.jpg']), '这两张图片显示了雪山上的景色'],
-    ]
 
     return history
 
@@ -108,6 +86,7 @@ def regenerate(
             state_session_id = state_session_id,
         )
     else:
+        logger.warning(f"no history, can't regenerate")
         return history
 
 

@@ -43,17 +43,17 @@ def chat_stream(
         yield history
         return
     query = query.strip()
+    logger.info(f"query: {query}")
 
     yield history + [[query, None]]
     time.sleep(1)
-    logger.info(f"query: {query}")
     number = np.random.randint(1, 100, 20)
-    logger.info(f"history: {history + [[query, str(number)]]}")
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])
         yield history + [[query, str(number[:i+1])]]
     logger.info(f"response: {number}")
+    logger.info(f"history: {history + [[query, str(number)]]}")
 
 
 def regenerate(
@@ -83,6 +83,7 @@ def regenerate(
             state_session_id = state_session_id,
         )
     else:
+        logger.warning(f"no history, can't regenerate")
         yield history
 
 

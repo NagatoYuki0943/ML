@@ -42,8 +42,8 @@ def chat(
     if query is None or len(query.strip()) < 1:
         return history
     query = query.strip()
-
     logger.info(f"query: {query}")
+
     time.sleep(3)
     response = str(np.random.randint(1, 100, 20))
     logger.info(f"response: {response}")
@@ -65,22 +65,22 @@ def regenerate(
     history = [] if history is None else list(history)
 
     # 重新生成时要把最后的query和response弹出,重用query
-    if regenerate:
-        if len(history) > 0:
-            query, _ = history.pop(-1)
-            return chat(
-                query = query,
-                history = history,
-                max_new_tokens = max_new_tokens,
-                temperature = temperature,
-                top_p = top_p,
-                top_k = top_k,
-                language1 = language1,
-                language2 = language2,
-                state_session_id = state_session_id,
-            )
-        else:
-            return history
+    if len(history) > 0:
+        query, _ = history.pop(-1)
+        return chat(
+            query = query,
+            history = history,
+            max_new_tokens = max_new_tokens,
+            temperature = temperature,
+            top_p = top_p,
+            top_k = top_k,
+            language1 = language1,
+            language2 = language2,
+            state_session_id = state_session_id,
+        )
+    else:
+        logger.warning(f"no history, can't regenerate")
+        return history
 
 
 def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:

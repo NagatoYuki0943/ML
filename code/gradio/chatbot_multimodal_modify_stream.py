@@ -37,13 +37,14 @@ def multimodal_chat(
             "top_k": top_k,
     })
 
-    logger.info(f"{query = }")
+    logger.info(f"query : {query }")
     for file in query["files"]:
         logger.info(f"{file = }")
         history.append([(file,), None])
     query_text = query["text"]
     # if query_text is None or len(query_text.strip()) == 0:
     if query_text is None or (len(query_text.strip()) == 0 and len(query["files"]) == 0):
+        logger.warning(f"query is None, return history")
         yield history
         return
     query_text = query_text.strip()
@@ -56,7 +57,7 @@ def multimodal_chat(
 
     for i in range(len(number)):
         time.sleep(0.1)
-        logger.info(number[i])
+        logger.info(f"number[{i}] = {number[i]}")
         yield history + [[query_text, str(number[:i+1])]]
 
 
@@ -89,6 +90,7 @@ def regenerate(
             state_session_id = state_session_id,
         )
     else:
+        logger.warning(f"no history, can't regenerate")
         yield history
 
 

@@ -38,15 +38,18 @@ def multimodal_chat(
     })
 
     logger.info(f"query : {query }")
-    for file in query["files"]:
-        logger.info(f"{file = }")
-        history.append([(file,), None])
     query_text = query["text"]
     # if query_text is None or len(query_text.strip()) == 0:
     if query_text is None or (len(query_text.strip()) == 0 and len(query["files"]) == 0):
         logger.warning(f"query is None, return history")
         return history
     query_text = query_text.strip()
+    logger.info(f"query_text: {query_text}")
+
+    # 将图片放入历史记录中
+    for file in query["files"]:
+        logger.info(f"{file = }")
+        history.append([(file,), None])
 
     time.sleep(3)
     response = str(object=np.random.randint(1, 100, 20))
@@ -108,12 +111,14 @@ def combine_chatbot_and_query(
     history: Sequence | None = None,
 ) -> Sequence:
     history = [] if history is None else list(history)
+    query_text = query["text"]
+    if query_text is None or (len(query_text.strip()) == 0 and len(query["files"]) == 0):
+        return history
+
+    # 将图片放入历史记录中
     for x in query["files"]:
         print(f"file: {x}")
         history.append([(x,), None])
-    query_text = query["text"]
-    if query_text is None or len(query_text) == 0:
-        return history
     return history + [[query_text, None]]
 
 

@@ -38,9 +38,6 @@ def multimodal_chat(
     })
 
     logger.info(f"query : {query }")
-    for file in query["files"]:
-        logger.info(f"{file = }")
-        history.append([(file,), None])
     query_text = query["text"]
     # if query_text is None or len(query_text.strip()) == 0:
     if query_text is None or (len(query_text.strip()) == 0 and len(query["files"]) == 0):
@@ -48,6 +45,13 @@ def multimodal_chat(
         yield history
         return
     query_text = query_text.strip()
+    logger.info(f"query_text: {query_text}")
+
+    # 将图片放入历史记录中
+    for file in query["files"]:
+        logger.info(f"{file = }")
+        history.append([(file,), None])
+
     yield history + [[query_text, None]]
 
     time.sleep(1)

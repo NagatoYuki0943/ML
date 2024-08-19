@@ -5,6 +5,7 @@ import streamlit as st
 import numpy as np
 import time
 from typing import Generator, Any
+from loguru import logger
 
 
 print("streamlit version: ", st.__version__)
@@ -40,49 +41,12 @@ print("streamlit version: ", st.__version__)
 
 
 # App title
-st.set_page_config(page_title="🦙💬 LLaMA 2 Chatbot")
+st.set_page_config(page_title="🦙💬 LLaMA Chatbot")
 
 # Store LLM generated responses
 if "messages" not in st.session_state.keys():
     print("streamlit init messages")
     st.session_state.messages = []
-
-
-# chat
-def chat(
-    prompts: list,
-    max_new_tokens: int = 1024,
-    top_p: float = 0.8,
-    top_k: int = 40,
-    temperature: float = 0.8,
-    regenerate: bool = False
-) -> Generator[Any, Any, Any]:
-    """聊天"""
-    # 重新生成时要把最后的query和response弹出,重用query
-    if regenerate:
-        # 有历史就重新生成,没有历史就返回空
-        if len(prompts) > 1:
-            prompts.pop(-1)
-            print("aaaaaaa")
-        else:
-            yield ""
-            return
-
-    print(
-        {
-            "max_new_tokens":  max_new_tokens,
-            "top_p": top_p,
-            "top_k": top_k,
-            "temperature": temperature}
-    )
-
-    number = np.random.randint(1, 100, 10)
-    for i in range(10):
-        time.sleep(0.1)
-        print(number[i], end=" ", flush=True)
-        yield str(number[i]) + " "
-    print("\n")
-
 
 def regenerate():
     """重新生成"""
@@ -102,52 +66,64 @@ def clear_chat_history():
     st.session_state.messages = []
 
 
-def main():
-    # Replicate Credentials
-    with st.sidebar:
-        st.title('🦙💬 LLaMA 2 Chatbot')
-        st.write('This chatbot is created using the open-source LLaMA 2 LLM model from Meta.')
+# Replicate Credentials
+with st.sidebar:
+    st.title('🦙💬 LLaMA Chatbot')
+    st.write('This chatbot is created using the open-source LLaMA LLM model from Meta.')
 
-        st.subheader('Models and parameters')
-        selected_model = st.sidebar.selectbox('Choose a LLaMA2 model', ['LLaMA2-7B', 'LLaMA2-13B', 'LLaMA2-70B'], key='selected_model')
+    st.subheader('Models and parameters')
+    selected_model = st.sidebar.selectbox('Choose a LLaMA3 model', ['LLaMA3.1-7B', 'LLaMA3.1-70B', 'LLaMA3.1-405B'], key='selected_model')
+    max_new_tokens = st.sidebar.slider(label='max_new_tokens', min_value=1, max_value=2048, value=1024, step=1)
+    temperature = st.sidebar.slider(label='temperature', min_value=0.01, max_value=1.5, value=0.8, step=0.01)
+    top_p = st.sidebar.slider(label='top_p', min_value=0.01, max_value=1.0, value=0.8, step=0.01)
+    top_k = st.sidebar.slider(label='top_k', min_value=1, max_value=100, value=40, step=1)
 
-        max_new_tokens = st.sidebar.slider(label='max_new_tokens', min_value=1, max_value=2048, value=1024, step=1)
-        top_p = st.sidebar.slider(label='top_p', min_value=0.01, max_value=1.0, value=0.8, step=0.01)
-        top_k = st.sidebar.slider(label='top_k', min_value=1, max_value=100, value=40, step=1)
-        temperature = st.sidebar.slider(label='temperature', min_value=0.01, max_value=1.5, value=0.8, step=0.01)
+    st.subheader('Chat functions')
+    st.sidebar.button('🔄 Retry', on_click=regenerate)
+    st.sidebar.button('↩️ Undo', on_click=undo)
+    st.sidebar.button('🗑️ Clear', on_click=clear_chat_history)
 
-        st.subheader('Chat functions')
-        st.sidebar.button('🔄 Retry', on_click=regenerate)
-        st.sidebar.button('↩️ Undo', on_click=undo)
-        st.sidebar.button('🗑️ Clear', on_click=clear_chat_history)
+# Display or clear chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
 
-    # Display or clear chat messages
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-    # User-provided prompt
-    if prompt := st.chat_input():
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.write(prompt)
-
-    # Generate a new response if last message is not from assistant
-    if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] != "assistant":
-        with st.chat_message("assistant"):
-            # with st.spinner("Thinking..."):
-                response = chat(st.session_state.messages, max_new_tokens, top_p, top_k, temperature)
-                placeholder = st.empty()
-                full_response = ''
-                for item in response:
-                    full_response += item
-                    placeholder.markdown(full_response)
-                placeholder.markdown(full_response)
-
-        message = {"role": "assistant", "content": full_response}
-        st.session_state.messages.append(message)
+# User-provided prompt
+if prompt := st.chat_input():
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.write(prompt)
 
 
-if __name__ == "__main__":
-    main()
+def chat() -> Generator[str, Any, None]:
+    prompts = st.session_state.messages
+    logger.info(f"{prompts = }")
 
+    logger.info(f"{selected_model = }")
+
+    logger.info({
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+    })
+
+    response = str(np.random.randint(1, 100, 20))
+    logger.info(f"response: {response}")
+
+    time.sleep(1)
+    for i in range(len(response)):
+        time.sleep(0.1)
+        logger.info(response[i])
+        yield response[:i+1]
+
+
+# Generate a new response if last message is not from assistant
+if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] != "assistant":
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            placeholder = st.empty()
+            for response in chat():
+                placeholder.markdown(response)
+                message = {"role": "assistant", "content": response}
+                st.session_state.messages.append(message)

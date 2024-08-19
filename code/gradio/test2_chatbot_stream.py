@@ -33,7 +33,7 @@ def chat_stream(
     logger.info(f"{language1 = }, {language2 = }")
     logger.info(f"{state_session_id = }")
     logger.info({
-            "max_new_tokens":  max_new_tokens,
+            "max_new_tokens": max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,

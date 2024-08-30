@@ -31,7 +31,7 @@ class BaseConfig:
 
 @dataclass
 class MainConfig(BaseConfig):
-    """主进程配置
+    """主线程配置
     """
     lock = Lock()   # 锁, 在读取或者修改配置文件时要加锁
     main_sleep_interval: int = 500  # 主循环 sleep_time ms
@@ -160,3 +160,13 @@ class MQTTConfig(BaseConfig):
     port: int = 1883
     timeout: int = 60
     topic: str = "test/topic"
+
+
+@dataclass
+class FTPConfig(BaseConfig):
+    """FTP配置
+    """
+    ip: str = ""
+    port: int = 0
+    username: str = ""
+    password: str = ""

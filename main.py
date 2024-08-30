@@ -18,6 +18,7 @@ from algorithm import (
 )
 from config import (
     MainConfig,
+    StereoCalibrationConfig,
     MatchTemplateConfig,
     CameraConfig,
     RingsLocationConfig,
@@ -52,6 +53,7 @@ def main() -> None:
     location_save_dir.mkdir(parents=True, exist_ok=True)
     left_camera_result_save_path = save_dir / "left_result.jsonl"
     right_camera_result_save_path = save_dir / "right_result.jsonl"
+    calibration_result_save_path = save_dir / "calibration_result.jsonl"
     #-------------------- 基础 --------------------#
 
     #-------------------- 初始化相机 --------------------#
@@ -85,6 +87,15 @@ def main() -> None:
 
     #-------------------- 畸变矫正 --------------------#
     logger.info("开始初始化畸变矫正")
+    stereo_calibration = StereoCalibration(
+        StereoCalibrationConfig.getattr('camera_matrix_left'),
+        StereoCalibrationConfig.getattr('camera_matrix_right'),
+        StereoCalibrationConfig.getattr('distortion_coefficients_left'),
+        StereoCalibrationConfig.getattr('distortion_coefficients_right'),
+        StereoCalibrationConfig.getattr('R'),
+        StereoCalibrationConfig.getattr('T'),
+        StereoCalibrationConfig.getattr('pixel_width_mm'),
+    )
     logger.success("初始化畸变矫正完成")
     #-------------------- 畸变矫正 --------------------#
 
@@ -150,29 +161,37 @@ def main() -> None:
     left_image_timestamp, left_image, left_image_metadata = left_camera_queue.get()
     left_image = cv2.cvtColor(left_image, cv2.COLOR_RGB2GRAY)
     logger.warning(f"{left_image.shape = }, ExposureTime = {left_image_metadata['ExposureTime']}, AnalogueGain = {left_image_metadata['AnalogueGain']}")
-    cv2.imwrite(save_dir / "left_camera_match_template_standard.jpg", left_image)
+    cv2.imwrite(save_dir / "left_image_standard.jpg", left_image)
 
     right_image_timestamp, right_image, right_image_metadata = right_thread_queue.get()
     right_image = cv2.cvtColor(right_image, cv2.COLOR_RGB2GRAY)
     logger.warning(f"{right_image.shape = }, ExposureTime = {right_image_metadata['ExposureTime']}, AnalogueGain = {right_image_metadata['AnalogueGain']}")
-    cv2.imwrite(save_dir / "right_camera_match_template_standard.jpg", right_image)
+    cv2.imwrite(save_dir / "right_image_standard.jpg", right_image)
     #-------------------- 取图 --------------------#
 
     #-------------------- 畸变矫正 --------------------#
     logger.info("rectify image start")
+    rectified_left_image, rectified_right_image, \
+    R1, R2, P1, P2, Q, roi1, roi2, \
+    undistorted_left_image, undistorted_right_image = stereo_calibration.rectify_images(
+        left_image,
+        right_image,
+    )
+    cv2.imwrite(save_dir / "left_image_undistorted.jpg", undistorted_left_image)
+    cv2.imwrite(save_dir / "right_image_undistorted.jpg", undistorted_right_image)
     logger.success("rectify image success")
     #-------------------- 畸变矫正 --------------------#
 
     #-------------------- left image --------------------#
     logger.info("left image find target start")
-    left_image_boxes = find_target(left_image)
+    left_image_boxes = find_target(undistorted_left_image)
     logger.info(f"left image find target result: \n{left_image_boxes}")
 
     left_image_up_box = left_image_boxes[0]
     left_image_down_box = left_image_boxes[1]
 
     # 绘制boxes
-    left_image_draw = left_image.copy()
+    left_image_draw = undistorted_left_image.copy()
     for i in range(len(left_image_boxes)):
         cv2.rectangle(
             img = left_image_draw,
@@ -183,21 +202,21 @@ def main() -> None:
         )
     plt.figure(figsize=(10, 10))
     plt.imshow(left_image_draw, cmap='gray')
-    plt.savefig(save_dir / "left_camera_match_template_standard_target.png")
+    plt.savefig(save_dir / "left_image_match_template.png")
     plt.close()
     logger.success("left image find target success")
     #-------------------- left image --------------------#
 
     #-------------------- right image --------------------#
     logger.info("right image find target start")
-    right_image_boxes = find_target(right_image)
+    right_image_boxes = find_target(undistorted_right_image)
     logger.info(f"right image find target result: \n{right_image_boxes}")
 
     right_image_up_box = right_image_boxes[0]
     right_image_down_box = right_image_boxes[1]
 
     # 绘制boxes
-    right_image_draw = right_image.copy()
+    right_image_draw = undistorted_right_image.copy()
     for i in range(len(right_image_boxes)):
         cv2.rectangle(
             img = right_image_draw,
@@ -208,7 +227,7 @@ def main() -> None:
         )
     plt.figure(figsize=(10, 10))
     plt.imshow(right_image_draw, cmap='gray')
-    plt.savefig(save_dir / "right_camera_match_template_standard_target.png")
+    plt.savefig(save_dir / "right_image_match_template.png")
     plt.close()
     logger.success("right image find target success")
     #-------------------- right image --------------------#
@@ -253,8 +272,7 @@ def main() -> None:
     CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
     CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
 
-    cv2.imwrite(save_dir / "left_image_adjust_exposure_finish_down_target.jpg", left_image_down_target)
-    cv2.imwrite(save_dir / "left_image_adjust_exposure_finish.jpg", left_image)
+    cv2.imwrite(save_dir / "left_image_adjust_exposure.jpg", left_image)
     logger.success("adjust exposure end")
 
     # 调整曝光后，清空队列，清除调整曝光前的图片
@@ -272,7 +290,7 @@ def main() -> None:
     left_image = None
     right_image = None
     while True:
-        logger.warning(f"{left_image.__class__.__name__}, {right_image.__class__.__name__}")
+        # logger.warning(f"{left_image.__class__.__name__}, {right_image.__class__.__name__}")
         #-------------------- left camera capture --------------------#
         left_camera_qsize = left_camera_queue.qsize()
         if left_camera_qsize > 0:
@@ -318,6 +336,12 @@ def main() -> None:
             save_detect_results: bool = RingsLocationConfig.getattr("save_detect_results")
 
             #-------------------- 畸变矫正 --------------------#
+            rectified_left_image, rectified_right_image, \
+            R1, R2, P1, P2, Q, roi1, roi2, \
+            undistorted_left_image, undistorted_right_image = stereo_calibration.rectify_images(
+                left_image,
+                right_image,
+            )
             #-------------------- 畸变矫正 --------------------#
 
             left_image_up_center = None
@@ -326,8 +350,8 @@ def main() -> None:
             right_image_down_center = None
             #-------------------- left image location --------------------#
             # 截取图像
-            left_image_up_target = left_image[left_image_up_box[1]:left_image_up_box[3], left_image_up_box[0]:left_image_up_box[2]]
-            left_image_down_target = left_image[left_image_down_box[1]:left_image_down_box[3], left_image_down_box[0]:left_image_down_box[2]]
+            left_image_up_target = undistorted_left_image[left_image_up_box[1]:left_image_up_box[3], left_image_up_box[0]:left_image_up_box[2]]
+            left_image_down_target = undistorted_left_image[left_image_down_box[1]:left_image_down_box[3], left_image_down_box[0]:left_image_down_box[2]]
             # cv2.imwrite(location_save_dir / f"left_image_{left_image_timestamp}--up_target.jpg", left_image_up_target)
             # cv2.imwrite(location_save_dir / f"left_image_{left_image_timestamp}--down_target.jpg", left_image_down_target)
 
@@ -351,8 +375,8 @@ def main() -> None:
                 left_image_up_result['metadata'] = left_image_metadata
                 logger.success(f"{left_image_up_result = }")
                 logger.success(f"left image up rings location success")
-                left_image_up_center: list[float] = [left_image_up_result['center_x_mean'], left_image_up_result['center_y_mean']]
-
+                left_image_up_center = np.array([left_image_up_result['center_x_mean'], left_image_up_result['center_y_mean']])
+                # 保存到文件
                 string = json.dumps(left_image_up_result, ensure_ascii=False)
                 with open(left_camera_result_save_path, mode='a', encoding='utf-8') as f:
                     f.write(string + "\n")
@@ -381,8 +405,8 @@ def main() -> None:
                 left_image_down_result['metadata'] = left_image_metadata
                 logger.success(f"{left_image_down_result = }")
                 logger.success(f"left image down rings location success")
-                left_image_down_center: list[float] = [left_image_down_result['center_x_mean'], left_image_down_result['center_y_mean']]
-
+                left_image_down_center = np.array([left_image_down_result['center_x_mean'], left_image_down_result['center_y_mean']])
+                # 保存到文件
                 string = json.dumps(left_image_down_result, ensure_ascii=False)
                 with open(left_camera_result_save_path, mode='a', encoding='utf-8') as f:
                     f.write(string + "\n")
@@ -394,8 +418,8 @@ def main() -> None:
 
             #-------------------- right image location --------------------#
             # 截取图像
-            right_image_up_target = right_image[right_image_up_box[1]:right_image_up_box[3], right_image_up_box[0]:right_image_up_box[2]]
-            right_image_down_target = right_image[right_image_down_box[1]:right_image_down_box[3], right_image_down_box[0]:right_image_down_box[2]]
+            right_image_up_target = undistorted_right_image[right_image_up_box[1]:right_image_up_box[3], right_image_up_box[0]:right_image_up_box[2]]
+            right_image_down_target = undistorted_right_image[right_image_down_box[1]:right_image_down_box[3], right_image_down_box[0]:right_image_down_box[2]]
             # cv2.imwrite(location_save_dir / f"right_image_{right_image_timestamp}--up_target.jpg", right_image_up_target)
             # cv2.imwrite(location_save_dir / f"right_image_{right_image_timestamp}--down_target.jpg", right_image_down_target)
 
@@ -419,8 +443,8 @@ def main() -> None:
                 right_image_up_result['metadata'] = right_image_metadata
                 logger.success(f"{right_image_up_result = }")
                 logger.success(f"right image up rings location success")
-                right_image_up_center: list[float] = [right_image_up_result['center_x_mean'], right_image_up_result['center_y_mean']]
-
+                right_image_up_center = np.array([right_image_up_result['center_x_mean'], right_image_up_result['center_y_mean']])
+                # 保存到文件
                 string = json.dumps(right_image_up_result, ensure_ascii=False)
                 with open(right_camera_result_save_path, mode='a', encoding='utf-8') as f:
                     f.write(string + "\n")
@@ -449,8 +473,8 @@ def main() -> None:
                 right_image_down_result['metadata'] = right_image_metadata
                 logger.success(f"{right_image_down_result = }")
                 logger.success(f"right image down rings location success")
-                right_image_down_center: list[float] = [right_image_down_result['center_x_mean'], right_image_down_result['center_y_mean']]
-
+                right_image_down_center = np.array([right_image_down_result['center_x_mean'], right_image_down_result['center_y_mean']])
+                # 保存到文件
                 string = json.dumps(right_image_down_result, ensure_ascii=False)
                 with open(right_camera_result_save_path, mode='a', encoding='utf-8') as f:
                     f.write(string + "\n")
@@ -460,11 +484,37 @@ def main() -> None:
                 logger.error(f"right image down circle location failed")
             #-------------------- right image location --------------------#
 
-            if all([left_image_up_center, left_image_down_center, right_image_up_center, right_image_down_center]):
+            if all(center is not None for center in \
+                [left_image_up_center, left_image_down_center, right_image_up_center, right_image_down_center]):
                 logger.critical(f"all cameras location success")
                 logger.info(f"{left_image_up_center = }, {left_image_down_center = }, {right_image_up_center = }, {right_image_down_center = }")
 
                 # 矫正坐标
+                left_points = np.array([left_image_up_center, left_image_down_center])
+                rectified_left_points = stereo_calibration.undistort_points(
+                    left_points,
+                    stereo_calibration.camera_matrix_left,
+                    R1, P1
+                )
+                right_points = np.array([right_image_up_center, right_image_down_center])
+                rectified_right_points = stereo_calibration.undistort_points(
+                    right_points,
+                    stereo_calibration.camera_matrix_right,
+                    R2, P2
+                )
+                logger.info(f"{rectified_left_points = }, {rectified_right_points = }")
+
+                # 保存到文件
+                string = json.dumps({
+                        "left_image_timestamp": left_image_timestamp,
+                        "right_image_timestamp": right_image_timestamp,
+                        "rectified_left_points": rectified_left_points,
+                        "rectified_right_points": rectified_right_points,
+                    },
+                    ensure_ascii=False
+                )
+                with open(calibration_result_save_path, mode='a', encoding='utf-8') as f:
+                    f.write(string + "\n")
 
                 # 检查距离
 

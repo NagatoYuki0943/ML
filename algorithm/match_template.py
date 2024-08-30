@@ -50,7 +50,7 @@ def sort_boxes(boxes: np.ndarray, sort_by: Literal["x", "y", "xy"] = "x") -> np.
     """
     assert sort_by in ["x", "y", "xy"], f"sort_by must be 'x', 'y' or 'xy' but got {sort_by}"
 
-    # lexsort: 给定多个排序键，lexsort返回一个整数索引数组，该数组按多个键描述排序顺序。序列中的最后一个键用于主排序，倒数第二个键用于次排序，以此类推。
+    # lexsort: 给定多个排序键, lexsort返回一个整数索引数组, 该数组按多个键描述排序顺序.序列中的最后一个键用于主排序, 倒数第二个键用于次排序, 以此类推.
     if sort_by == "x":
         combined_indices = np.lexsort((boxes[:, 3], boxes[:, 1], boxes[:, 2], boxes[:, 0]))
     elif sort_by == "y":
@@ -95,7 +95,7 @@ def sort_boxes_center(boxes: np.ndarray, sort_by: Literal["x", "y"] = "x") -> np
     x_center = (boxes[:, 0] + boxes[:, 2]) / 2
     y_center = (boxes[:, 1] + boxes[:, 3]) / 2
 
-    # lexsort: 给定多个排序键，lexsort返回一个整数索引数组，该数组按多个键描述排序顺序。序列中的最后一个键用于主排序，倒数第二个键用于次排序，以此类推。
+    # lexsort: 给定多个排序键, lexsort返回一个整数索引数组, 该数组按多个键描述排序顺序.序列中的最后一个键用于主排序, 倒数第二个键用于次排序, 以此类推.
     if sort_by == "x":
         combined_indices = np.lexsort((y_center, x_center))
     else:
@@ -155,8 +155,9 @@ def match_template_max(
     image: np.ndarray,
     template: np.ndarray,
     match_method: int = cv2.TM_CCOEFF_NORMED,
-) -> list[tuple[float, list[int]]]:
-    """模板匹配，获取匹配阈值最大/最小的位置
+    mask: np.ndarray | None = None,
+) -> tuple[float, list[int]]:
+    """模板匹配, 获取匹配阈值最大/最小的位置
 
     Args:
         image (np.ndarray): 图片
@@ -168,25 +169,34 @@ def match_template_max(
             TM_CCORR_NORMED:  归一化的相关性匹配方法, 越大代表越准确, 对亮度变化不敏感
             TM_CCOEFF:        相关系数匹配方法, 越大代表越准确
             TM_CCOEFF_NORMED: 归一化的相关系数匹配方法, 越大代表越准确, 对亮度变化不敏感
+        mask (np.ndarray | None, optional): 遮罩, 用于控制匹配区域, 大小必须与模板大小一致.
+            仅适用于 TM_SQDIFF 和 TM_CCORR_NORMED.
+            如果 mask 数据类型为 CV_8U, 则掩码将被解释为二进制掩码, 这意味着仅使用掩码为非零的元素, 并且这些元素保持不变, 与实际掩码值无关（权重等于 1）.
+            如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
 
     Returns:
-        list[tuple[float, list[int]]]: [(最高得分和框的坐标, [x1, y1, x2, y2])]
+        tuple[float, list[int]]: (最高得分, 框的坐标)
     """
+    if mask is not None:
+        assert match_method in (cv2.TM_SQDIFF, cv2.TM_CCORR_NORMED), \
+        f"when use mask, match_method must be cv2.TM_SQDIFF or cv2.TM_CCORR_NORMED, got: {match_method}"
+
     template_h, template_w = template.shape[:2]
 
     match_image = cv2.matchTemplate(
-        image=image,        # 图片
-        templ=template,     # 模板
-        method=match_method,# 匹配方法
+        image = image,          # 图片
+        templ = template,       # 模板
+        method = match_method,  # 匹配方法
+        mask = mask,            # 遮罩
     )
 
     # min_loc: [x, y]
     # max_loc: [x, y]
     min_value, max_value, min_loc, max_loc = cv2.minMaxLoc(src=match_image)
 
-    # 在函数完成比较后，可以使用minMaxLoc函数将最佳匹配作为全局最小值（当使用TM_SQDIFF时）或最大值（当采用TM_CCORR或TM_CCOEFF时）。
-    # 在彩色图像的情况下，在所有通道上进行分子中的模板求和和和分母中的每个求和，并且对每个通道使用单独的平均值。
-    # 也就是说，该函数可以采用颜色模板和彩色图像。结果仍然是单通道图像，更易于分析。
+    # 在函数完成比较后, 可以使用minMaxLoc函数将最佳匹配作为全局最小值（当使用TM_SQDIFF时）或最大值（当采用TM_CCORR或TM_CCOEFF时）.
+    # 在彩色图像的情况下, 在所有通道上进行分子中的模板求和和和分母中的每个求和, 并且对每个通道使用单独的平均值.
+    # 也就是说, 该函数可以采用颜色模板和彩色图像.结果仍然是单通道图像, 更易于分析.
     if match_method == cv2.TM_SQDIFF or match_method == cv2.TM_SQDIFF_NORMED:
         score = min_value
         real_loc = min_loc
@@ -195,17 +205,18 @@ def match_template_max(
         real_loc = max_loc
 
     box = [*real_loc, real_loc[0] + template_w, real_loc[1] + template_h]
-    return [(score, box)]
+    return (score, box)
 
 
 def match_template_filter_by_threshold(
     image: np.ndarray,
     template: np.ndarray,
     match_method: int = cv2.TM_CCOEFF_NORMED,
-    match_threshold: float = 0.5,
+    match_threshold: float = 0.8,
     iou_threshold: float = 0.5,
+    mask: np.ndarray | None = None,
 ) -> list[tuple[float, list[int]]]:
-    """模板匹配根据匹配阈值过滤，配合 iou 过滤
+    """模板匹配根据匹配阈值过滤, 配合 iou 过滤
 
     Args:
         image (np.ndarray): 图片
@@ -217,24 +228,32 @@ def match_template_filter_by_threshold(
             TM_CCORR_NORMED:  归一化的相关性匹配方法, 越大代表越准确, 对亮度变化不敏感
             TM_CCOEFF:        相关系数匹配方法, 越大代表越准确
             TM_CCOEFF_NORMED: 归一化的相关系数匹配方法, 越大代表越准确, 对亮度变化不敏感
-        match_threshold (float, optional): 匹配阈值. Defaults to 0.5.
+        match_threshold (float, optional): 匹配阈值. Defaults to 0.8.
         iou_threshold (float, optional): iou threshold. Defaults to 0.5.
+        mask (np.ndarray | None, optional): 遮罩, 用于控制匹配区域, 大小必须与模板大小一致.
+            仅适用于 TM_SQDIFF 和 TM_CCORR_NORMED.
+            如果 mask 数据类型为 CV_8U, 则掩码将被解释为二进制掩码, 这意味着仅使用掩码为非零的元素, 并且这些元素保持不变, 与实际掩码值无关（权重等于 1）.
+            如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
 
     Returns:
-        list[tuple[float, list[int]]]:
+        list[tuple[float, list[int]]]: [(得分, 框的坐标), ...]
     """
+    if mask is not None:
+        assert match_method in (cv2.TM_SQDIFF, cv2.TM_CCORR_NORMED), \
+        f"when use mask, match_method must be cv2.TM_SQDIFF or cv2.TM_CCORR_NORMED, got: {match_method}"
 
     template_h, template_w = template.shape[:2]
 
     match_image = cv2.matchTemplate(
-        image=image,        # 图片
-        templ=template,     # 模板
-        method=match_method,# 匹配方法
+        image = image,          # 图片
+        templ = template,       # 模板
+        method = match_method,  # 匹配方法
+        mask = mask,            # 遮罩
     )
 
-    # 在函数完成比较后，可以使用minMaxLoc函数将最佳匹配作为全局最小值（当使用TM_SQDIFF时）或最大值（当采用TM_CCORR或TM_CCOEFF时）。
-    # 在彩色图像的情况下，在所有通道上进行分子中的模板求和和和分母中的每个求和，并且对每个通道使用单独的平均值。
-    # 也就是说，该函数可以采用颜色模板和彩色图像。结果仍然是单通道图像，更易于分析。
+    # 在函数完成比较后, 可以使用minMaxLoc函数将最佳匹配作为全局最小值（当使用TM_SQDIFF时）或最大值（当采用TM_CCORR或TM_CCOEFF时）.
+    # 在彩色图像的情况下, 在所有通道上进行分子中的模板求和和和分母中的每个求和, 并且对每个通道使用单独的平均值.
+    # 也就是说, 该函数可以采用颜色模板和彩色图像.结果仍然是单通道图像, 更易于分析.
     if match_method == cv2.TM_SQDIFF or match_method == cv2.TM_SQDIFF_NORMED:
         keep_y, keep_x = np.where(match_image < match_threshold)
         scores = match_image[keep_y, keep_x]
@@ -263,40 +282,6 @@ def match_template_filter_by_threshold(
     return match_result
 
 
-def multi_target_match_template(
-    image: np.ndarray,
-    template: np.ndarray,
-    match_method: int = cv2.TM_CCOEFF_NORMED,
-    target_number: int = 1,
-) -> tuple[float, list[int]]:
-    """模板匹配多个目标, 匹配方法为将每次匹配到的目标屏蔽掉, 进行多次匹配
-
-    Args:
-        image (np.ndarray): 图片
-        template (np.ndarray): 模板图片
-        match_method (int, optional): 匹配算法. Defaults to cv2.TM_SQDIFF_NORMED.
-            TM_SQDIFF:        方差匹配方法, 越小代表越准确
-            TM_SQDIFF_NORMED: 归一化的方差匹配方法, 越小代表越准确
-            TM_CCORR:         相关性匹配方法, 越大代表越准确
-            TM_CCORR_NORMED:  归一化的相关性匹配方法, 越大代表越准确, 对亮度变化不敏感
-            TM_CCOEFF:        相关系数匹配方法, 越大代表越准确
-            TM_CCOEFF_NORMED: 归一化的相关系数匹配方法, 越大代表越准确, 对亮度变化不敏感
-        target_number (int, optional): 匹配目标数量. Defaults to 1.
-    Returns:
-        tuple[float, list[list[int]]: 最高得分和框的坐标, [x1, y1, x2, y2]
-    """
-    image_ = image.copy()
-    results = []
-    for i in range(target_number):
-        match_result = match_template_max(image_, template, match_method)
-        score, box = match_result[0]
-        results.append([score, box])
-        if i != target_number - 1:
-            # 将找到的区域设置为随机像素
-            image_[box[1]:box[3], box[0]:box[2]] = np.random.randint(0, 255, (box[3] - box[1], box[2] - box[0]))
-    return results
-
-
 def multi_scale_match_template(
     image: np.ndarray,
     template: np.ndarray,
@@ -306,9 +291,10 @@ def multi_scale_match_template(
     use_threshold_match: bool = True,
     threshold_match_threshold: float = 0.8,
     threshold_iou_threshold: float = 0.5,
+    mask: np.ndarray | None = None,
 ) -> list:
     """多尺度模板匹配
-    先根据 init_scale 将模板调整为相对于图片的大小，然后再循环 scales 调整 template 的大小进行匹配
+    先根据 init_scale 将模板调整为相对于图片的大小, 然后再循环 scales 调整 template 的大小进行匹配
 
     Args:
         image (np.ndarray): 图片
@@ -325,6 +311,10 @@ def multi_scale_match_template(
         use_threshold_match (bool, optional): 是否使用阈值匹配. Defaults to True.
         threshold_match_threshold (float, optional): 匹配阈值. Defaults to 0.8.
         threshold_iou_threshold (float, optional): iou threshold. Defaults to 0.5.
+        mask (np.ndarray | None, optional): 遮罩, 用于控制匹配区域, 大小必须与模板大小一致.
+            仅适用于 TM_SQDIFF 和 TM_CCORR_NORMED.
+            如果 mask 数据类型为 CV_8U, 则掩码将被解释为二进制掩码, 这意味着仅使用掩码为非零的元素, 并且这些元素保持不变, 与实际掩码值无关（权重等于 1）.
+            如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
 
     Returns:
         list: 每个 scale 匹配的模板结果, (scale, score, box)
@@ -349,14 +339,20 @@ def multi_scale_match_template(
         resized_w = int(_template_w * scale)
         # 使用最终尺寸一次 resize 模板
         template_resized = cv2.resize(template, (resized_w, resized_h))
+        mask_resized = cv2.resize(mask, (resized_w, resized_h)) if mask is not None else None
         logger.info(f"{scale = }, resize template size h = {resized_h}, w = {resized_w}")
         # 模糊模板
         # template_resized = cv2.GaussianBlur(template_resized, (3, 3), 0)
 
         if not use_threshold_match:
             # 选择最高得分
-            match_result = match_template_max(image, template_resized, match_method)
-            score, box = match_result[0] # 最高得分
+            match_result = match_template_max(
+                image,
+                template_resized,
+                match_method,
+                mask_resized,
+            )
+            score, box = match_result # 最高得分
             match_results.append((scale, score, box))
         else:
             # 通过阈值匹配
@@ -366,9 +362,10 @@ def multi_scale_match_template(
                 match_method,
                 threshold_match_threshold,
                 threshold_iou_threshold,
+                mask,
             )
             # scale: int
-            # match_result: [[score, box]...]  -> [[scale, score, box]...]
+            # match_result: [[score, box], ...]  -> [[scale, score, box], ...]
             _match_result = list(zip([scale] * len(match_result), *list(zip(*match_result))))
             match_results.extend(_match_result)
 
@@ -383,56 +380,6 @@ def multi_scale_match_template(
     return match_results
 
 
-def multi_target_multi_scale_match_template_old(
-    image: np.ndarray,
-    template: np.ndarray,
-    match_method: int = cv2.TM_CCOEFF_NORMED,
-    init_scale: float = 0.125,
-    scales: tuple[float] = (1.0, 4.0, 0.1),
-    target_number: int = 1,
-) -> list:
-    """多目标多尺度匹配,将每次匹配到的位置屏蔽掉，然后重新匹配
-    先根据 init_scale 将模板调整为相对于图片的大小，然后再循环 scales 调整 template 的大小进行匹配
-
-    Args:
-        image (np.ndarray): 图片
-        template (np.ndarray): 模板图片
-        match_method (int, optional): 匹配方法. Defaults to cv2.TM_CCOEFF_NORMED.
-            TM_SQDIFF:        方差匹配方法, 越小代表越准确
-            TM_SQDIFF_NORMED: 归一化的方差匹配方法, 越小代表越准确
-            TM_CCORR:         相关性匹配方法, 越大代表越准确
-            TM_CCORR_NORMED:  归一化的相关性匹配方法, 越大代表越准确, 对亮度变化不敏感
-            TM_CCOEFF:        相关系数匹配方法, 越大代表越准确
-            TM_CCOEFF_NORMED: 归一化的相关系数匹配方法, 越大代表越准确, 对亮度变化不敏感
-        init_scale (float, optional): 将模板的最小边长调整为图片最小边长的比例. Defaults to 0.125.
-        scales (tuple[float], optional): 缩放的范围, (start, end, step), include end. Defaults to (1.0, 4.0, 0.1).
-        target_number (int, optional): 匹配目标数量. Defaults to 1.
-
-    Returns:
-        list: 多目标匹配结果 boxes
-    """
-    image_ = image.copy()
-    boxes = []
-    for i in range(target_number):
-        logger.info(f"match number {i + 1} target")
-        result = multi_scale_match_template(
-            image_,
-            template,
-            match_method,
-            init_scale,
-            scales
-        )
-        best_result = result[0] # 选择最好的匹配结果
-        logger.info(f"match number {i + 1} target best result: {best_result}")
-        box = best_result[2]
-        boxes.append(box)
-        if i != target_number - 1:
-            # 将找到的区域设置为随机像素
-            image_[box[1]:box[3], box[0]:box[2]] = np.random.randint(0, 255, (box[3] - box[1], box[2] - box[0]))
-
-    return boxes
-
-
 def multi_target_multi_scale_match_template(
     image: np.ndarray,
     template: np.ndarray,
@@ -444,9 +391,10 @@ def multi_target_multi_scale_match_template(
     use_threshold_match: bool = True,
     threshold_match_threshold: float = 0.8,
     threshold_iou_threshold: float = 0.5,
+    mask: np.ndarray | None = None,
 ) -> np.ndarray:
     """多目标多尺度匹配
-    先根据 init_scale 将模板调整为相对于图片的大小，然后再循环 scales 调整 template 的大小进行匹配
+    先根据 init_scale 将模板调整为相对于图片的大小, 然后再循环 scales 调整 template 的大小进行匹配
 
     Args:
         image (np.ndarray): 图片
@@ -465,6 +413,10 @@ def multi_target_multi_scale_match_template(
         use_threshold_match (bool, optional): 是否使用阈值匹配. Defaults to True.
         threshold_match_threshold (float, optional): 匹配阈值. Defaults to 0.8.
         threshold_iou_threshold (float, optional): iou threshold. Defaults to 0.5.
+        mask (np.ndarray | None, optional): 遮罩, 用于控制匹配区域, 大小必须与模板大小一致.
+            仅适用于 TM_SQDIFF 和 TM_CCORR_NORMED.
+            如果 mask 数据类型为 CV_8U, 则掩码将被解释为二进制掩码, 这意味着仅使用掩码为非零的元素, 并且这些元素保持不变, 与实际掩码值无关（权重等于 1）.
+            如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
 
     Returns:
         np.ndarray: 多目标匹配结果 boxes, [[x_min, y_min, x_max, y_max],...]
@@ -479,6 +431,7 @@ def multi_target_multi_scale_match_template(
         use_threshold_match,
         threshold_match_threshold,
         threshold_iou_threshold,
+        mask,
     )
     # logger.info(f"multi_scale_match_template results: {results}")
     _scales = np.array([result[0] for result in results])

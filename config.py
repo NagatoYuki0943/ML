@@ -1,6 +1,7 @@
 from threading import Lock
 from typing import Literal
 from pathlib import Path
+import numpy as np
 import cv2
 from dataclasses import dataclass, field
 from typing import Any
@@ -35,6 +36,7 @@ class MainConfig(BaseConfig):
     lock = Lock()   # 锁, 在读取或者修改配置文件时要加锁
     main_sleep_interval: int = 500  # 主循环 sleep_time ms
     save_dir: Path = Path("results")
+    log_level: Literal['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
 
 
 @dataclass
@@ -50,6 +52,36 @@ class CameraConfig(BaseConfig):
     queue_maxsize: int = 5                                  # 相机拍照队列最大长度
     camera_left_index: int = 1                              # 左侧相机 index
     camera_right_index: int = 0                             # 右侧相机 index
+
+
+@dataclass
+class StereoCalibrationConfig(BaseConfig):
+    """畸变矫正配置
+    """
+    lock = Lock()
+    camera_matrix_left = np.array([
+        [7.44937603e+03, 0.00000000e+00, 1.79056889e+03],
+        [0.00000000e+00, 7.45022891e+03, 1.26665786e+03],
+        [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
+    ])
+    camera_matrix_right = np.array([
+        [7.46471035e+03, 0.00000000e+00, 1.81985040e+03],
+        [0.00000000e+00, 7.46415680e+03, 1.38081032e+03],
+        [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
+    ])
+    distortion_coefficients_left = np.array([[-4.44924086e-01, 6.27814725e-01, -1.80510014e-03, -8.97545764e-04, -1.84473439e+01]])
+    distortion_coefficients_right = np.array([[-4.07660445e-01, -2.23391154e+00, -1.09115383e-03, -3.04516347e-03, 7.45504877e+01]])
+    R = np.array([
+        [0.97743098, 0.00689964, 0.21114231],
+        [-0.00564446, 0.99996264, -0.00654684],
+        [-0.2111796, 0.0052073, 0.97743341]
+    ])
+    T = np.array([[-476.53571438], [4.78988367], [49.50495583]])
+    # 给定的传感器尺寸和图像分辨率
+    sensor_width_mm = 6.413  # 传感器宽度，以毫米为单位
+    image_width_pixels = 3840  # 图像宽度，以像素为单位
+    # 计算每个像素的宽度（以毫米为单位）
+    pixel_width_mm = sensor_width_mm / image_width_pixels
 
 
 @dataclass

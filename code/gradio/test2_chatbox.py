@@ -244,7 +244,6 @@ def main():
 
         gr.Markdown("""提醒：<br>
         1. 内容由 AI 大模型生成，请仔细甄别。<br>
-        <a href="https://beian.miit.gov.cn/" target="_blank" style="text-decoration: none; color: black; display: block; margin: 0 auto; width: fit-content;">湘ICP备2024080322号</a>
         """)
 
         # 初始化session_id

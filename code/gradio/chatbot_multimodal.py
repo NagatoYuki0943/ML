@@ -69,5 +69,9 @@ with gr.Blocks() as demo:
     chatbot.like(print_like_dislike, None, None)
 
 demo.queue()
-if __name__ == "__main__":
-    demo.launch()
+demo.launch(
+    server_name = "127.0.0.1",
+    server_port = 7860,
+    share = True,
+    max_threads = 100,
+)

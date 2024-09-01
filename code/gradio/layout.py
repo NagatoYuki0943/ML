@@ -68,4 +68,9 @@ with gr.Blocks(css="style.css") as demo:
 
                 txt3 = gr.Textbox(lines=4, label="txt3", placeholder="txt3")
 
-demo.launch()
+demo.launch(
+    server_name = "127.0.0.1",
+    server_port = 7860,
+    share = True,
+    max_threads = 100,
+)

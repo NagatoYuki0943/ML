@@ -75,4 +75,9 @@ with block as demo:
             outputs=[output_label]
         )
 
-demo.launch()
+demo.launch(
+    server_name = "127.0.0.1",
+    server_port = 7860,
+    share = True,
+    max_threads = 100,
+)

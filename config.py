@@ -35,8 +35,14 @@ class MainConfig(BaseConfig):
     """
     lock = Lock()   # 锁, 在读取或者修改配置文件时要加锁
     main_sleep_interval: int = 500  # 主循环 sleep_time ms
-    save_dir: Path = Path("results")
     log_level: Literal['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
+    save_dir: Path = Path("results")
+    save_dir.mkdir(parents=True, exist_ok=True)
+    location_save_dir = save_dir / "rings_location"
+    location_save_dir.mkdir(parents=True, exist_ok=True)
+    left_camera_result_save_path = save_dir / "left_result.jsonl"
+    right_camera_result_save_path = save_dir / "right_result.jsonl"
+    calibration_result_save_path = save_dir / "calibration_result.jsonl"
 
 
 @dataclass
@@ -98,6 +104,9 @@ class MatchTemplateConfig(BaseConfig):
     use_threshold_match: bool = True
     threshold_match_threshold: float = 0.6
     threshold_iou_threshold: float = 0.5
+    boxes: list[list[int]]      # [[x1, y1, x2, y2], ...]
+    left_boxes: list[list[int]] # [[x1, y1, x2, y2], ...]
+    right_boxes: list[list[int]]# [[x1, y1, x2, y2], ...]
 
 
 @dataclass

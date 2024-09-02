@@ -48,12 +48,10 @@ def main() -> None:
     main_queue = Queue()
 
     save_dir: Path = MainConfig.getattr("save_dir")
-    save_dir.mkdir(parents=True, exist_ok=True)
-    location_save_dir = save_dir / "rings_location"
-    location_save_dir.mkdir(parents=True, exist_ok=True)
-    left_camera_result_save_path = save_dir / "left_result.jsonl"
-    right_camera_result_save_path = save_dir / "right_result.jsonl"
-    calibration_result_save_path = save_dir / "calibration_result.jsonl"
+    location_save_dir = MainConfig.getattr("location_save_dir")
+    left_camera_result_save_path = MainConfig.getattr("left_camera_result_save_path")
+    right_camera_result_save_path = MainConfig.getattr("right_camera_result_save_path")
+    calibration_result_save_path = MainConfig.getattr("calibration_result_save_path")
     #-------------------- 基础 --------------------#
 
     #-------------------- 初始化相机 --------------------#
@@ -79,7 +77,7 @@ def main() -> None:
         left_camera_thread = camera1_thread
         right_camera_thread = camera0_thread
     left_camera_queue = left_camera_thread.queue
-    right_thread_queue = right_camera_thread.queue
+    right_camera_queue = right_camera_thread.queue
 
     time.sleep(1)
     logger.success("初始化相机完成")
@@ -163,7 +161,7 @@ def main() -> None:
     logger.warning(f"{left_image.shape = }, ExposureTime = {left_image_metadata['ExposureTime']}, AnalogueGain = {left_image_metadata['AnalogueGain']}")
     cv2.imwrite(save_dir / "left_image_standard.jpg", left_image)
 
-    right_image_timestamp, right_image, right_image_metadata = right_thread_queue.get()
+    right_image_timestamp, right_image, right_image_metadata = right_camera_queue.get()
     right_image = cv2.cvtColor(right_image, cv2.COLOR_RGB2GRAY)
     logger.warning(f"{right_image.shape = }, ExposureTime = {right_image_metadata['ExposureTime']}, AnalogueGain = {right_image_metadata['AnalogueGain']}")
     cv2.imwrite(save_dir / "right_image_standard.jpg", right_image)
@@ -184,19 +182,17 @@ def main() -> None:
 
     #-------------------- left image --------------------#
     logger.info("left image find target start")
-    left_image_boxes = find_target(undistorted_left_image)
-    logger.info(f"left image find target result: \n{left_image_boxes}")
-
-    left_image_up_box = left_image_boxes[0]
-    left_image_down_box = left_image_boxes[1]
+    left_boxes = find_target(undistorted_left_image)
+    MatchTemplateConfig.left_boxes = left_boxes
+    logger.info(f"left image find target result: \n{left_boxes}")
 
     # 绘制boxes
     left_image_draw = undistorted_left_image.copy()
-    for i in range(len(left_image_boxes)):
+    for i in range(len(left_boxes)):
         cv2.rectangle(
             img = left_image_draw,
-            pt1 = (left_image_boxes[i][0], left_image_boxes[i][1]),
-            pt2 = (left_image_boxes[i][2], left_image_boxes[i][3]),
+            pt1 = (left_boxes[i][0], left_boxes[i][1]),
+            pt2 = (left_boxes[i][2], left_boxes[i][3]),
             color = (255, 0, 0),
             thickness = 3
         )
@@ -209,19 +205,17 @@ def main() -> None:
 
     #-------------------- right image --------------------#
     logger.info("right image find target start")
-    right_image_boxes = find_target(undistorted_right_image)
-    logger.info(f"right image find target result: \n{right_image_boxes}")
-
-    right_image_up_box = right_image_boxes[0]
-    right_image_down_box = right_image_boxes[1]
+    right_boxes = find_target(undistorted_right_image)
+    MatchTemplateConfig.right_boxes = right_boxes
+    logger.info(f"right image find target result: \n{right_boxes}")
 
     # 绘制boxes
     right_image_draw = undistorted_right_image.copy()
-    for i in range(len(right_image_boxes)):
+    for i in range(len(right_boxes)):
         cv2.rectangle(
             img = right_image_draw,
-            pt1 = (right_image_boxes[i][0], right_image_boxes[i][1]),
-            pt2 = (right_image_boxes[i][2], right_image_boxes[i][3]),
+            pt1 = (right_boxes[i][0], right_boxes[i][1]),
+            pt2 = (right_boxes[i][2], right_boxes[i][3]),
             color = (255, 0, 0),
             thickness = 3
         )
@@ -248,11 +242,11 @@ def main() -> None:
     while not left_camera_queue.empty():
         left_camera_queue.get()
 
+    left_boxes = MatchTemplateConfig.left_boxes
     while True:
         _, left_image, left_image_metadata = left_camera_queue.get()
         left_image = cv2.cvtColor(left_image, cv2.COLOR_RGB2GRAY)
-        # left_image_up_target = image[up_box[1]//2:up_box[3]//2, up_box[0]//2:up_box[2]//2]
-        left_image_down_target = left_image[left_image_down_box[1]//2:left_image_down_box[3]//2, left_image_down_box[0]//2:left_image_down_box[2]//2]
+        left_image_down_target = left_image[left_boxes[0][1]//2:left_boxes[0][3]//2, left_boxes[0][0]//2:left_boxes[0][2]//2]
         new_exposure_time, is_ok = adjust_exposure_by_mean(
             left_image_down_target,
             left_image_metadata['ExposureTime'],
@@ -279,8 +273,8 @@ def main() -> None:
     time.sleep(1)
     while not left_camera_queue.empty():
         left_camera_queue.get()
-    while not right_thread_queue.empty():
-        right_thread_queue.get()
+    while not right_camera_queue.empty():
+        right_camera_queue.get()
     #------------------------------ 调整曝光 ------------------------------#
 
     # 主循环
@@ -306,16 +300,16 @@ def main() -> None:
         #-------------------- left camera capture --------------------#
 
         #-------------------- right camera capture --------------------#
-        right_camera_qsize = right_thread_queue.qsize()
+        right_camera_qsize = right_camera_queue.qsize()
         if right_camera_qsize > 0:
             # 忽略多余的图片
             if right_camera_qsize > 1:
                 logger.warning(f"right camera got {right_camera_qsize} frames, ignore {right_camera_qsize - 1} frames")
                 for _ in range(right_camera_qsize - 1):
-                    right_thread_queue.get()
+                    right_camera_queue.get()
 
             # 获取照片
-            right_image_timestamp, right_image, right_image_metadata = right_thread_queue.get()
+            right_image_timestamp, right_image, right_image_metadata = right_camera_queue.get()
             logger.info(f"right camera get image: {right_image_timestamp}, shape = {right_image.shape}, ExposureTime = {right_image_metadata['ExposureTime']}, AnalogueGain = {right_image_metadata['AnalogueGain']}")
         #-------------------- right camera capture --------------------#
 
@@ -350,8 +344,9 @@ def main() -> None:
             right_image_down_center = None
             #-------------------- left image location --------------------#
             # 截取图像
-            left_image_up_target = undistorted_left_image[left_image_up_box[1]:left_image_up_box[3], left_image_up_box[0]:left_image_up_box[2]]
-            left_image_down_target = undistorted_left_image[left_image_down_box[1]:left_image_down_box[3], left_image_down_box[0]:left_image_down_box[2]]
+            left_boxes = MatchTemplateConfig.left_boxes
+            left_image_up_target = undistorted_left_image[left_boxes[0][1]:left_boxes[0][3], left_boxes[0][0]:left_boxes[0][2]]
+            left_image_down_target = undistorted_left_image[left_boxes[1][1]:left_boxes[1][3], left_boxes[1][0]:left_boxes[1][2]]
             # cv2.imwrite(location_save_dir / f"left_image_{left_image_timestamp}--up_target.jpg", left_image_up_target)
             # cv2.imwrite(location_save_dir / f"left_image_{left_image_timestamp}--down_target.jpg", left_image_down_target)
 
@@ -418,8 +413,9 @@ def main() -> None:
 
             #-------------------- right image location --------------------#
             # 截取图像
-            right_image_up_target = undistorted_right_image[right_image_up_box[1]:right_image_up_box[3], right_image_up_box[0]:right_image_up_box[2]]
-            right_image_down_target = undistorted_right_image[right_image_down_box[1]:right_image_down_box[3], right_image_down_box[0]:right_image_down_box[2]]
+            right_boxes = MatchTemplateConfig.right_boxes
+            right_image_up_target = undistorted_right_image[right_boxes[0][1]:right_boxes[0][3], right_boxes[0][0]:right_boxes[0][2]]
+            right_image_down_target = undistorted_right_image[right_boxes[1][1]:right_boxes[1][3], right_boxes[1][0]:right_boxes[1][2]]
             # cv2.imwrite(location_save_dir / f"right_image_{right_image_timestamp}--up_target.jpg", right_image_up_target)
             # cv2.imwrite(location_save_dir / f"right_image_{right_image_timestamp}--down_target.jpg", right_image_down_target)
 

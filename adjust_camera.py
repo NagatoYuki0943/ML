@@ -25,10 +25,12 @@ def adjust_exposure_by_mean(
 def adjust_exposure1(
     camera_queue: queue.Queue,
     boxes: list[list[int]] | None = None, # [[x1, y1, x2, y2]]
-) -> list[int]:
+) -> dict[int, list[list[int]] | None]:
     logger.info("adjust exposure start")
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
-    final_exposure_time: int = CameraConfig.getattr("exposure_time")
+    exposure2boxes: dict[int, list[list[int]] | None] = {
+        CameraConfig.getattr("exposure_time"): boxes
+    }
 
     #-------------------- 第一次全分辨率拍摄 --------------------#
     # 第一次拍摄不调整相机的 capture_mode，因此使用的是原始分辨率
@@ -57,7 +59,9 @@ def adjust_exposure1(
             logger.info(f"{new_exposure_time = }, {direction = }")
             if direction == 0:
                 logger.success("original exposure is ok")
-                final_exposure_time = new_exposure_time
+                exposure2boxes = {
+                    new_exposure_time: boxes
+                }
                 return
 
         else:
@@ -79,7 +83,9 @@ def adjust_exposure1(
                 logger.info(f"boxid = {i}, {box = }, {new_exposure_time = }, {direction = }")
 
             if all(direction == 0 for direction in directions):
-                final_exposure_time = int(np.mean(new_exposure_times))
+                exposure2boxes = {
+                    int(np.mean(new_exposure_times)): boxes
+                }
                 logger.success("original exposure is ok")
                 return
 
@@ -135,7 +141,9 @@ def adjust_exposure1(
                 logger.info(f"{new_exposure_time = }, {direction = }")
 
                 if direction == 0:
-                    final_exposure_time = new_exposure_time
+                    exposure2boxes = {
+                        new_exposure_time: boxes
+                    }
                     break
 
             else:
@@ -160,7 +168,9 @@ def adjust_exposure1(
                 CameraConfig.setattr("exposure_time", new_exposure_mean)
 
                 if all(direction == 0 for direction in directions):
-                    final_exposure_time = new_exposure_mean
+                    exposure2boxes = {
+                        new_exposure_mean: boxes
+                    }
                     break
 
         except queue.Empty:
@@ -169,26 +179,29 @@ def adjust_exposure1(
         if j == adjust_total_times - 1:
             logger.warning(f"adjust exposure times: {adjust_total_times}, final failed")
 
-    logger.success(f"final set {new_exposure_time = }")
-
     # 还原相机配置
     CameraConfig.setattr("capture_mode", default_capture_mode)
     CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
     CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
     #-------------------- 低分辨率快速拍摄 --------------------#
 
+    logger.success(f"final set {new_exposure_time = }")
+    logger.info(f"{exposure2boxes = }")
     logger.info("adjust exposure end")
-    return [final_exposure_time] if isinstance(final_exposure_time, int) else final_exposure_time
+    return exposure2boxes
 
 
 # 始终使用高分辨率
 def adjust_exposure2(
     camera_queue: queue.Queue,
     boxes: list[list[int]] | None = None, # [[x1, y1, x2, y2]]
-) -> list[int]:
+) -> dict[int, list[list[int]] | None]:
     logger.info("adjust exposure start")
+    boxes = np.array(boxes) if boxes is not None else None
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
-    final_exposure_time: int = CameraConfig.getattr("exposure_time")
+    exposure2boxes: dict[int, list[list[int]] | None] = {
+        CameraConfig.getattr("exposure_time"): boxes
+    }
 
     #-------------------- 高分辨率快速拍摄 --------------------#
     default_capture_time_interval: int = CameraConfig.getattr("capture_time_interval")
@@ -227,7 +240,9 @@ def adjust_exposure2(
                 logger.info(f"{new_exposure_time = }, {direction = }")
 
                 if direction == 0:
-                    final_exposure_time = new_exposure_time
+                    exposure2boxes = {
+                        new_exposure_time: boxes
+                    }
                     if j == 0:
                         logger.success("original exposure is ok")
                     break
@@ -254,7 +269,9 @@ def adjust_exposure2(
                 CameraConfig.setattr("exposure_time", new_exposure_mean)
 
                 if all(direction == 0 for direction in directions):
-                    final_exposure_time = new_exposure_mean
+                    exposure2boxes = {
+                        new_exposure_mean: boxes
+                    }
                     if j == 0:
                         logger.success("original exposure is ok")
                     break
@@ -265,12 +282,13 @@ def adjust_exposure2(
         if j == adjust_total_times - 1:
             logger.warning(f"adjust exposure times: {adjust_total_times}, final failed")
 
-    logger.success(f"final set {new_exposure_time = }")
-
     # 还原相机配置
     CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
     CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
+
     #-------------------- 高分辨率快速拍摄 --------------------#
 
+    logger.success(f"final set {new_exposure_time = }")
+    logger.info(f"{exposure2boxes = }")
     logger.info("adjust exposure end")
-    return [final_exposure_time] if isinstance(final_exposure_time, int) else final_exposure_time
+    return exposure2boxes

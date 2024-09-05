@@ -223,10 +223,10 @@ def main() -> None:
                 logger.success(f"The cycle is started.")
 
                 # 每次开始调整曝光
-                exposures = adjust_exposure2(camera_queue, boxes)
-                logger.info(f"exposures: {exposures}")
+                exposure2boxes = adjust_exposure2(camera_queue, boxes)
+                logger.info(f"exposure2boxes: {exposure2boxes}")
 
-                total_cycle_loop_count = 1 + len(exposures)
+                total_cycle_loop_count = 1 + len(exposure2boxes)
                 logger.info(f"During this cycle, there will be {total_cycle_loop_count} iterations.")
                 cycle_loop_count += 1
                 logger.info(f"The {cycle_loop_count} iteration within the cycle.")

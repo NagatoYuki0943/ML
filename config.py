@@ -57,7 +57,7 @@ class CameraConfig(BaseConfig):
     exposure_time: int = 40000                              # 曝光时间 us
     analogue_gain: float = None                             # 模拟增益
     capture_time_interval: int = 1000                       # 相机拍照间隔 ms
-    return_image_time_interval: int = 5000                  # 返回图片的检测 ms
+    return_image_time_interval: int = 2000                  # 返回图片的检测 ms
     capture_mode: Literal['preview', 'low', 'full'] = 'full'# 相机拍照模式
     queue_maxsize: int = 5                                  # 相机拍照队列最大长度
     camera_left_index: int = 1                              # 左侧相机 index

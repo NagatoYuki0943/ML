@@ -29,7 +29,7 @@ from config import (
 
 from camera_engine import camera_engine
 from find_target import find_target
-from adjust_camera import adjust_exposure2
+from adjust_camera import adjust_exposure2, adjust_exposure3
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import clear_queue
@@ -131,11 +131,16 @@ def main() -> None:
     logger.success("init end")
     #------------------------------ 初始化 ------------------------------#
 
-    #------------------------------ 调整曝光1 ------------------------------#
+    #------------------------------ 调整曝光 ------------------------------#
     logger.info("ajust exposure 1 start")
-    adjust_exposure2(camera_queue)
+    adjust_exposure3(camera_queue)
     logger.success("ajust exposure 1 end")
-    #------------------------------ 调整曝光1 ------------------------------#
+    try:
+        _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
+        cv2.imwrite(save_dir / "image_adjust_exposure.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+    except queue.Empty:
+        logger.error("get picture timeout")
+    #------------------------------ 调整曝光 ------------------------------#
 
     #------------------------------ 找到目标 ------------------------------#
     logger.info("find target start")
@@ -146,7 +151,6 @@ def main() -> None:
     #-------------------- 取图 --------------------#
     try:
         image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_standard.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         logger.info(f"{image.shape = }, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}")
 
@@ -188,25 +192,12 @@ def main() -> None:
 
     #------------------------------ 找到目标 ------------------------------#
 
-    #------------------------------ 调整曝光2 ------------------------------#
-    logger.info("ajust exposure 2 start")
-    adjust_exposure2(camera_queue, boxes)
-    # 调整曝光后，清空队列，清除调整曝光前的图片
-    clear_queue(camera_queue)
-    logger.success("ajust exposure 2 end")
-    try:
-        _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_adjust_exposure.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-    except queue.Empty:
-        logger.error("get picture timeout")
-    #------------------------------ 调整曝光2 ------------------------------#
-
     # 主循环
     i = 0
     # 一个周期内总循环次数
     total_cycle_loop_count = 0
     # 一个周期内循环计数
-    cycle_loop_count = 0
+    cycle_loop_count = -1
     # 每个周期的间隔时间
     cycle_time_interval: int = MainConfig.getattr("cycle_time_interval")
     cycle_before_time = time.time()
@@ -218,26 +209,50 @@ def main() -> None:
         _cycle_current_time_period = int(cycle_current_time * 1000 // cycle_time_interval)
         # 进入周期
         # 条件为 当前时间周期大于等于前一个时间周期 或者 周期已经开始运行
-        if _cycle_current_time_period > _cycle_before_time_period or cycle_loop_count > 0:
-            if cycle_loop_count == 0:  # 每个周期的第一次循环
+        if _cycle_current_time_period > _cycle_before_time_period or cycle_loop_count > -1:
+            if cycle_loop_count == -1:  # 每个周期的第一次循环
                 logger.success(f"The cycle is started.")
+                #-------------------- 调整全图曝光 --------------------#
+                logger.info("full image ajust exposure start")
+                adjust_exposure3(camera_queue)
+                logger.info("full image ajust exposure end")
+                #-------------------- 调整全图曝光 --------------------#
 
+                #-------------------- 模板匹配 --------------------#
+                #-------------------- 模板匹配 --------------------#
+
+                #-------------------- 调整 box 曝光 --------------------#
+                logger.info("boxes ajust exposure start")
+                boxes = MatchTemplateConfig.getattr("boxes")
                 # 每次开始调整曝光
-                exposure2boxes = adjust_exposure2(camera_queue, boxes)
+                # ex: {72000: array([[1327, 1697, 1828, 2198]]), 78000: array([[1781,  811, 2100, 1130]])}
+                exposure2boxes = adjust_exposure3(camera_queue, boxes)
+                cycle_exposure_times = list(exposure2boxes.keys())
                 logger.info(f"exposure2boxes: {exposure2boxes}")
+                logger.info("boxes ajust exposure end")
+                #-------------------- 调整 box 曝光 --------------------#
 
+                #-------------------- 设定循环 --------------------##
+                # 总的循环轮数为 1 + 曝光次数
                 total_cycle_loop_count = 1 + len(exposure2boxes)
-                logger.info(f"During this cycle, there will be {total_cycle_loop_count} iterations.")
-                cycle_loop_count += 1
+                logger.critical(f"During this cycle, there will be {total_cycle_loop_count} iterations.")
+                # 当前周期，采用从 0 开始
+                cycle_loop_count = 0
                 logger.info(f"The {cycle_loop_count} iteration within the cycle.")
+
+                # 设置下一轮的曝光值
+                exposure_time = cycle_exposure_times[cycle_loop_count]
+                CameraConfig.setattr("exposure_time", exposure_time)
+                #-------------------- 设定循环 --------------------##
+
+                # 周期设置
                 cycle_before_time = cycle_current_time
 
             else:
                 #-------------------- camera capture --------------------#
                 camera_qsize = camera_queue.qsize()
                 if camera_qsize > 0:
-                    cycle_loop_count += 1 # 周期内循环计数加1
-                    logger.info(f"The {cycle_loop_count} iteration within the cycle.")
+                    logger.info(f"The {cycle_loop_count + 1} iteration within the cycle.")
 
                     # 忽略多余的图片
                     if camera_qsize > 1:
@@ -252,7 +267,7 @@ def main() -> None:
                         # 获取照片
                         image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
                         logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
-                        #-------------------- camera capture --------------------#
+                #-------------------- camera capture --------------------#
 
                         #------------------------- 检测目标 -------------------------#
                         # 获取检测参数
@@ -272,15 +287,15 @@ def main() -> None:
 
                         #-------------------- single box location --------------------#
                         # for循环，截取图像
-                        boxes = MatchTemplateConfig.boxes
+                        exposure = cycle_exposure_times[cycle_loop_count]
+                        _boxes = exposure2boxes[exposure]
                         centers = []
-                        for j, box in enumerate(boxes):
+                        for j, _box in enumerate(_boxes):
                             # [x1, y1, x2, y2]
-                            target = image[box[1]:box[3], box[0]:box[2]]
-                            # cv2.imwrite(location_save_dir / f"image_{image_timestamp}--up_target.jpg", image_up_target)
+                            target = image[_box[1]:_box[3], _box[0]:_box[2]]
 
                             try:
-                                logger.info(f"image box {j} rings location start")
+                                logger.info(f"box {j} rings location start")
                                 result = adaptive_threshold_rings_location(
                                     target,
                                     f"image--{image_timestamp}--{j}",
@@ -298,8 +313,8 @@ def main() -> None:
                                 )
                                 result['metadata'] = image_metadata
                                 logger.success(f"{result = }")
-                                logger.success(f"image box {j} rings location success")
-                                center = np.array([result['center_x_mean'] + box[0], result['center_y_mean'] + box[1]])
+                                logger.success(f"box {j} rings location success")
+                                center = np.array([result['center_x_mean'] + _box[0], result['center_y_mean'] + _box[1]])
                                 centers.append(center)
                                 # 保存到文件
                                 string = json.dumps(result, ensure_ascii=False)
@@ -307,7 +322,7 @@ def main() -> None:
                                     f.write(string + "\n")
                             except Exception as e:
                                 logger.error(e)
-                                logger.error(f"image box {j} rings location failed")
+                                logger.error(f"box {j} rings location failed")
                                 center = None
                                 centers.append(center)
                         #-------------------- single box location --------------------#
@@ -315,24 +330,24 @@ def main() -> None:
                         logger.success(f"{centers = }")
                         #------------------------- 检测目标 -------------------------#
 
-                        # #------------------------- 结束周期 -------------------------#
-                        # if cycle_loop_count == total_cycle_loop_count:
-                        #     cycle_loop_count = 0  # 重置周期内循环计数
-                        #     logger.info(f"The cycle is over.")
-                        # #------------------------- 结束周期 -------------------------#
-
                     except queue.Empty:
-                        # 出现错误，循环减一
-                        cycle_loop_count -= 1
                         logger.error("get picture timeout")
 
                     else:
-                        # 没有发生错误，正常判断是否结束周期
-                        #------------------------- 结束周期 -------------------------#
-                        if cycle_loop_count == total_cycle_loop_count:
-                            cycle_loop_count = 0  # 重置周期内循环计数
+                        # 没有发生错误
+                        # 周期内循环计数加1
+                        cycle_loop_count += 1
+
+                        # 正常判断是否结束周期
+                        if cycle_loop_count == total_cycle_loop_count - 1:
+                            #------------------------- 结束周期 -------------------------#
+                            cycle_loop_count = -1  # 重置周期内循环计数
                             logger.success(f"The cycle is over.")
-                        #------------------------- 结束周期 -------------------------#
+                            #------------------------- 结束周期 -------------------------#
+                        else:
+                            # 不是结束周期，设置下一轮的曝光值
+                            exposure_time = cycle_exposure_times[cycle_loop_count]
+                            CameraConfig.setattr("exposure_time", exposure_time)
 
         # 主循环休眠
         main_sleep_interval: int = MainConfig.getattr("main_sleep_interval")

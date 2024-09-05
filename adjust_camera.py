@@ -47,8 +47,8 @@ def adjust_exposure1(
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
+        # 全图
         if boxes is None:
-            # 不截图
             # 先检测曝光是否合适
             new_exposure_time, direction = adjust_exposure_by_mean(
                 image,
@@ -58,12 +58,13 @@ def adjust_exposure1(
             )
             logger.info(f"{new_exposure_time = }, {direction = }")
             if direction == 0:
-                logger.success("original exposure is ok")
+                logger.success(f"full picture original exposure time {new_exposure_time} us is ok")
                 exposure2boxes = {
                     new_exposure_time: boxes
                 }
                 return
 
+        # 分组
         else:
             directions = []
             new_exposure_times = []
@@ -86,14 +87,14 @@ def adjust_exposure1(
                 exposure2boxes = {
                     int(np.mean(new_exposure_times)): boxes
                 }
-                logger.success("original exposure is ok")
+                logger.success(f"boxes: {boxes}, original exposure time {new_exposure_times[0]} us is ok")
                 return
 
     except queue.Empty:
         logger.error("get picture timeout")
 
     #-------------------- 第一次全分辨率拍摄 --------------------#
-    logger.warning(f"original exposure is not ok, new_exposure_time = {new_exposure_time}")
+    logger.warning(f"original exposure time is not ok, new_exposure_time = {new_exposure_time} us")
     CameraConfig.setattr("exposure_time", new_exposure_time)
 
     #-------------------- 低分辨率快速拍摄 --------------------#
@@ -129,6 +130,7 @@ def adjust_exposure1(
             _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
             image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
+            # 全图
             if _boxes is None:
                 new_exposure_time, direction = adjust_exposure_by_mean(
                     image,
@@ -146,6 +148,7 @@ def adjust_exposure1(
                     }
                     break
 
+            # 分组
             else:
                 directions = []
                 new_exposure_times = []
@@ -197,7 +200,7 @@ def adjust_exposure2(
     boxes: list[list[int]] | None = None, # [[x1, y1, x2, y2]]
 ) -> dict[int, list[list[int]] | None]:
     logger.info("adjust exposure start")
-    boxes = np.array(boxes) if boxes is not None else None
+    boxes: np.ndarray | None = np.array(boxes) if boxes is not None else None
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
     exposure2boxes: dict[int, list[list[int]] | None] = {
         CameraConfig.getattr("exposure_time"): boxes
@@ -228,6 +231,7 @@ def adjust_exposure2(
             logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
             image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
+            # 全图
             if boxes is None:
                 new_exposure_time, direction = adjust_exposure_by_mean(
                     image,
@@ -244,9 +248,10 @@ def adjust_exposure2(
                         new_exposure_time: boxes
                     }
                     if j == 0:
-                        logger.success("original exposure is ok")
+                        logger.success(f"full picture original exposure time {new_exposure_time} us is ok")
                     break
 
+            # 划分box
             else:
                 directions = []
                 new_exposure_times = []
@@ -270,10 +275,10 @@ def adjust_exposure2(
 
                 if all(direction == 0 for direction in directions):
                     exposure2boxes = {
-                        new_exposure_mean: boxes
+                        new_exposure_times[0]: boxes
                     }
                     if j == 0:
-                        logger.success("original exposure is ok")
+                        logger.success(f"boxes: {boxes}, original exposure time {new_exposure_times} us is ok")
                     break
 
         except queue.Empty:
@@ -290,5 +295,132 @@ def adjust_exposure2(
 
     logger.success(f"final set {new_exposure_time = }")
     logger.info(f"{exposure2boxes = }")
+    logger.info("adjust exposure end")
+    return exposure2boxes
+
+
+# 使用递归实现快速调节曝光
+def adjust_exposure3(
+    camera_queue: queue.Queue,
+    boxes: list[list[int]] | None = None, # [[x1, y1, x2, y2]]
+) -> dict[int, list[list[int]] | None]:
+    logger.info("adjust exposure start")
+    boxes: np.ndarray | None = np.array(boxes) if boxes is not None else None
+    get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
+    exposure2boxes: dict[int, list[list[int]] | None] = {
+        CameraConfig.getattr("exposure_time"): boxes
+    }
+
+    #-------------------- 高分辨率快速拍摄 --------------------#
+    default_capture_time_interval: int = CameraConfig.getattr("capture_time_interval")
+    default_return_image_time_interval: int = CameraConfig.getattr("return_image_time_interval")
+
+    # 调整相机配置，加快拍照
+    CameraConfig.setattr("capture_time_interval", AdjustCameraConfig.getattr("capture_time_interval"))
+    CameraConfig.setattr("return_image_time_interval", AdjustCameraConfig.getattr("return_image_time_interval"))
+
+    try:
+        camera_qsize = camera_queue.qsize()
+        if camera_qsize > 1:
+            logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
+            for _ in range(camera_qsize - 1):
+                try:
+                    camera_queue.get(timeout=get_picture_timeout)
+                except queue.Empty:
+                    logger.error("get picture timeout")
+
+        image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
+        logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+        # 全图
+        if boxes is None:
+            new_exposure_time, direction = adjust_exposure_by_mean(
+                image,
+                image_metadata['ExposureTime'],
+                AdjustCameraConfig.getattr("mean_light_suitable_range"),
+                AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+            )
+            CameraConfig.setattr("exposure_time", new_exposure_time)
+
+            # 可以
+            if direction == 0:
+                exposure2boxes = {
+                    new_exposure_time: boxes
+                }
+                logger.success(f"full picture picture time {new_exposure_time} us is ok")
+            # 需要调节
+            else:
+                logger.info(f"{new_exposure_time = }, {direction = }")
+                exposure2boxes = adjust_exposure3(camera_queue)
+
+        # 划分box
+        else:
+            directions = []
+            new_exposure_times = []
+            for i, box in enumerate(boxes):
+                target_image = image[box[1]:box[3], box[0]:box[2]]
+                new_exposure_time, direction = adjust_exposure_by_mean(
+                    target_image,
+                    image_metadata['ExposureTime'],
+                    AdjustCameraConfig.getattr("mean_light_suitable_range"),
+                    AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                )
+
+                directions.append(direction)
+                new_exposure_times.append(new_exposure_time)
+                logger.info(f"boxid = {i}, {box = }, {new_exposure_time = }, {direction = }")
+
+            logger.info(f"{new_exposure_times = }")
+
+            # 全都可以
+            if all(direction == 0 for direction in directions):
+                exposure2boxes = {
+                    new_exposure_times[0]: boxes
+                }
+                logger.success(f"boxes: {boxes}, original exposure time {new_exposure_times[0]} us is ok")
+            # 需要分组
+            else:
+                # 将box分组
+                directions = np.array(directions)
+                directions_low = np.where(directions==-1)[0]
+                directions_ok = np.where(directions==0)[0]
+                directions_high = np.where(directions==1)[0]
+
+                # 分组使用递归调用
+                exposure2boxes = {}
+                if directions_low.size > 0:
+                    logger.info("adjust exposure low")
+                    exposure_time_low = new_exposure_times[directions_low[0]]
+                    boxes_low = boxes[directions_low]
+                    CameraConfig.setattr("exposure_time", exposure_time_low)
+                    exposure2boxes_low = adjust_exposure3(camera_queue, boxes_low)
+                    exposure2boxes.update(exposure2boxes_low)
+
+                if directions_ok.size > 0:
+                    exposure_time_ok = new_exposure_times[directions_ok[0]]
+                    boxes_ok = boxes[directions_ok]
+                    exposure2boxes_ok = {
+                        exposure_time_ok: boxes_ok
+                    }
+                    exposure2boxes.update(exposure2boxes_ok)
+
+                if directions_high.size > 0:
+                    logger.info("adjust exposure high")
+                    boxes_high = boxes[directions_high]
+                    exposure_time_high = new_exposure_times[directions_high[0]]
+                    CameraConfig.setattr("exposure_time", exposure_time_high)
+                    exposure2boxes_high = adjust_exposure3(camera_queue, boxes_high)
+                    exposure2boxes.update(exposure2boxes_high)
+
+    except queue.Empty:
+        logger.error("get picture timeout")
+
+    # 还原相机配置
+    CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
+    CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
+    #-------------------- 高分辨率快速拍摄 --------------------#
+
+    logger.success(f"{exposure2boxes = }")
     logger.info("adjust exposure end")
     return exposure2boxes

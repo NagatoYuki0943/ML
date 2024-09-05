@@ -40,9 +40,12 @@ class MainConfig(BaseConfig):
     save_dir.mkdir(parents=True, exist_ok=True)
     location_save_dir = save_dir / "rings_location"
     location_save_dir.mkdir(parents=True, exist_ok=True)
+    camera_result_save_path = save_dir / "camera_result.jsonl"
     left_camera_result_save_path = save_dir / "left_result.jsonl"
     right_camera_result_save_path = save_dir / "right_result.jsonl"
     calibration_result_save_path = save_dir / "calibration_result.jsonl"
+    get_picture_timeout: int = 10       # 获取图片超时时间 s
+    cycle_time_interval: int = 10000    # 主循环时间 ms
 
 
 @dataclass
@@ -50,7 +53,8 @@ class CameraConfig(BaseConfig):
     """相机配置
     """
     lock = Lock()
-    exposure_time: int = 40000                              # 曝光时间 微秒
+    low_res_ratio: float = 0.5                              # 相机拍摄低分辨率比率
+    exposure_time: int = 40000                              # 曝光时间 us
     analogue_gain: float = None                             # 模拟增益
     capture_time_interval: int = 1000                       # 相机拍照间隔 ms
     return_image_time_interval: int = 5000                  # 返回图片的检测 ms
@@ -58,6 +62,19 @@ class CameraConfig(BaseConfig):
     queue_maxsize: int = 5                                  # 相机拍照队列最大长度
     camera_left_index: int = 1                              # 左侧相机 index
     camera_right_index: int = 0                             # 右侧相机 index
+
+
+@dataclass
+class AdjustCameraConfig(BaseConfig):
+    """调整相机配置
+    """
+    lock = Lock()
+    mean_light_suitable_range: tuple[float] = (100, 160)
+    adjust_exposure_time_step: int = 2000
+    capture_mode: Literal['preview', 'low', 'full'] = 'low'
+    capture_time_interval: int = 100        # 拍照间隔 us
+    return_image_time_interval: int = 100   # 返回图片间隔 us
+    adjust_total_times: int = 100
 
 
 @dataclass
@@ -104,21 +121,9 @@ class MatchTemplateConfig(BaseConfig):
     use_threshold_match: bool = True
     threshold_match_threshold: float = 0.6
     threshold_iou_threshold: float = 0.5
-    boxes: list[list[int]]      # [[x1, y1, x2, y2], ...]
-    left_boxes: list[list[int]] # [[x1, y1, x2, y2], ...]
-    right_boxes: list[list[int]]# [[x1, y1, x2, y2], ...]
-
-
-@dataclass
-class AdjustCameraConfig(BaseConfig):
-    """调整相机配置
-    """
-    lock = Lock()
-    mean_light_suitable_range: tuple[float] = (100, 160)
-    adjust_exposure_time_step: int = 1000
-    capture_mode: Literal['preview', 'low', 'full'] = 'low'
-    capture_time_interval: int = 100
-    return_image_time_interval: int = 300
+    boxes: list[list[int]] = None     # [[x1, y1, x2, y2], ...]
+    left_boxes: list[list[int]] = None # [[x1, y1, x2, y2], ...]
+    right_boxes: list[list[int]] = None # [[x1, y1, x2, y2], ...]
 
 
 @dataclass

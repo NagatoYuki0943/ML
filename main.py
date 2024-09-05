@@ -29,14 +29,15 @@ from config import (
 
 from camera_engine import camera_engine
 from find_target import find_target
-from adjust_camera import adjust_exposure_by_mean
+from adjust_camera import adjust_exposure
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
+from utils import clear_queue
 
 
 # 将日志输出到文件
 # 每天 0 点新创建一个 log 文件
-log_file = logger.add('log/runtime_{time}.log', rotation='00:00')
+handler_id = logger.add('log/runtime_{time}.log', rotation='00:00')
 
 
 def main() -> None:
@@ -52,6 +53,7 @@ def main() -> None:
     left_camera_result_save_path = MainConfig.getattr("left_camera_result_save_path")
     right_camera_result_save_path = MainConfig.getattr("right_camera_result_save_path")
     calibration_result_save_path = MainConfig.getattr("calibration_result_save_path")
+    get_picture_timeout = MainConfig.getattr("get_picture_timeout")
     #-------------------- 基础 --------------------#
 
     #-------------------- 初始化相机 --------------------#
@@ -131,6 +133,7 @@ def main() -> None:
     # mqtt_receive_thread = Thread(
     #     target = mqtt_receive,
     #     kwargs={'client':mqtt_comm, 'queue':main_queue},
+    #     daemon=True
     # )
     # mqtt_send_thread = ThreadWrapper(
     #     target_func = mqtt_send,
@@ -145,6 +148,9 @@ def main() -> None:
     logger.success("init end")
     #------------------------------ 初始化 ------------------------------#
 
+    #------------------------------ 调整曝光1 ------------------------------#
+    adjust_exposure(left_camera_queue)
+    #------------------------------ 调整曝光1 ------------------------------#
 
     #------------------------------ 找到目标 ------------------------------#
     logger.info("find target start")
@@ -156,12 +162,12 @@ def main() -> None:
     right_image_metadata: dict
 
     #-------------------- 取图 --------------------#
-    left_image_timestamp, left_image, left_image_metadata = left_camera_queue.get()
+    _, left_image, left_image_metadata = left_camera_queue.get()
     left_image = cv2.cvtColor(left_image, cv2.COLOR_RGB2GRAY)
     logger.warning(f"{left_image.shape = }, ExposureTime = {left_image_metadata['ExposureTime']}, AnalogueGain = {left_image_metadata['AnalogueGain']}")
     cv2.imwrite(save_dir / "left_image_standard.jpg", left_image)
 
-    right_image_timestamp, right_image, right_image_metadata = right_camera_queue.get()
+    _, right_image, right_image_metadata = right_camera_queue.get()
     right_image = cv2.cvtColor(right_image, cv2.COLOR_RGB2GRAY)
     logger.warning(f"{right_image.shape = }, ExposureTime = {right_image_metadata['ExposureTime']}, AnalogueGain = {right_image_metadata['AnalogueGain']}")
     cv2.imwrite(save_dir / "right_image_standard.jpg", right_image)
@@ -228,297 +234,249 @@ def main() -> None:
     logger.success("find target end")
     #------------------------------ 找到目标 ------------------------------#
 
-    #------------------------------ 调整曝光 ------------------------------#
-    logger.info("adjust exposure start")
-    default_capture_mode: str = CameraConfig.getattr("capture_mode")
-    default_capture_time_interval: int = CameraConfig.getattr("capture_time_interval")
-    default_return_image_time_interval: int = CameraConfig.getattr("return_image_time_interval")
-    # 调整相机配置，加快拍照
-    CameraConfig.setattr("capture_mode", AdjustCameraConfig.getattr("capture_mode"))
-    CameraConfig.setattr("capture_time_interval", AdjustCameraConfig.getattr("capture_time_interval"))
-    CameraConfig.setattr("return_image_time_interval", AdjustCameraConfig.getattr("return_image_time_interval"))
-
-    # 忽略所有的相机拍照
-    while not left_camera_queue.empty():
-        left_camera_queue.get()
-
-    left_boxes = MatchTemplateConfig.left_boxes
-    while True:
-        _, left_image, left_image_metadata = left_camera_queue.get()
-        left_image = cv2.cvtColor(left_image, cv2.COLOR_RGB2GRAY)
-        left_image_down_target = left_image[left_boxes[0][1]//2:left_boxes[0][3]//2, left_boxes[0][0]//2:left_boxes[0][2]//2]
-        new_exposure_time, is_ok = adjust_exposure_by_mean(
-            left_image_down_target,
-            left_image_metadata['ExposureTime'],
-            AdjustCameraConfig.getattr("mean_light_suitable_range"),
-            AdjustCameraConfig.getattr("adjust_exposure_time_step"),
-        )
-
-        CameraConfig.setattr("exposure_time", new_exposure_time)
-        logger.info(f"{new_exposure_time = }, {is_ok = }")
-        if is_ok == "ok":
-            break
-
-    logger.success(f"set {new_exposure_time = }")
-
-    # 还原相机配置
-    CameraConfig.setattr("capture_mode", default_capture_mode)
-    CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
-    CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
-
-    cv2.imwrite(save_dir / "left_image_adjust_exposure.jpg", left_image)
-    logger.success("adjust exposure end")
-
+    #------------------------------ 调整曝光2 ------------------------------#
+    adjust_exposure(left_camera_queue, left_boxes[0])
     # 调整曝光后，清空队列，清除调整曝光前的图片
-    time.sleep(1)
-    while not left_camera_queue.empty():
-        left_camera_queue.get()
-    while not right_camera_queue.empty():
-        right_camera_queue.get()
-    #------------------------------ 调整曝光 ------------------------------#
+    clear_queue(left_camera_queue, right_camera_queue)
+    _, left_image, _ = left_camera_queue.get()
+    cv2.imwrite(save_dir / "left_image_adjust_exposure.jpg", left_image)
+    _, right_image, _ = right_camera_queue.get()
+    cv2.imwrite(save_dir / "right_image_adjust_exposure.jpg", right_image)
+    #------------------------------ 调整曝光2 ------------------------------#
 
     # 主循环
     i = 0
 
-    # 用来保存不同周期的多个camera的图片（多个相机拍照可能不同步）
-    left_image = None
-    right_image = None
     while True:
+        # 每次开始调整曝光
+        adjust_exposure(left_camera_queue, left_boxes[0])
         # logger.warning(f"{left_image.__class__.__name__}, {right_image.__class__.__name__}")
         #-------------------- left camera capture --------------------#
         left_camera_qsize = left_camera_queue.qsize()
-        if left_camera_qsize > 0:
-            # 忽略多余的图片
-            if left_camera_qsize > 1:
-                logger.warning(f"left camera got {left_camera_qsize} frames, ignore {left_camera_qsize - 1} frames")
-                for _ in range(left_camera_qsize - 1):
-                    left_camera_queue.get()
+        # 忽略多余的图片
+        if left_camera_qsize > 1:
+            logger.warning(f"left camera got {left_camera_qsize} frames, ignore {left_camera_qsize - 1} frames")
+            for _ in range(left_camera_qsize - 1):
+                left_camera_queue.get()
 
-            # 获取照片
-            left_image_timestamp, left_image, left_image_metadata = left_camera_queue.get()
-            logger.info(f"left camera get image: {left_image_timestamp}, shape = {left_image.shape}, ExposureTime = {left_image_metadata['ExposureTime']}, AnalogueGain = {left_image_metadata['AnalogueGain']}")
+        # 获取照片
+        left_image_timestamp, left_image, left_image_metadata = left_camera_queue.get()
+        logger.info(f"left camera get image: {left_image_timestamp}, shape = {left_image.shape}, ExposureTime = {left_image_metadata['ExposureTime']}, AnalogueGain = {left_image_metadata['AnalogueGain']}")
         #-------------------- left camera capture --------------------#
 
         #-------------------- right camera capture --------------------#
         right_camera_qsize = right_camera_queue.qsize()
-        if right_camera_qsize > 0:
-            # 忽略多余的图片
-            if right_camera_qsize > 1:
-                logger.warning(f"right camera got {right_camera_qsize} frames, ignore {right_camera_qsize - 1} frames")
-                for _ in range(right_camera_qsize - 1):
-                    right_camera_queue.get()
+        # 忽略多余的图片
+        if right_camera_qsize > 1:
+            logger.warning(f"right camera got {right_camera_qsize} frames, ignore {right_camera_qsize - 1} frames")
+            for _ in range(right_camera_qsize - 1):
+                right_camera_queue.get()
 
-            # 获取照片
-            right_image_timestamp, right_image, right_image_metadata = right_camera_queue.get()
-            logger.info(f"right camera get image: {right_image_timestamp}, shape = {right_image.shape}, ExposureTime = {right_image_metadata['ExposureTime']}, AnalogueGain = {right_image_metadata['AnalogueGain']}")
+        # 获取照片
+        right_image_timestamp, right_image, right_image_metadata = right_camera_queue.get()
+        logger.info(f"right camera get image: {right_image_timestamp}, shape = {right_image.shape}, ExposureTime = {right_image_metadata['ExposureTime']}, AnalogueGain = {right_image_metadata['AnalogueGain']}")
         #-------------------- right camera capture --------------------#
 
         #------------------------- 检测目标 -------------------------#
-        if left_image is not None and right_image is not None:
-            logger.critical(f"get left image: {left_image_timestamp}, get right image: {right_image_timestamp}")
+        # 获取检测参数
+        gradient_threshold_percent: float = RingsLocationConfig.getattr("gradient_threshold_percent")
+        iters: int = RingsLocationConfig.getattr("iters")
+        order: int = RingsLocationConfig.getattr("order")
+        rings_nums: int = RingsLocationConfig.getattr("rings_nums")
+        min_group_size: int = RingsLocationConfig.getattr("min_group_size")
+        sigmas: int = RingsLocationConfig.getattr("sigmas")
+        draw_scale: int = RingsLocationConfig.getattr("draw_scale")
+        save_grads: bool = RingsLocationConfig.getattr("save_grads")
+        save_detect_images: bool = RingsLocationConfig.getattr("save_detect_images")
+        save_detect_results: bool = RingsLocationConfig.getattr("save_detect_results")
 
-            # 获取检测参数
-            gradient_threshold_percent: float = RingsLocationConfig.getattr("gradient_threshold_percent")
-            iters: int = RingsLocationConfig.getattr("iters")
-            order: int = RingsLocationConfig.getattr("order")
-            rings_nums: int = RingsLocationConfig.getattr("rings_nums")
-            min_group_size: int = RingsLocationConfig.getattr("min_group_size")
-            sigmas: int = RingsLocationConfig.getattr("sigmas")
-            draw_scale: int = RingsLocationConfig.getattr("draw_scale")
-            save_grads: bool = RingsLocationConfig.getattr("save_grads")
-            save_detect_images: bool = RingsLocationConfig.getattr("save_detect_images")
-            save_detect_results: bool = RingsLocationConfig.getattr("save_detect_results")
+        #-------------------- 畸变矫正 --------------------#
+        rectified_left_image, rectified_right_image, \
+        R1, R2, P1, P2, Q, roi1, roi2, \
+        undistorted_left_image, undistorted_right_image = stereo_calibration.rectify_images(
+            left_image,
+            right_image,
+        )
+        #-------------------- 畸变矫正 --------------------#
 
-            #-------------------- 畸变矫正 --------------------#
-            rectified_left_image, rectified_right_image, \
-            R1, R2, P1, P2, Q, roi1, roi2, \
-            undistorted_left_image, undistorted_right_image = stereo_calibration.rectify_images(
-                left_image,
-                right_image,
+        left_image_up_center = None
+        left_image_down_center = None
+        right_image_up_center = None
+        right_image_down_center = None
+        #-------------------- left image location --------------------#
+        # 截取图像
+        left_boxes = MatchTemplateConfig.left_boxes
+        left_image_up_target = undistorted_left_image[left_boxes[0][1]:left_boxes[0][3], left_boxes[0][0]:left_boxes[0][2]]
+        left_image_down_target = undistorted_left_image[left_boxes[1][1]:left_boxes[1][3], left_boxes[1][0]:left_boxes[1][2]]
+        # cv2.imwrite(location_save_dir / f"left_image_{left_image_timestamp}--up_target.jpg", left_image_up_target)
+        # cv2.imwrite(location_save_dir / f"left_image_{left_image_timestamp}--down_target.jpg", left_image_down_target)
+
+        try:
+            logger.info(f"left image up rings location start")
+            left_image_up_result = adaptive_threshold_rings_location(
+                left_image_up_target,
+                f"left_image--{left_image_timestamp}--up",
+                iters,
+                order,
+                rings_nums,
+                min_group_size,
+                sigmas,
+                location_save_dir,
+                draw_scale,
+                save_grads,
+                save_detect_images,
+                save_detect_results,
+                gradient_threshold_percent,
             )
-            #-------------------- 畸变矫正 --------------------#
-
+            left_image_up_result['metadata'] = left_image_metadata
+            logger.success(f"{left_image_up_result = }")
+            logger.success(f"left image up rings location success")
+            left_image_up_center = np.array([left_image_up_result['center_x_mean'], left_image_up_result['center_y_mean']])
+            # 保存到文件
+            string = json.dumps(left_image_up_result, ensure_ascii=False)
+            with open(left_camera_result_save_path, mode='a', encoding='utf-8') as f:
+                f.write(string + "\n")
+        except Exception as e:
             left_image_up_center = None
+            logger.error(e)
+            logger.error(f"left image up circle location failed")
+
+        try:
+            logger.info(f"left image down rings location start")
+            left_image_down_result = adaptive_threshold_rings_location(
+                left_image_down_target,
+                f"left_image--{left_image_timestamp}--down",
+                iters,
+                order,
+                rings_nums,
+                min_group_size,
+                sigmas,
+                location_save_dir,
+                draw_scale,
+                save_grads,
+                save_detect_images,
+                save_detect_results,
+                gradient_threshold_percent,
+            )
+            left_image_down_result['metadata'] = left_image_metadata
+            logger.success(f"{left_image_down_result = }")
+            logger.success(f"left image down rings location success")
+            left_image_down_center = np.array([left_image_down_result['center_x_mean'], left_image_down_result['center_y_mean']])
+            # 保存到文件
+            string = json.dumps(left_image_down_result, ensure_ascii=False)
+            with open(left_camera_result_save_path, mode='a', encoding='utf-8') as f:
+                f.write(string + "\n")
+        except Exception as e:
             left_image_down_center = None
+            logger.error(e)
+            logger.error(f"left image down circle location failed")
+        #-------------------- left image location --------------------#
+
+        #-------------------- right image location --------------------#
+        # 截取图像
+        right_boxes = MatchTemplateConfig.right_boxes
+        right_image_up_target = undistorted_right_image[right_boxes[0][1]:right_boxes[0][3], right_boxes[0][0]:right_boxes[0][2]]
+        right_image_down_target = undistorted_right_image[right_boxes[1][1]:right_boxes[1][3], right_boxes[1][0]:right_boxes[1][2]]
+        # cv2.imwrite(location_save_dir / f"right_image_{right_image_timestamp}--up_target.jpg", right_image_up_target)
+        # cv2.imwrite(location_save_dir / f"right_image_{right_image_timestamp}--down_target.jpg", right_image_down_target)
+
+        try:
+            logger.info(f"right image up rings location start")
+            right_image_up_result = adaptive_threshold_rings_location(
+                right_image_up_target,
+                f"right_image--{right_image_timestamp}--up",
+                iters,
+                order,
+                rings_nums,
+                min_group_size,
+                sigmas,
+                location_save_dir,
+                draw_scale,
+                save_grads,
+                save_detect_images,
+                save_detect_results,
+                gradient_threshold_percent,
+            )
+            right_image_up_result['metadata'] = right_image_metadata
+            logger.success(f"{right_image_up_result = }")
+            logger.success(f"right image up rings location success")
+            right_image_up_center = np.array([right_image_up_result['center_x_mean'], right_image_up_result['center_y_mean']])
+            # 保存到文件
+            string = json.dumps(right_image_up_result, ensure_ascii=False)
+            with open(right_camera_result_save_path, mode='a', encoding='utf-8') as f:
+                f.write(string + "\n")
+        except Exception as e:
             right_image_up_center = None
+            logger.error(e)
+            logger.error(f"right image up circle location failed")
+
+        try:
+            logger.info(f"right image down rings location start")
+            right_image_down_result = adaptive_threshold_rings_location(
+                right_image_down_target,
+                f"right_image--{right_image_timestamp}--down",
+                iters,
+                order,
+                rings_nums,
+                min_group_size,
+                sigmas,
+                location_save_dir,
+                draw_scale,
+                save_grads,
+                save_detect_images,
+                save_detect_results,
+                gradient_threshold_percent,
+            )
+            right_image_down_result['metadata'] = right_image_metadata
+            logger.success(f"{right_image_down_result = }")
+            logger.success(f"right image down rings location success")
+            right_image_down_center = np.array([right_image_down_result['center_x_mean'], right_image_down_result['center_y_mean']])
+            # 保存到文件
+            string = json.dumps(right_image_down_result, ensure_ascii=False)
+            with open(right_camera_result_save_path, mode='a', encoding='utf-8') as f:
+                f.write(string + "\n")
+        except Exception as e:
             right_image_down_center = None
-            #-------------------- left image location --------------------#
-            # 截取图像
-            left_boxes = MatchTemplateConfig.left_boxes
-            left_image_up_target = undistorted_left_image[left_boxes[0][1]:left_boxes[0][3], left_boxes[0][0]:left_boxes[0][2]]
-            left_image_down_target = undistorted_left_image[left_boxes[1][1]:left_boxes[1][3], left_boxes[1][0]:left_boxes[1][2]]
-            # cv2.imwrite(location_save_dir / f"left_image_{left_image_timestamp}--up_target.jpg", left_image_up_target)
-            # cv2.imwrite(location_save_dir / f"left_image_{left_image_timestamp}--down_target.jpg", left_image_down_target)
+            logger.error(e)
+            logger.error(f"right image down circle location failed")
+        #-------------------- right image location --------------------#
 
-            try:
-                logger.info(f"left image up rings location start")
-                left_image_up_result = adaptive_threshold_rings_location(
-                    left_image_up_target,
-                    f"left_image--{left_image_timestamp}--up",
-                    iters,
-                    order,
-                    rings_nums,
-                    min_group_size,
-                    sigmas,
-                    location_save_dir,
-                    draw_scale,
-                    save_grads,
-                    save_detect_images,
-                    save_detect_results,
-                    gradient_threshold_percent,
-                )
-                left_image_up_result['metadata'] = left_image_metadata
-                logger.success(f"{left_image_up_result = }")
-                logger.success(f"left image up rings location success")
-                left_image_up_center = np.array([left_image_up_result['center_x_mean'], left_image_up_result['center_y_mean']])
-                # 保存到文件
-                string = json.dumps(left_image_up_result, ensure_ascii=False)
-                with open(left_camera_result_save_path, mode='a', encoding='utf-8') as f:
-                    f.write(string + "\n")
-            except Exception as e:
-                left_image_up_center = None
-                logger.error(e)
-                logger.error(f"left image up circle location failed")
+        if all(center is not None for center in \
+            [left_image_up_center, left_image_down_center, right_image_up_center, right_image_down_center]):
+            logger.critical(f"all cameras location success")
+            logger.info(f"{left_image_up_center = }, {left_image_down_center = }, {right_image_up_center = }, {right_image_down_center = }")
 
-            try:
-                logger.info(f"left image down rings location start")
-                left_image_down_result = adaptive_threshold_rings_location(
-                    left_image_down_target,
-                    f"left_image--{left_image_timestamp}--down",
-                    iters,
-                    order,
-                    rings_nums,
-                    min_group_size,
-                    sigmas,
-                    location_save_dir,
-                    draw_scale,
-                    save_grads,
-                    save_detect_images,
-                    save_detect_results,
-                    gradient_threshold_percent,
-                )
-                left_image_down_result['metadata'] = left_image_metadata
-                logger.success(f"{left_image_down_result = }")
-                logger.success(f"left image down rings location success")
-                left_image_down_center = np.array([left_image_down_result['center_x_mean'], left_image_down_result['center_y_mean']])
-                # 保存到文件
-                string = json.dumps(left_image_down_result, ensure_ascii=False)
-                with open(left_camera_result_save_path, mode='a', encoding='utf-8') as f:
-                    f.write(string + "\n")
-            except Exception as e:
-                left_image_down_center = None
-                logger.error(e)
-                logger.error(f"left image down circle location failed")
-            #-------------------- left image location --------------------#
+            # 矫正坐标
+            left_points = np.array([left_image_up_center, left_image_down_center])
+            rectified_left_points = stereo_calibration.undistort_points(
+                left_points,
+                stereo_calibration.camera_matrix_left,
+                R1, P1
+            )
+            right_points = np.array([right_image_up_center, right_image_down_center])
+            rectified_right_points = stereo_calibration.undistort_points(
+                right_points,
+                stereo_calibration.camera_matrix_right,
+                R2, P2
+            )
+            logger.info(f"{rectified_left_points = }, {rectified_right_points = }")
 
-            #-------------------- right image location --------------------#
-            # 截取图像
-            right_boxes = MatchTemplateConfig.right_boxes
-            right_image_up_target = undistorted_right_image[right_boxes[0][1]:right_boxes[0][3], right_boxes[0][0]:right_boxes[0][2]]
-            right_image_down_target = undistorted_right_image[right_boxes[1][1]:right_boxes[1][3], right_boxes[1][0]:right_boxes[1][2]]
-            # cv2.imwrite(location_save_dir / f"right_image_{right_image_timestamp}--up_target.jpg", right_image_up_target)
-            # cv2.imwrite(location_save_dir / f"right_image_{right_image_timestamp}--down_target.jpg", right_image_down_target)
+            # 保存到文件
+            string = json.dumps({
+                    "left_image_timestamp": left_image_timestamp,
+                    "right_image_timestamp": right_image_timestamp,
+                    "rectified_left_points": rectified_left_points,
+                    "rectified_right_points": rectified_right_points,
+                },
+                ensure_ascii=False
+            )
+            with open(calibration_result_save_path, mode='a', encoding='utf-8') as f:
+                f.write(string + "\n")
 
-            try:
-                logger.info(f"right image up rings location start")
-                right_image_up_result = adaptive_threshold_rings_location(
-                    right_image_up_target,
-                    f"right_image--{right_image_timestamp}--up",
-                    iters,
-                    order,
-                    rings_nums,
-                    min_group_size,
-                    sigmas,
-                    location_save_dir,
-                    draw_scale,
-                    save_grads,
-                    save_detect_images,
-                    save_detect_results,
-                    gradient_threshold_percent,
-                )
-                right_image_up_result['metadata'] = right_image_metadata
-                logger.success(f"{right_image_up_result = }")
-                logger.success(f"right image up rings location success")
-                right_image_up_center = np.array([right_image_up_result['center_x_mean'], right_image_up_result['center_y_mean']])
-                # 保存到文件
-                string = json.dumps(right_image_up_result, ensure_ascii=False)
-                with open(right_camera_result_save_path, mode='a', encoding='utf-8') as f:
-                    f.write(string + "\n")
-            except Exception as e:
-                right_image_up_center = None
-                logger.error(e)
-                logger.error(f"right image up circle location failed")
+            # 检查距离
 
-            try:
-                logger.info(f"right image down rings location start")
-                right_image_down_result = adaptive_threshold_rings_location(
-                    right_image_down_target,
-                    f"right_image--{right_image_timestamp}--down",
-                    iters,
-                    order,
-                    rings_nums,
-                    min_group_size,
-                    sigmas,
-                    location_save_dir,
-                    draw_scale,
-                    save_grads,
-                    save_detect_images,
-                    save_detect_results,
-                    gradient_threshold_percent,
-                )
-                right_image_down_result['metadata'] = right_image_metadata
-                logger.success(f"{right_image_down_result = }")
-                logger.success(f"right image down rings location success")
-                right_image_down_center = np.array([right_image_down_result['center_x_mean'], right_image_down_result['center_y_mean']])
-                # 保存到文件
-                string = json.dumps(right_image_down_result, ensure_ascii=False)
-                with open(right_camera_result_save_path, mode='a', encoding='utf-8') as f:
-                    f.write(string + "\n")
-            except Exception as e:
-                right_image_down_center = None
-                logger.error(e)
-                logger.error(f"right image down circle location failed")
-            #-------------------- right image location --------------------#
+            # 传递消息
 
-            if all(center is not None for center in \
-                [left_image_up_center, left_image_down_center, right_image_up_center, right_image_down_center]):
-                logger.critical(f"all cameras location success")
-                logger.info(f"{left_image_up_center = }, {left_image_down_center = }, {right_image_up_center = }, {right_image_down_center = }")
-
-                # 矫正坐标
-                left_points = np.array([left_image_up_center, left_image_down_center])
-                rectified_left_points = stereo_calibration.undistort_points(
-                    left_points,
-                    stereo_calibration.camera_matrix_left,
-                    R1, P1
-                )
-                right_points = np.array([right_image_up_center, right_image_down_center])
-                rectified_right_points = stereo_calibration.undistort_points(
-                    right_points,
-                    stereo_calibration.camera_matrix_right,
-                    R2, P2
-                )
-                logger.info(f"{rectified_left_points = }, {rectified_right_points = }")
-
-                # 保存到文件
-                string = json.dumps({
-                        "left_image_timestamp": left_image_timestamp,
-                        "right_image_timestamp": right_image_timestamp,
-                        "rectified_left_points": rectified_left_points,
-                        "rectified_right_points": rectified_right_points,
-                    },
-                    ensure_ascii=False
-                )
-                with open(calibration_result_save_path, mode='a', encoding='utf-8') as f:
-                    f.write(string + "\n")
-
-                # 检查距离
-
-                # 传递消息
-
-            # 清除图片
-            left_image = None
-            right_image = None
         #------------------------- 检测目标 -------------------------#
 
         # 主循环休眠

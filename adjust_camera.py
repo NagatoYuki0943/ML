@@ -349,7 +349,7 @@ def adjust_exposure3(
                 exposure2boxes = {
                     new_exposure_time: boxes
                 }
-                logger.success(f"full picture picture time {new_exposure_time} us is ok")
+                logger.success(f"full picture exposure time {new_exposure_time} us is ok")
             # 需要调节
             else:
                 logger.info(f"{new_exposure_time = }, {direction = }")

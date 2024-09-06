@@ -28,7 +28,7 @@ from config import (
 )
 
 from camera_engine import camera_engine
-from find_target import find_target
+from find_target import find_target, around_find_target
 from adjust_camera import adjust_exposure2, adjust_exposure3
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
@@ -156,28 +156,28 @@ def main() -> None:
 
     #-------------------- 取图 --------------------#
     try:
-        image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
+        _, image, _ = camera_queue.get(timeout=get_picture_timeout)
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         logger.info(f"{image.shape = }, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}")
         #-------------------- 取图 --------------------#
 
         #-------------------- 畸变矫正 --------------------#
         logger.info("rectify image start")
-
+        rectified_image = image
         logger.success("rectify image success")
         #-------------------- 畸变矫正 --------------------#
 
+        #-------------------- 模板匹配 --------------------#
         logger.info("image find target start")
         target_number: int = MatchTemplateConfig.getattr("target_number")
-        ratios, scores, boxes, got_target_number = find_target(image)
+        ratios, scores, boxes, got_target_number = find_target(rectified_image)
         logger.info(f"image find target ratios: \n{ratios}")
         logger.info(f"image find target scores: \n{scores}")
         logger.info(f"image find target boxes: \n{boxes}")
         logger.info(f"image find target number: {got_target_number}")
         if got_target_number < target_number:
-            logger.warning(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
-        else:
-            logger.success(f"find target number {got_target_number} equal target number {target_number}")
+            # 数量不够，发送告警
+            ...
 
         # 绘制boxes
         image_draw = image.copy()
@@ -195,6 +195,7 @@ def main() -> None:
         plt.savefig(save_dir / "image_match_template.png")
         plt.close()
         logger.success("image find target success")
+        #-------------------- 模板匹配 --------------------#
 
         logger.success("find target end")
     except queue.Empty:
@@ -204,6 +205,8 @@ def main() -> None:
 
     # 主循环
     i = 0
+    # 一个周期内的结果
+    cycle_result = []
     # 一个周期内总循环次数
     total_cycle_loop_count = 0
     # 一个周期内循环计数
@@ -228,8 +231,20 @@ def main() -> None:
                 logger.info("full image ajust exposure end")
                 #-------------------- 调整全图曝光 --------------------#
 
-                #-------------------- 模板匹配 --------------------#
-                #-------------------- 模板匹配 --------------------#
+                #-------------------- 找到目标 --------------------#
+                try:
+                    _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+                    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+                    #-------------------- 畸变矫正 --------------------#
+                    rectified_image = image
+                    #-------------------- 畸变矫正 --------------------#
+
+                    #-------------------- 小区域模板匹配 --------------------#
+                    around_find_target(rectified_image)
+                    #-------------------- 小区域模板匹配 --------------------#
+                except queue.Empty:
+                    logger.error("get picture timeout")
+                #-------------------- 找到目标 --------------------#
 
                 #-------------------- 调整 box 曝光 --------------------#
                 logger.info("boxes ajust exposure start")
@@ -293,6 +308,7 @@ def main() -> None:
                         save_detect_results: bool = RingsLocationConfig.getattr("save_detect_results")
 
                         #-------------------- 畸变矫正 --------------------#
+                        rectified_image = image
                         #-------------------- 畸变矫正 --------------------#
 
                         #-------------------- single box location --------------------#
@@ -302,7 +318,7 @@ def main() -> None:
                         centers = []
                         for j, _box in enumerate(_boxes):
                             x1, y1, x2, y2 = _box
-                            target = image[y1:y2, x1:x2]
+                            target = rectified_image[y1:y2, x1:x2]
 
                             try:
                                 logger.info(f"box {j} rings location start")
@@ -338,6 +354,7 @@ def main() -> None:
                         #-------------------- single box location --------------------#
 
                         logger.success(f"{centers = }")
+                        cycle_result.append(centers)
                         #------------------------- 检测目标 -------------------------#
 
                     except queue.Empty:
@@ -350,8 +367,47 @@ def main() -> None:
 
                         # 正常判断是否结束周期
                         if cycle_loop_count == total_cycle_loop_count - 1:
+                            #------------------------- 检查是否丢失目标 -------------------------#
+                            _target_number = MatchTemplateConfig.getattr("target_number")
+                            _got_target_number = MatchTemplateConfig.getattr("got_target_number")
+                            if _target_number > _got_target_number:
+                                logger.warning(f"The target number {_target_number} is not enough, got {_got_target_number} targets, start to find lost target.")
+                                # 丢失目标
+                                try:
+                                    _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+                                    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+                                    #-------------------- 畸变矫正 --------------------#
+                                    rectified_image = image
+                                    #-------------------- 畸变矫正 --------------------#
+
+                                    #-------------------- 模板匹配 --------------------#
+                                    find_target(rectified_image)
+                                    #-------------------- 模板匹配 --------------------#
+
+                                    _target_number = MatchTemplateConfig.getattr("target_number")
+                                    _got_target_number = MatchTemplateConfig.getattr("got_target_number")
+                                    if _target_number > _got_target_number:
+                                        # 重新查找完成之后仍然不够, 发送告警
+                                        logger.critical(f"The target number {_target_number} is not enough, got {_got_target_number} targets.")
+                                    else:
+                                        # 丢失目标重新找回
+                                        logger.success(f"The lost target has been found, the target number {_target_number} is enough, got {_got_target_number} targets.")
+
+                                except queue.Empty:
+                                    logger.error("get picture timeout")
+                            else:
+                                # 目标数量正常
+                                logger.success(f"The target number {_target_number} is enough, got {_got_target_number} targets.")
+                            #------------------------- 检查是否丢失目标 -------------------------#
+
+
+                            #------------------------- 整理检测结果 -------------------------#
+                            logger.success(f"cycle_result: {cycle_result = }")
+                            #------------------------- 整理检测结果 -------------------------#
+
                             #------------------------- 结束周期 -------------------------#
-                            cycle_loop_count = -1  # 重置周期内循环计数
+                            cycle_result = [] # 重置周期内结果
+                            cycle_loop_count = -1   # 重置周期内循环计数
                             logger.success(f"The cycle is over.")
                             #------------------------- 结束周期 -------------------------#
                         else:

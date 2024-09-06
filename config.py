@@ -6,6 +6,7 @@ import cv2
 from dataclasses import dataclass, field
 from typing import Any
 from loguru import logger
+import yaml
 
 
 @dataclass
@@ -85,24 +86,24 @@ class StereoCalibrationConfig(BaseConfig):
     """畸变矫正配置
     """
     lock = Lock()
-    camera_matrix_left = np.array([
+    camera_matrix_left = [
         [7.44937603e+03, 0.00000000e+00, 1.79056889e+03],
         [0.00000000e+00, 7.45022891e+03, 1.26665786e+03],
         [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
-    ])
-    camera_matrix_right = np.array([
+    ]
+    camera_matrix_right = [
         [7.46471035e+03, 0.00000000e+00, 1.81985040e+03],
         [0.00000000e+00, 7.46415680e+03, 1.38081032e+03],
         [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
-    ])
-    distortion_coefficients_left = np.array([[-4.44924086e-01, 6.27814725e-01, -1.80510014e-03, -8.97545764e-04, -1.84473439e+01]])
-    distortion_coefficients_right = np.array([[-4.07660445e-01, -2.23391154e+00, -1.09115383e-03, -3.04516347e-03, 7.45504877e+01]])
-    R = np.array([
+    ]
+    distortion_coefficients_left = [[-4.44924086e-01, 6.27814725e-01, -1.80510014e-03, -8.97545764e-04, -1.84473439e+01]]
+    distortion_coefficients_right = [[-4.07660445e-01, -2.23391154e+00, -1.09115383e-03, -3.04516347e-03, 7.45504877e+01]]
+    R = [
         [0.97743098, 0.00689964, 0.21114231],
         [-0.00564446, 0.99996264, -0.00654684],
         [-0.2111796, 0.0052073, 0.97743341]
-    ])
-    T = np.array([[-476.53571438], [4.78988367], [49.50495583]])
+    ]
+    T = [[-476.53571438], [4.78988367], [49.50495583]]
     # 给定的传感器尺寸和图像分辨率
     sensor_width_mm = 6.413  # 传感器宽度，以毫米为单位
     image_width_pixels = 3840  # 图像宽度，以像素为单位
@@ -160,16 +161,16 @@ class SerialCommConfig(BaseConfig):
     BUFFER_SIZE: int = 2048
     timeout: float = 0
     # 温度记录日志配置
-    temperature_logger = logger.bind(temperature = True)
-    temperature_logger.add(
-        "log/temperature_data.log",
-        format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
-        level="INFO",
-        rotation="500 MB",
-        retention="10 days",
-        compression="zip",
-        filter=lambda record: "temperature" in record["extra"],
-    )
+    # temperature_logger = logger.bind(temperature = True)
+    # temperature_logger.add(
+    #     "log/temperature_data.log",
+    #     format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
+    #     level="INFO",
+    #     rotation="500 MB",
+    #     retention="10 days",
+    #     compression="zip",
+    #     filter=lambda record: "temperature" in record["extra"],
+    # )
 
 
 @dataclass
@@ -190,3 +191,47 @@ class FTPConfig(BaseConfig):
     port: int = 0
     username: str = ""
     password: str = ""
+
+
+def save_config_to_yaml(config: MainConfig, file_path: str | Path):
+    """
+    Save a configuration class to a YAML file.
+
+    :param config: The configuration class to save
+    :param file_path: The path to save the YAML file
+    """
+    data = {}
+    for attr in dir(config):
+        if not attr.startswith("__") and not callable(getattr(config, attr)) and not attr.startswith("lock"):
+            value = config.getattr(attr)
+            if isinstance(value, Path):
+                value = str(value)
+            data[attr] = value
+
+    data = {config.__name__: data}
+    with open(file_path, 'w') as file:
+        yaml.dump(data, file, default_flow_style=False)
+
+
+def load_config_from_yaml(config: MainConfig, file_path: str | Path):
+    """
+    Load configuration from a YAML file and update the given configuration class.
+
+    :param config: The configuration class to update
+    :param file_path: The path to the YAML file to load
+    """
+    with open(file_path, 'r') as file:
+        data = yaml.safe_load(file)
+
+    data = data[config.__name__]
+    for key, value in data.items():
+        if hasattr(config, key):
+            if isinstance(getattr(config, key), Path):
+                value = Path(value)
+            config.setattr(key, value)
+
+
+# Example usage:
+if __name__ == "__main__":
+    save_config_to_yaml(MainConfig, "main_config.yaml")
+    load_config_from_yaml(MainConfig, "main_config.yaml")

@@ -13,6 +13,7 @@ def adjust_exposure_by_mean(
     adjust_exposure_time_step: float = 1000,
 ) -> tuple[float, int]:
     mean_bright = mean_brightness(image)
+    logger.info(f"{exposure_time = }, {mean_bright = }")
     if mean_bright < mean_light_suitable_range[0]:
         return exposure_time + adjust_exposure_time_step, 1
     elif mean_bright > mean_light_suitable_range[1]:

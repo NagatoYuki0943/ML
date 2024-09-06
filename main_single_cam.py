@@ -132,12 +132,18 @@ def main() -> None:
     #------------------------------ 初始化 ------------------------------#
 
     #------------------------------ 调整曝光 ------------------------------#
+    try:
+        _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
+        cv2.imwrite(save_dir / "image_default.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2GRAY))
+    except queue.Empty:
+        logger.error("get picture timeout")
+
     logger.info("ajust exposure 1 start")
     adjust_exposure3(camera_queue)
     logger.success("ajust exposure 1 end")
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_adjust_exposure.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        cv2.imwrite(save_dir / "image_adjust_exposure.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2GRAY))
     except queue.Empty:
         logger.error("get picture timeout")
     #------------------------------ 调整曝光 ------------------------------#
@@ -153,7 +159,6 @@ def main() -> None:
         image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         logger.info(f"{image.shape = }, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}")
-
         #-------------------- 取图 --------------------#
 
         #-------------------- 畸变矫正 --------------------#
@@ -164,10 +169,15 @@ def main() -> None:
 
         logger.info("image find target start")
         target_number: int = MatchTemplateConfig.getattr("target_number")
-        boxes = find_target(image)
-        # boxes = find_target(undistorted_image)
-        MatchTemplateConfig.boxes = boxes
-        logger.info(f"image find target result: \n{boxes}")
+        ratios, scores, boxes, got_target_number = find_target(image)
+        logger.info(f"image find target ratios: \n{ratios}")
+        logger.info(f"image find target scores: \n{scores}")
+        logger.info(f"image find target boxes: \n{boxes}")
+        logger.info(f"image find target number: {got_target_number}")
+        if got_target_number < target_number:
+            logger.warning(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
+        else:
+            logger.success(f"find target number {got_target_number} equal target number {target_number}")
 
         # 绘制boxes
         image_draw = image.copy()
@@ -235,10 +245,10 @@ def main() -> None:
                 #-------------------- 设定循环 --------------------##
                 # 总的循环轮数为 1 + 曝光次数
                 total_cycle_loop_count = 1 + len(exposure2boxes)
-                logger.critical(f"During this cycle, there will be {total_cycle_loop_count} iterations.")
+                logger.critical(f"During this cycle, there will be {total_cycle_loop_count} iters.")
                 # 当前周期，采用从 0 开始
                 cycle_loop_count = 0
-                logger.info(f"The {cycle_loop_count} iteration within the cycle.")
+                logger.info(f"The {cycle_loop_count} iter within the cycle.")
 
                 # 设置下一轮的曝光值
                 exposure_time = cycle_exposure_times[cycle_loop_count]
@@ -252,7 +262,7 @@ def main() -> None:
                 #-------------------- camera capture --------------------#
                 camera_qsize = camera_queue.qsize()
                 if camera_qsize > 0:
-                    logger.info(f"The {cycle_loop_count + 1} iteration within the cycle.")
+                    logger.info(f"The {cycle_loop_count + 1} iter within the cycle.")
 
                     # 忽略多余的图片
                     if camera_qsize > 1:
@@ -291,8 +301,8 @@ def main() -> None:
                         _boxes = exposure2boxes[exposure]
                         centers = []
                         for j, _box in enumerate(_boxes):
-                            # [x1, y1, x2, y2]
-                            target = image[_box[1]:_box[3], _box[0]:_box[2]]
+                            x1, y1, x2, y2 = _box
+                            target = image[y1:y2, x1:x2]
 
                             try:
                                 logger.info(f"box {j} rings location start")

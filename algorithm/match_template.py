@@ -46,7 +46,7 @@ def sort_boxes(boxes: np.ndarray, sort_by: Literal["x", "y", "xy"] = "x") -> np.
         sort_by (Literal["x", "y", "xy"], optional): 排序方式. Defaults to "x".
 
     Returns:
-        np.ndarray: 排序的box
+        np.ndarray: 排序的index
     """
     assert sort_by in ["x", "y", "xy"], f"sort_by must be 'x', 'y' or 'xy' but got {sort_by}"
 
@@ -58,26 +58,35 @@ def sort_boxes(boxes: np.ndarray, sort_by: Literal["x", "y", "xy"] = "x") -> np.
     else:
         combined_indices = np.lexsort((boxes[:, 3], boxes[:, 2], boxes[:, 1], boxes[:, 0]))
 
-    return boxes[combined_indices]
+    return combined_indices
 
 
 def test_sort_boxes():
     boxes = np.array([[0, 4, 4, 5], [0, 0, 5, 4], [6, 6, 10, 11], [1, 6, 7, 8], [6, 4, 9, 7], [1, 8, 12, 10]])
-    print(sort_boxes(boxes))
+    index = sort_boxes(boxes)
+    print(index)
+    print(boxes[index])
+    # [0 1 3 5 4 2]
     # [[ 0  4  4  5]
     #  [ 0  0  5  4]
     #  [ 1  6  7  8]
     #  [ 1  8 12 10]
     #  [ 6  4  9  7]
     #  [ 6  6 10 11]]
-    print(sort_boxes(boxes, "y"))
+    index = sort_boxes(boxes, "y")
+    print(index)
+    print(boxes[index])
+    # [1 0 4 3 2 5]
     # [[ 0  0  5  4]
     #  [ 0  4  4  5]
     #  [ 6  4  9  7]
     #  [ 1  6  7  8]
     #  [ 6  6 10 11]
     #  [ 1  8 12 10]]
-    print(sort_boxes(boxes, "xy"))
+    index = sort_boxes(boxes, "xy")
+    print(index)
+    print(boxes[index])
+    # [1 0 3 5 4 2]
     # [[ 0  0  5  4]
     #  [ 0  4  4  5]
     #  [ 1  6  7  8]
@@ -88,7 +97,14 @@ def test_sort_boxes():
 
 
 def sort_boxes_center(boxes: np.ndarray, sort_by: Literal["x", "y"] = "x") -> np.ndarray:
-    """根据中心 x or y 从小到大排序对 boxes 进行排序
+    """根据 x or y 从小到大排序对 boxes 进行排序
+
+    Args:
+        boxes (np.ndarray): 未排序的box,  [[x_min, y_min, x_max, y_max],...]
+        sort_by (Literal["x", "y"], optional): 排序方式. Defaults to "x".
+
+    Returns:
+        np.ndarray: 排序的index
     """
     assert sort_by in ["x", "y"], f"sort_by must be 'x' or 'y' but got {sort_by}"
 
@@ -100,19 +116,25 @@ def sort_boxes_center(boxes: np.ndarray, sort_by: Literal["x", "y"] = "x") -> np
         combined_indices = np.lexsort((y_center, x_center))
     else:
         combined_indices = np.lexsort((x_center, y_center))
-    return boxes[combined_indices]
+    return combined_indices
 
 
 def test_sort_boxes_center():
     boxes = np.array([[0, 4, 4, 5], [0, 0, 5, 4], [6, 6, 10, 11], [1, 6, 7, 8], [6, 4, 9, 7], [1, 8, 12, 10]])
-    print(sort_boxes_center(boxes))
+    index = sort_boxes_center(boxes)
+    print(index)
+    print(boxes[index])
+    # [0 1 3 5 4 2]
     # [[ 0  4  4  5]
     #  [ 0  0  5  4]
     #  [ 1  6  7  8]
     #  [ 1  8 12 10]
     #  [ 6  4  9  7]
     #  [ 6  6 10 11]]
-    print(sort_boxes_center(boxes, "y"))
+    index = sort_boxes_center(boxes, "y")
+    print(index)
+    print(boxes[index])
+    # [1 0 4 3 2 5]
     # [[ 0  0  5  4]
     #  [ 0  4  4  5]
     #  [ 6  4  9  7]
@@ -237,6 +259,7 @@ def match_template_filter_by_threshold(
 
     Returns:
         list[tuple[float, list[int]]]: [(得分, 框的坐标), ...]
+                                       当找不到时，返回 []
     """
     if mask is not None:
         assert match_method in (cv2.TM_SQDIFF, cv2.TM_CCORR_NORMED), \
@@ -255,12 +278,12 @@ def match_template_filter_by_threshold(
     # 在彩色图像的情况下, 在所有通道上进行分子中的模板求和和和分母中的每个求和, 并且对每个通道使用单独的平均值.
     # 也就是说, 该函数可以采用颜色模板和彩色图像.结果仍然是单通道图像, 更易于分析.
     if match_method == cv2.TM_SQDIFF or match_method == cv2.TM_SQDIFF_NORMED:
-        keep_y, keep_x = np.where(match_image < match_threshold)
+        keep_y, keep_x = np.where(match_image <= match_threshold)
         scores = match_image[keep_y, keep_x]
         # sort scores, 升序
         sort_index = np.argsort(scores)
     else:
-        keep_y, keep_x = np.where(match_image > match_threshold)
+        keep_y, keep_x = np.where(match_image >= match_threshold)
         scores = match_image[keep_y, keep_x]
         # sort scores, 降序
         sort_index = np.argsort(-scores)
@@ -317,16 +340,13 @@ def multi_scale_match_template(
             如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
 
     Returns:
-        list: 每个 scale 匹配的模板结果, (scale, score, box)
+        list: 每个 scale 匹配的模板结果, [final_ratio, score, box], final_ratio 为模板最终的缩放比率, score 为匹配得分, box 为匹配框的坐标
     """
 
     # 将模板大小调整到相对于图片合适的大小
     template_h, template_w = template.shape[:2]
     image_h, image_w = image.shape[:2]
     ratio = min(image_h, image_w) * init_scale / min(template_h, template_w)
-    # 临时尺寸
-    _template_h = template_h * ratio
-    _template_w = template_w * ratio
 
     # 模糊图像
     # image = cv2.GaussianBlur(image, (3, 3), 0)
@@ -334,13 +354,15 @@ def multi_scale_match_template(
     match_results = []
     # 根据不同尺度调整模板的大小
     for scale in np.arange(scales[0], scales[1] + 1e-8, scales[2]).tolist():
-        # 临时尺寸 * scale 得到最终尺寸
-        resized_h = int(_template_h * scale)
-        resized_w = int(_template_w * scale)
+        # 得到最终比率
+        final_ratio = ratio * scale
+        # 根据最终比率得到模板的尺寸
+        resized_h = int(final_ratio * template_h)
+        resized_w = int(final_ratio * template_w)
         # 使用最终尺寸一次 resize 模板
         template_resized = cv2.resize(template, (resized_w, resized_h))
         mask_resized = cv2.resize(mask, (resized_w, resized_h)) if mask is not None else None
-        logger.info(f"{scale = }, resize template size h = {resized_h}, w = {resized_w}")
+        logger.info(f"{scale = }, {final_ratio = }, resize template size h = {resized_h}, w = {resized_w}")
         # 模糊模板
         # template_resized = cv2.GaussianBlur(template_resized, (3, 3), 0)
 
@@ -353,7 +375,7 @@ def multi_scale_match_template(
                 mask_resized,
             )
             score, box = match_result # 最高得分
-            match_results.append((scale, score, box))
+            match_results.append((final_ratio, score, box))
         else:
             # 通过阈值匹配
             match_result = match_template_filter_by_threshold(
@@ -364,9 +386,9 @@ def multi_scale_match_template(
                 threshold_iou_threshold,
                 mask,
             )
-            # scale: int
-            # match_result: [[score, box], ...]  -> [[scale, score, box], ...]
-            _match_result = list(zip([scale] * len(match_result), *list(zip(*match_result))))
+            # final_ratio: float
+            # match_result: [[score, box], ...]  -> [[final_ratio, score, box], ...]
+            _match_result = list(zip([final_ratio] * len(match_result), *list(zip(*match_result))))
             match_results.extend(_match_result)
 
     if match_method == cv2.TM_SQDIFF or match_method == cv2.TM_SQDIFF_NORMED:
@@ -392,7 +414,7 @@ def multi_target_multi_scale_match_template(
     threshold_match_threshold: float = 0.8,
     threshold_iou_threshold: float = 0.5,
     mask: np.ndarray | None = None,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """多目标多尺度匹配
     先根据 init_scale 将模板调整为相对于图片的大小, 然后再循环 scales 调整 template 的大小进行匹配
 
@@ -419,7 +441,8 @@ def multi_target_multi_scale_match_template(
             如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
 
     Returns:
-        np.ndarray: 多目标匹配结果 boxes, [[x_min, y_min, x_max, y_max],...]
+        tuple[np.ndarray, np.ndarray, np.ndarray]: reserve_final_ratios, reserve_scores, reserve_boxes
+                                                   模板最终的缩放比率, 匹配得分, b匹配框的坐标
     """
     # 多目标匹配
     results = multi_scale_match_template(
@@ -434,8 +457,8 @@ def multi_target_multi_scale_match_template(
         mask,
     )
     # logger.info(f"multi_scale_match_template results: {results}")
-    _scales = np.array([result[0] for result in results])
-    logger.info(f"scales:\n {_scales}")
+    final_ratios = np.array([result[0] for result in results])
+    logger.info(f"final_ratios:\n {final_ratios}")
     scores = np.array([result[1] for result in results])
     logger.info(f"scores:\n {scores}")
     boxes = np.array([result[2] for result in results])
@@ -443,10 +466,10 @@ def multi_target_multi_scale_match_template(
 
     # iou 过滤
     reserve_index = iou_filter_by_threshold(boxes, iou_threshold)
-    reserve_scales = _scales[reserve_index]
+    reserve_final_ratios = final_ratios[reserve_index]
     reserve_scores = scores[reserve_index]
     reserve_boxes = boxes[reserve_index]
-    logger.info(f"reserve_scales:\n {reserve_scales}")
+    logger.info(f"reserve_final_ratios:\n {reserve_final_ratios}")
     logger.info(f"reserve_scores:\n {reserve_scores}")
     logger.info(f"reserve_boxes:\n {reserve_boxes}")
 
@@ -455,9 +478,11 @@ def multi_target_multi_scale_match_template(
 
     # 获取前 target_number 个匹配结果
     if target_number > 0:
+        reserve_final_ratios = reserve_final_ratios[:target_number]
+        reserve_scores = reserve_scores[:target_number]
         reserve_boxes = reserve_boxes[:target_number]
     logger.info(f"match boxes:\n {reserve_boxes}")
-    return reserve_boxes
+    return reserve_final_ratios, reserve_scores, reserve_boxes
 
 
 if __name__ == "__main__":

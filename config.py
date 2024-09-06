@@ -69,7 +69,7 @@ class AdjustCameraConfig(BaseConfig):
     """调整相机配置
     """
     lock = Lock()
-    mean_light_suitable_range: tuple[float] = (100, 160)
+    mean_light_suitable_range: tuple[float] = (80, 160) # (100, 160)
     adjust_exposure_time_step: int = 2000
     capture_mode: Literal['preview', 'low', 'full'] = 'low'
     capture_time_interval: int = 100        # 拍照间隔 us
@@ -113,17 +113,19 @@ class MatchTemplateConfig(BaseConfig):
     """
     lock = Lock()
     template_path: Path = Path("assets/template/circles2-7.5cm-390.png")
-    match_method: int = cv2.TM_CCOEFF_NORMED
-    init_scale: float = 0.075   # 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
-    scales: tuple[float] = (1.0, 4.0, 0.1)
-    target_number: int = 2
-    iou_threshold: float = 0.5
-    use_threshold_match: bool = True
-    threshold_match_threshold: float = 0.6
-    threshold_iou_threshold: float = 0.5
-    boxes: list[list[int]] = None     # [[x1, y1, x2, y2], ...]
-    left_boxes: list[list[int]] = None # [[x1, y1, x2, y2], ...]
-    right_boxes: list[list[int]] = None # [[x1, y1, x2, y2], ...]
+    match_method: int = cv2.TM_CCOEFF_NORMED    # 匹配方法
+    init_scale: float = 0.075                   # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
+    scales: tuple[float] = (1.0, 4.0, 0.1)      # 缩放 scale 范围 (start, end, step)
+    target_number: int = 2                      # 靶标数量
+    got_target_number: int = 0                  # 找到的靶标数量
+    iou_threshold: float = 0.5                  # iou 阈值
+    use_threshold_match: bool = True            # 是否使用阈值匹配
+    threshold_match_threshold: float = 0.6      # 阈值匹配阈值
+    threshold_iou_threshold: float = 0.5        # 阈值匹配 iou 阈值
+    ratios: np.ndarray = None                   # 模板缩放比率 [...]
+    scores: np.ndarray = None                   # 匹配得分 [...]
+    boxes: np.ndarray = None                    # 匹配的 boxes [[x1, y1, x2, y2], ...]
+    boxes_status: np.ndarray = None             # 当前 box 状态，用 True 代表找得到，False 代表丢失
 
 
 @dataclass

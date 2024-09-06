@@ -11,12 +11,20 @@ def adjust_exposure_by_mean(
     exposure_time: float,
     mean_light_suitable_range: tuple[float],
     adjust_exposure_time_step: float = 1000,
+    suitable_ignore_ratio: float = 0.0,
 ) -> tuple[float, int]:
     mean_bright = mean_brightness(image)
     logger.info(f"{exposure_time = }, {mean_bright = }")
-    if mean_bright < mean_light_suitable_range[0]:
+
+    # 缩小 mean_light_suitable_range 区间，让它更加宽松
+    suitable_range = mean_light_suitable_range[1] - mean_light_suitable_range[0]
+    ignore_range = suitable_range * suitable_ignore_ratio
+    low = mean_light_suitable_range[0] + ignore_range
+    high = mean_light_suitable_range[1] - ignore_range
+
+    if mean_bright < low:
         return exposure_time + adjust_exposure_time_step, 1
-    elif mean_bright > mean_light_suitable_range[1]:
+    elif mean_bright > high:
         return exposure_time - adjust_exposure_time_step, -1
     else:
         return exposure_time, 0
@@ -55,6 +63,7 @@ def adjust_exposure1(
                 image_metadata['ExposureTime'],
                 AdjustCameraConfig.getattr("mean_light_suitable_range"),
                 AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                AdjustCameraConfig.getattr("suitable_ignore_ratio"),
             )
             logger.info(f"{new_exposure_time = }, {direction = }")
             if direction == 0:
@@ -77,6 +86,7 @@ def adjust_exposure1(
                     image_metadata['ExposureTime'],
                     AdjustCameraConfig.getattr("mean_light_suitable_range"),
                     AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                    AdjustCameraConfig.getattr("suitable_ignore_ratio"),
                 )
 
                 directions.append(direction)
@@ -137,6 +147,7 @@ def adjust_exposure1(
                     image_metadata['ExposureTime'],
                     AdjustCameraConfig.getattr("mean_light_suitable_range"),
                     AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                    AdjustCameraConfig.getattr("suitable_ignore_ratio"),
                 )
 
                 CameraConfig.setattr("exposure_time", new_exposure_time)
@@ -159,6 +170,7 @@ def adjust_exposure1(
                         image_metadata['ExposureTime'],
                         AdjustCameraConfig.getattr("mean_light_suitable_range"),
                         AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                        AdjustCameraConfig.getattr("suitable_ignore_ratio"),
                     )
 
                     directions.append(direction)
@@ -237,6 +249,7 @@ def adjust_exposure2(
                     image_metadata['ExposureTime'],
                     AdjustCameraConfig.getattr("mean_light_suitable_range"),
                     AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                    AdjustCameraConfig.getattr("suitable_ignore_ratio"),
                 )
 
                 CameraConfig.setattr("exposure_time", new_exposure_time)
@@ -261,6 +274,7 @@ def adjust_exposure2(
                         image_metadata['ExposureTime'],
                         AdjustCameraConfig.getattr("mean_light_suitable_range"),
                         AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                        AdjustCameraConfig.getattr("suitable_ignore_ratio"),
                     )
 
                     directions.append(direction)
@@ -338,6 +352,7 @@ def adjust_exposure3(
                 image_metadata['ExposureTime'],
                 AdjustCameraConfig.getattr("mean_light_suitable_range"),
                 AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                AdjustCameraConfig.getattr("suitable_ignore_ratio"),
             )
             CameraConfig.setattr("exposure_time", new_exposure_time)
 
@@ -363,6 +378,7 @@ def adjust_exposure3(
                     image_metadata['ExposureTime'],
                     AdjustCameraConfig.getattr("mean_light_suitable_range"),
                     AdjustCameraConfig.getattr("adjust_exposure_time_step"),
+                    AdjustCameraConfig.getattr("suitable_ignore_ratio"),
                 )
 
                 directions.append(direction)

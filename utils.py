@@ -1,4 +1,6 @@
 from queue import Queue
+import cv2
+import numpy as np
 
 
 def clear_queue(*queues: Queue):
@@ -15,3 +17,14 @@ def clear_queue(*queues: Queue):
         except Exception as e:
             # 处理其他可能的异常
             print(f"An error occurred: {e}")
+
+
+def enhance_contrast_clahe(image: np.ndarray, clip_limit=2.0, tile_grid_size=(8, 8)) -> np.ndarray:
+    """clahe增强对比度"""
+    # 创建CLAHE对象
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+
+    # 应用CLAHE
+    enhanced_image = clahe.apply(image)
+
+    return enhanced_image

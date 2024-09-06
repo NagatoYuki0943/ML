@@ -2,9 +2,11 @@ import time
 from datetime import datetime
 from queue import Queue
 from loguru import logger
+import cv2
 
 from algorithm import RaspberryCameras
 from config import CameraConfig
+from utils import enhance_contrast_clahe
 
 
 # 相机线程
@@ -64,6 +66,17 @@ def camera_engine(
                 if queue.full():
                     queue.get()
                     logger.warning(f"camera {camera_index} queue is full, delete the first image in queue")
+
+                # 转换为Gray，Default: RGB
+                output_format = CameraConfig.getattr("output_format")
+                if output_format == "gray":
+                    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+                # 是否有滤光板
+                has_filter_plate = CameraConfig.getattr("has_filter_plate")
+                if not has_filter_plate:
+                    image = enhance_contrast_clahe(image)
+
                 # 将图像放入队列中
                 queue.put((timestamp, image, metadata))
                 logger.success(f"camera {camera_index} put {timestamp} image into queue")

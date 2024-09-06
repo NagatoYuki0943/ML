@@ -46,7 +46,6 @@ def adjust_exposure1(
                     logger.error("get picture timeout")
 
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
         # 全图
         if boxes is None:
@@ -230,7 +229,6 @@ def adjust_exposure2(
 
             image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
             logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
             # 全图
             if boxes is None:
@@ -332,7 +330,6 @@ def adjust_exposure3(
 
         image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
         logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
         # 全图
         if boxes is None:

@@ -62,6 +62,8 @@ class CameraConfig(BaseConfig):
     queue_maxsize: int = 5                                  # 相机拍照队列最大长度
     camera_left_index: int = 1                              # 左侧相机 index
     camera_right_index: int = 0                             # 右侧相机 index
+    output_format: Literal['rgb', 'gray'] = 'gray'          # 输出格式
+    has_filter_plate: bool = False                          # 是否有滤镜板
 
 
 @dataclass
@@ -69,7 +71,7 @@ class AdjustCameraConfig(BaseConfig):
     """调整相机配置
     """
     lock = Lock()
-    mean_light_suitable_range: tuple[float] = (70, 160) # (100, 160)
+    mean_light_suitable_range: tuple[float] = (80, 160) # (100, 160)
     adjust_exposure_time_step: int = 2000
     capture_mode: Literal['preview', 'low', 'full'] = 'low'
     capture_time_interval: int = 100        # 拍照间隔 us

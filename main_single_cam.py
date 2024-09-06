@@ -134,7 +134,7 @@ def main() -> None:
     #------------------------------ 调整曝光 ------------------------------#
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_default.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2GRAY))
+        cv2.imwrite(save_dir / "image_default.jpg", image)
     except queue.Empty:
         logger.error("get picture timeout")
 
@@ -143,7 +143,7 @@ def main() -> None:
     logger.success("ajust exposure 1 end")
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_adjust_exposure.jpg", cv2.cvtColor(image, cv2.COLOR_RGB2GRAY))
+        cv2.imwrite(save_dir / "image_adjust_exposure.jpg", image)
     except queue.Empty:
         logger.error("get picture timeout")
     #------------------------------ 调整曝光 ------------------------------#
@@ -157,7 +157,6 @@ def main() -> None:
     #-------------------- 取图 --------------------#
     try:
         _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         logger.info(f"{image.shape = }, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}")
         #-------------------- 取图 --------------------#
 
@@ -234,7 +233,6 @@ def main() -> None:
                 #-------------------- 找到目标 --------------------#
                 try:
                     _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-                    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
                     #-------------------- 畸变矫正 --------------------#
                     rectified_image = image
                     #-------------------- 畸变矫正 --------------------#
@@ -313,8 +311,8 @@ def main() -> None:
 
                         #-------------------- single box location --------------------#
                         # for循环，截取图像
-                        exposure = cycle_exposure_times[cycle_loop_count]
-                        _boxes = exposure2boxes[exposure]
+                        exposure_time = cycle_exposure_times[cycle_loop_count]
+                        _boxes = exposure2boxes[exposure_time]
                         centers = []
                         for j, _box in enumerate(_boxes):
                             x1, y1, x2, y2 = _box
@@ -354,7 +352,12 @@ def main() -> None:
                         #-------------------- single box location --------------------#
 
                         logger.success(f"{centers = }")
-                        cycle_result.append(centers)
+                        cycle_result.append({
+                            'image_timestamp': image_timestamp,
+                            'boxes': _boxes,
+                            'centers': centers,
+                            'exposure_time': exposure_time,
+                        })
                         #------------------------- 检测目标 -------------------------#
 
                     except queue.Empty:
@@ -367,6 +370,7 @@ def main() -> None:
 
                         # 正常判断是否结束周期
                         if cycle_loop_count == total_cycle_loop_count - 1:
+                            # 结束周期
                             #------------------------- 检查是否丢失目标 -------------------------#
                             _target_number = MatchTemplateConfig.getattr("target_number")
                             _got_target_number = MatchTemplateConfig.getattr("got_target_number")
@@ -375,7 +379,6 @@ def main() -> None:
                                 # 丢失目标
                                 try:
                                     _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-                                    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
                                     #-------------------- 畸变矫正 --------------------#
                                     rectified_image = image
                                     #-------------------- 畸变矫正 --------------------#
@@ -400,9 +403,8 @@ def main() -> None:
                                 logger.success(f"The target number {_target_number} is enough, got {_got_target_number} targets.")
                             #------------------------- 检查是否丢失目标 -------------------------#
 
-
                             #------------------------- 整理检测结果 -------------------------#
-                            logger.success(f"cycle_result: {cycle_result = }")
+                            logger.success(f"{cycle_result = }")
                             #------------------------- 整理检测结果 -------------------------#
 
                             #------------------------- 结束周期 -------------------------#

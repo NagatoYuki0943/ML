@@ -55,7 +55,7 @@ def find_target(image: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, 
     if got_target_number < target_number:
         logger.error(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
     else:
-        logger.success(f"find target number {got_target_number} equal set target number {target_number}")
+        logger.success(f"find target number {got_target_number} = set target number {target_number}")
 
     logger.info("find target end")
     return sorted_ratios, sorted_scores, sorted_boxes, got_target_number
@@ -154,7 +154,7 @@ def around_find_target(image: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.nd
     if got_target_number < target_number:
         logger.error(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
     else:
-        logger.success(f"find target number {got_target_number} equal set target number {target_number}")
+        logger.success(f"find target number {got_target_number} = set target number {target_number}")
 
     logger.info("around find target end")
     return sorted_ratios, sorted_scores, sorted_boxes, got_target_number

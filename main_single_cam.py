@@ -210,10 +210,13 @@ def main() -> None:
 
     #------------------------------ 找到目标 ------------------------------#
 
+    #-------------------- 循环变量 --------------------#
     # 主循环
     i = 0
     # 一个周期内的结果
-    cycle_result = []
+    cycle_results = []
+    # 初始的坐标
+    cycle_centers = None
     # 一个周期内总循环次数
     total_cycle_loop_count = 0
     # 一个周期内循环计数
@@ -221,6 +224,8 @@ def main() -> None:
     # 每个周期的间隔时间
     cycle_time_interval: int = MainConfig.getattr("cycle_time_interval")
     cycle_before_time = time.time()
+
+    #-------------------- 循环变量 --------------------#
 
     while True:
         cycle_current_time = time.time()
@@ -360,7 +365,7 @@ def main() -> None:
                         #-------------------- single box location --------------------#
 
                         logger.success(f"{centers = }")
-                        cycle_result.append({
+                        cycle_results.append({
                             'image_timestamp': image_timestamp,
                             'boxes': _boxes,
                             'centers': centers,
@@ -412,11 +417,45 @@ def main() -> None:
                             #------------------------- 检查是否丢失目标 -------------------------#
 
                             #------------------------- 整理检测结果 -------------------------#
-                            logger.success(f"{cycle_result = }")
+                            logger.success(f"{cycle_results = }")
+
+                            some_ring_locate_failed = False
+                            # 判断有没有目标没有检测到
+                            for result in cycle_results:
+                                for center in result:
+                                    if center is None:
+                                        some_ring_locate_failed = True
+                                        # 有目标没有检测到
+                                        continue
+
+                            if some_ring_locate_failed:
+                                # 有目标没有检测到
+                                logger.warning("Some ring location failed")
+                            else:
+                                # [n, 2] n个目标中心坐标
+                                new_cycle_centers = np.concatenate([result['centers'] for result in cycle_results])
+                                # 初始化 cycle_centers
+                                if cycle_centers is None:
+                                    cycle_centers = new_cycle_centers
+                                    logger.info(f"init cycle_centers: {cycle_centers}")
+                                else:
+                                    move_threshold = RingsLocationConfig.getattr("move_threshold")
+                                    # 计算移动距离
+                                    cycle_centers = np.array(cycle_centers)
+                                    # 需要调整框的index
+                                    move_distance = abs(new_cycle_centers - cycle_centers)             # [n, 2]
+                                    over_threshold = move_distance > move_threshold                             # [n, 2]
+                                    over_threshold = np.bitwise_or(over_threshold[:, 0], over_threshold[:, 1])  # [n]
+                                    over_threshold_index = np.where(over_threshold)[0]
+                                    if len(over_threshold_index) > 0:
+                                        logger.warning(f"found over threshold index: {over_threshold_index}, move_distance: {move_distance[over_threshold_index]}")
+                                    else:
+                                        logger.info(f"no over threshold index found, move_distance: {move_distance}")
+
                             #------------------------- 整理检测结果 -------------------------#
 
                             #------------------------- 结束周期 -------------------------#
-                            cycle_result = [] # 重置周期内结果
+                            cycle_results = [] # 重置周期内结果
                             cycle_loop_count = -1   # 重置周期内循环计数
                             logger.success(f"The cycle is over.")
                             #------------------------- 结束周期 -------------------------#

@@ -72,7 +72,7 @@ class AdjustCameraConfig(BaseConfig):
     """调整相机配置
     """
     lock = Lock()
-    mean_light_suitable_range: tuple[float] = (80, 160) # (100, 160)
+    mean_light_suitable_range: tuple[float] = (70, 160) # (100, 160)
     suitable_ignore_ratio: float = 0.1                 # 忽略 mean_light_suitable_range 最低和最高范围的百分比 [0, 100] -> [10, 90]
     adjust_exposure_time_step: int = 2000
     capture_mode: Literal['preview', 'low', 'full'] = 'low'
@@ -148,6 +148,7 @@ class RingsLocationConfig(BaseConfig):
     save_grads: bool = False
     save_detect_images: bool = False
     save_detect_results: bool = False
+    move_threshold: float = 0.1     # 定位误差阈值, pixel
 
 
 @dataclass

@@ -475,7 +475,7 @@ def adjust_exposure3(
     logger.info("adjust exposure start")
 
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
-    exposure2id2boxestate: dict[int, dict | None] = {
+    exposure2id2boxstate: dict[int, dict | None] = {
         CameraConfig.getattr("exposure_time"): id2boxestate
     }
 
@@ -513,14 +513,14 @@ def adjust_exposure3(
 
             # 可以
             if direction == 0:
-                exposure2id2boxestate = {
+                exposure2id2boxstate = {
                     new_exposure_time: id2boxestate
                 }
                 logger.success(f"full picture exposure time {new_exposure_time} us is ok")
             # 需要调节
             else:
                 logger.info(f"{new_exposure_time = }, {direction = }")
-                exposure2id2boxestate = adjust_exposure3(camera_queue)
+                exposure2id2boxstate = adjust_exposure3(camera_queue)
 
         # 划分box
         else:
@@ -550,7 +550,7 @@ def adjust_exposure3(
             # 全都可以
             if all(direction == 0 for direction in directions.values()):
                 new_exposure_time = list(new_exposure_times.values())[0]
-                exposure2id2boxestate = {
+                exposure2id2boxstate = {
                     new_exposure_time: id2boxestate
                 }
                 logger.success(f"id2boxestate: {id2boxestate}, original exposure time {new_exposure_time} us is ok")
@@ -578,7 +578,7 @@ def adjust_exposure3(
                 directions_high_keys = directions_keys[directions_high_index]
 
                 # 分组使用递归调用
-                exposure2id2boxestate = {}
+                exposure2id2boxstate = {}
                 if directions_low_keys.size > 0:
                     logger.info("adjust exposure low")
                     # 获取对应的曝光值
@@ -587,7 +587,7 @@ def adjust_exposure3(
                     # 根据 keys 获取 boxestate
                     id2boxestate_low = {int(i): id2boxestate[i] for i in directions_low_keys}
                     exposure2boxes_low = adjust_exposure3(camera_queue, id2boxestate_low)
-                    exposure2id2boxestate.update(exposure2boxes_low)
+                    exposure2id2boxstate.update(exposure2boxes_low)
 
                 if directions_ok_keys.size > 0:
                     # 获取对应的曝光值
@@ -597,7 +597,7 @@ def adjust_exposure3(
                     exposure2boxes_ok = {
                         exposure_time_ok: id2boxestate_ok
                     }
-                    exposure2id2boxestate.update(exposure2boxes_ok)
+                    exposure2id2boxstate.update(exposure2boxes_ok)
 
                 if directions_high_keys.size > 0:
                     logger.info("adjust exposure high")
@@ -607,7 +607,7 @@ def adjust_exposure3(
                     # 根据 keys 获取 boxestate
                     id2boxestate_high = {int(i): id2boxestate[i] for i in directions_high_keys}
                     exposure2boxes_high = adjust_exposure3(camera_queue, id2boxestate_high)
-                    exposure2id2boxestate.update(exposure2boxes_high)
+                    exposure2id2boxstate.update(exposure2boxes_high)
 
     except queue.Empty:
         logger.error("get picture timeout")
@@ -617,6 +617,6 @@ def adjust_exposure3(
     CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
     #-------------------- 高分辨率快速拍摄 --------------------#
 
-    logger.success(f"{exposure2id2boxestate = }")
+    logger.success(f"{exposure2id2boxstate = }")
     logger.info("adjust exposure end")
-    return exposure2id2boxestate
+    return exposure2id2boxstate

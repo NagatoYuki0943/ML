@@ -444,7 +444,7 @@ def adjust_exposure3(
     camera_queue: queue.Queue,
     id2boxestate: dict | None = None,
 ) -> dict[int, dict | None]:
-    """使用递归实现快速调节曝光
+    """使用递归实现快速调节曝光，全程使用高分辨率拍摄
 
     Args:
         camera_queue (queue.Queue): 相机队列

@@ -474,8 +474,10 @@ def main() -> None:
                             exposure_time = cycle_exposure_times[cycle_loop_count]
                             CameraConfig.setattr("exposure_time", exposure_time)
 
-        # 尝试保存
-        save_config_to_yaml()
+        # 检测周期外
+        if cycle_loop_count == -1:
+            # 尝试保存
+            save_config_to_yaml()
 
         # 主循环休眠
         main_sleep_interval: int = MainConfig.getattr("main_sleep_interval")

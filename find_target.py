@@ -190,6 +190,12 @@ def find_target(image: np.ndarray) -> tuple[dict, int]:
         threshold_match_threshold,
         threshold_iou_threshold,
     )
+    # 没有找到任何目标
+    if len(ratios) == 0:
+        MatchTemplateConfig.setattr("id2boxstate", None)
+        MatchTemplateConfig.setattr("got_target_number", 0)
+        return None, 0
+
     # 排序 box，不是必须的
     sorted_index = sort_boxes_center(boxes, sort_by='y')
     sorted_ratios = ratios[sorted_index]
@@ -236,7 +242,10 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
     #         "box": box
     #     }
     # }
-    id2boxstate: dict = MatchTemplateConfig.getattr("id2boxstate")
+    id2boxstate: dict | None = MatchTemplateConfig.getattr("id2boxstate")
+    # 如果没有目标，则直接全图查找
+    if id2boxstate is None:
+        return find_target(image)
 
     image_h, image_w = image.shape[:2]
     template_h, template_w = template.shape[:2]
@@ -245,8 +254,17 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
 
     # 循环box，截取box区域进行匹配
     for i, boxestate in id2boxstate.items():
-        ratio = boxestate["ratio"]
-        box = boxestate["box"]
+        ratio: float = boxestate["ratio"]
+        box: list = boxestate["box"]
+
+        # box 为 None 则跳过
+        if box is None:
+            new_id2boxstate[i] = {
+                "ratio": ratio,
+                "score": 0,
+                "box": None
+            }
+            continue
 
         # 匹配区域
         box_x1, box_y1, box_x2, box_y2 = box
@@ -309,6 +327,11 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
                 }
                 logger.warning(f"original target {i}, {ratio = }, {box = } not found")
 
+    # 如果检测不到全部的 box, 则不设置全局变量
+    if all((True if boxestate["box"] is None else False) for boxestate in new_id2boxstate.values()):
+        logger.warning("find around target failed, no target found")
+        return new_id2boxstate, 0
+
     MatchTemplateConfig.setattr("id2boxstate", new_id2boxstate)
     # 更新got_target_number
     got_target_number = len([boxestate for boxestate in new_id2boxstate.values() if boxestate["box"] is not None])
@@ -347,7 +370,10 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
     #         "box": box
     #     }
     # }
-    id2boxstate: dict = MatchTemplateConfig.getattr("id2boxstate")
+    id2boxstate: dict | None = MatchTemplateConfig.getattr("id2boxstate")
+    # 如果没有目标，则直接全图查找
+    if id2boxstate is None:
+        return find_target(image)
 
     image = image.copy()
     loss_id = []
@@ -378,13 +404,24 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
         threshold_match_threshold,
         threshold_iou_threshold,
     )
+    # 如果没有检测到任何丢失的目标，就不会修改原始值
+    if len(ratios) == 0:
+        logger.warning("find lost target failed, no target found")
+        got_target_number = len([boxestate for boxestate in id2boxstate.values() if boxestate["box"] is not None])
+        return id2boxstate, got_target_number
 
-    if len(ratios) <= len(loss_id):
-        logger.error(f"find lost target number less than loss target number, find_lost_target_number: {len(ratios)}, loss_target_number: {len(loss_id)}")
+    # 排序 box，不是必须的
+    sorted_index = sort_boxes_center(boxes, sort_by='y')
+    sorted_ratios = ratios[sorted_index]
+    sorted_scores = scores[sorted_index]
+    sorted_boxes = boxes[sorted_index]
+
+    if len(sorted_ratios) <= len(loss_id):
+        logger.error(f"find lost target number less than loss target number, find_lost_target_number: {len(sorted_ratios)}, loss_target_number: {len(loss_id)}")
     else:
-        logger.success(f"find_lost_target_number {len(ratios)} = loss_target_number {len(loss_id)}")
+        logger.success(f"find_lost_target_number {len(sorted_ratios)} = loss_target_number {len(loss_id)}")
 
-    for i, (ratio, score, box) in enumerate(zip(ratios, scores, boxes)):
+    for i, (ratio, score, box) in enumerate(zip(sorted_ratios, sorted_scores, sorted_boxes)):
         id2boxstate[loss_id[i]] = {
             "ratio": float(ratio),
             "score": float(score),

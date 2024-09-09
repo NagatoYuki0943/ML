@@ -46,19 +46,22 @@ handler_id = logger.add('log/runtime_{time}.log', rotation='00:00')
 def main() -> None:
     #------------------------------ 初始化 ------------------------------#
     logger.info("init start")
-    init_config_from_yaml()
-    logger.success("init config success")
-
-    #-------------------- 基础 --------------------#
-    # 主线程消息队列
-    main_queue = queue.Queue()
 
     save_dir: Path = MainConfig.getattr("save_dir")
     location_save_dir: Path = MainConfig.getattr("location_save_dir")
     camera_result_save_path: Path = MainConfig.getattr("camera_result_save_path")
     history_save_path: Path = MainConfig.getattr("history_save_path")
     standard_save_path: Path = MainConfig.getattr("standard_save_path")
+    config_path: Path = MainConfig.getattr("config_path")
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
+
+    init_config_from_yaml(config_path=config_path)
+    logger.success("init config success")
+
+    #-------------------- 基础 --------------------#
+    # 主线程消息队列
+    main_queue = queue.Queue()
+
     #-------------------- 基础 --------------------#
 
     #-------------------- 运行时配置 --------------------#
@@ -190,6 +193,9 @@ def main() -> None:
         if got_target_number < target_number:
             # 数量不够，发送告警
             ...
+            if got_target_number == 0:
+                # 没找到任何目标，发送告警
+                ...
 
         boxes = [boxestate['box'] for boxestate in id2boxstate.values()]
         # 绘制boxes
@@ -215,7 +221,7 @@ def main() -> None:
         logger.error("get picture timeout")
 
     # 尝试保存
-    save_config_to_yaml()
+    save_config_to_yaml(config_path=config_path)
     #------------------------------ 找到目标 ------------------------------#
 
     #-------------------- 循环变量 --------------------#
@@ -262,7 +268,10 @@ def main() -> None:
                     #-------------------- 小区域模板匹配 --------------------#
                     _, got_target_number = find_around_target(rectified_image)
                     if got_target_number == 0:
-                        logger.warning("no target found in the image")
+                        logger.warning("no target found in the image, start find_lost_target")
+                        _, got_target_number = find_lost_target(rectified_image)
+                        if got_target_number == 0:
+                            logger.error("no target found in the image, exit")
                         continue
                     #-------------------- 小区域模板匹配 --------------------#
                 except queue.Empty:
@@ -398,9 +407,9 @@ def main() -> None:
                             # 结束周期
                             #------------------------- 检查是否丢失目标 -------------------------#
                             _target_number = MatchTemplateConfig.getattr("target_number")
-                            _got_target_number = MatchTemplateConfig.getattr("got_target_number")
-                            if _target_number > _got_target_number:
-                                logger.warning(f"The target number {_target_number} is not enough, got {_got_target_number} targets, start to find lost target.")
+                            got_target_number = MatchTemplateConfig.getattr("got_target_number")
+                            if _target_number > got_target_number:
+                                logger.warning(f"The target number {_target_number} is not enough, got {got_target_number} targets, start to find lost target.")
                                 # 丢失目标
                                 try:
                                     _, image, _ = camera_queue.get(timeout=get_picture_timeout)
@@ -409,23 +418,21 @@ def main() -> None:
                                     #-------------------- 畸变矫正 --------------------#
 
                                     #-------------------- 模板匹配 --------------------#
-                                    find_lost_target(rectified_image)
+                                    _, got_target_number = find_lost_target(rectified_image)
                                     #-------------------- 模板匹配 --------------------#
 
-                                    _target_number = MatchTemplateConfig.getattr("target_number")
-                                    _got_target_number = MatchTemplateConfig.getattr("got_target_number")
-                                    if _target_number > _got_target_number:
+                                    if _target_number > got_target_number:
                                         # 重新查找完成之后仍然不够, 发送告警
-                                        logger.critical(f"The target number {_target_number} is not enough, got {_got_target_number} targets.")
+                                        logger.critical(f"The target number {_target_number} is not enough, got {got_target_number} targets.")
                                     else:
                                         # 丢失目标重新找回
-                                        logger.success(f"The lost target has been found, the target number {_target_number} is enough, got {_got_target_number} targets.")
+                                        logger.success(f"The lost target has been found, the target number {_target_number} is enough, got {got_target_number} targets.")
 
                                 except queue.Empty:
                                     logger.error("get picture timeout")
                             else:
                                 # 目标数量正常
-                                logger.success(f"The target number {_target_number} is enough, got {_got_target_number} targets.")
+                                logger.success(f"The target number {_target_number} is enough, got {got_target_number} targets.")
                             #------------------------- 检查是否丢失目标 -------------------------#
 
                             #------------------------- 整理检测结果 -------------------------#
@@ -477,7 +484,7 @@ def main() -> None:
         # 检测周期外
         if cycle_loop_count == -1:
             # 尝试保存
-            save_config_to_yaml()
+            save_config_to_yaml(config_path=config_path)
 
         # 主循环休眠
         main_sleep_interval: int = MainConfig.getattr("main_sleep_interval")

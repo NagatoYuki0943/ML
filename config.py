@@ -47,6 +47,7 @@ class MainConfig(BaseConfig):
     calibration_result_save_path = save_dir / "calibration_result.jsonl"
     history_save_path = save_dir / "history.jsonl"
     standard_save_path = save_dir / "standard.jsonl"
+    config_path: Path = Path("config.yaml")
     get_picture_timeout: int = 10       # 获取图片超时时间 s
     cycle_time_interval: int = 10000    # 主循环时间 ms
 
@@ -132,7 +133,7 @@ class MatchTemplateConfig(BaseConfig):
     # scores: np.ndarray = None                   # 匹配得分 [...]
     # boxes: np.ndarray = None                    # 匹配的 boxes [[x1, y1, x2, y2], ...]
     # boxes_status: np.ndarray = None             # 当前 box 状态，用 True 代表找得到，False 代表丢失
-    id2boxstate: dict[int, dict] = None         # 靶标 id 到 boxes 的映射
+    id2boxstate: dict[int, dict] | None = None  # 靶标 id 到 boxes 的映射
     search_range: float = 1                     # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
 
 

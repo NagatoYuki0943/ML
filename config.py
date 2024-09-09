@@ -58,13 +58,13 @@ class CameraConfig(BaseConfig):
     exposure_time: int = 40000                              # 曝光时间 us
     analogue_gain: float = None                             # 模拟增益
     capture_time_interval: int = 1000                       # 相机拍照间隔 ms
-    return_image_time_interval: int = 2000                  # 返回图片的检测 ms
+    return_image_time_interval: int = 3000                  # 返回图片的检测 ms
     capture_mode: Literal['preview', 'low', 'full'] = 'full'# 相机拍照模式
     queue_maxsize: int = 5                                  # 相机拍照队列最大长度
     camera_left_index: int = 1                              # 左侧相机 index
     camera_right_index: int = 0                             # 右侧相机 index
     output_format: Literal['rgb', 'gray'] = 'gray'          # 输出格式
-    has_filter_plate: bool = False                          # 是否有滤镜板
+    has_filter_plate: bool = True                          # 是否有滤镜板
 
 
 @dataclass
@@ -126,10 +126,11 @@ class MatchTemplateConfig(BaseConfig):
     use_threshold_match: bool = True            # 是否使用阈值匹配
     threshold_match_threshold: float = 0.6      # 阈值匹配阈值
     threshold_iou_threshold: float = 0.5        # 阈值匹配 iou 阈值
-    ratios: np.ndarray = None                   # 模板缩放比率 [...]
-    scores: np.ndarray = None                   # 匹配得分 [...]
-    boxes: np.ndarray = None                    # 匹配的 boxes [[x1, y1, x2, y2], ...]
-    boxes_status: np.ndarray = None             # 当前 box 状态，用 True 代表找得到，False 代表丢失
+    # ratios: np.ndarray = None                   # 模板缩放比率 [...]
+    # scores: np.ndarray = None                   # 匹配得分 [...]
+    # boxes: np.ndarray = None                    # 匹配的 boxes [[x1, y1, x2, y2], ...]
+    # boxes_status: np.ndarray = None             # 当前 box 状态，用 True 代表找得到，False 代表丢失
+    id2boxstate: dict[int, dict] = None         # 靶标 id 到 boxes 的映射
     search_range: float = 1                     # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
 
 
@@ -194,45 +195,60 @@ class FTPConfig(BaseConfig):
     password: str = ""
 
 
-def save_config_to_yaml(config: MainConfig, file_path: str | Path):
+def save_config_to_yaml(configs: list[BaseConfig], config_path: str | Path):
     """
     Save a configuration class to a YAML file.
 
     :param config: The configuration class to save
-    :param file_path: The path to save the YAML file
+    :param config_path: The path to save the YAML file
     """
-    data = {}
-    for attr in dir(config):
-        if not attr.startswith("__") and not callable(getattr(config, attr)) and not attr.startswith("lock"):
-            value = config.getattr(attr)
-            if isinstance(value, Path):
-                value = str(value)
-            data[attr] = value
+    class2data = {}
+    for config in configs:
+        data = {}
+        for attr in dir(config):
+            if not attr.startswith("__") and not callable(getattr(config, attr)) and not attr.startswith("lock"):
+                value = config.getattr(attr)
+                if isinstance(value, Path):
+                    value = str(value)
+                data[attr] = value
+        class2data[config.__name__] = data
 
-    data = {config.__name__: data}
-    with open(file_path, 'w') as file:
-        yaml.dump(data, file, default_flow_style=False)
+    with open(config_path, 'w') as file:
+        yaml.dump(class2data, file, default_flow_style=False)
 
 
-def load_config_from_yaml(config: MainConfig, file_path: str | Path):
+def load_config_from_yaml(configs: list[BaseConfig], config_path: str | Path):
     """
     Load configuration from a YAML file and update the given configuration class.
 
     :param config: The configuration class to update
-    :param file_path: The path to the YAML file to load
+    :param config_path: The path to the YAML file to load
     """
-    with open(file_path, 'r') as file:
-        data = yaml.safe_load(file)
+    with open(config_path, 'r') as file:
+        class2data = yaml.load(file, Loader=yaml.FullLoader)
 
-    data = data[config.__name__]
-    for key, value in data.items():
-        if hasattr(config, key):
-            if isinstance(getattr(config, key), Path):
-                value = Path(value)
-            config.setattr(key, value)
+    for config in configs:
+        data = class2data[config.__name__]
+        for key, value in data.items():
+            if hasattr(config, key):
+                if isinstance(getattr(config, key), Path):
+                    value = Path(value)
+                config.setattr(key, value)
 
 
-# Example usage:
+CONFIGS = [MainConfig, CameraConfig, AdjustCameraConfig, StereoCalibrationConfig, MatchTemplateConfig, RingsLocationConfig, SerialCommConfig, MQTTConfig, FTPConfig]
+
+
+def init_config(config_path: str | Path = "config.yaml"):
+    """
+    初始化配置
+    """
+    if not Path(config_path).exists():
+        save_config_to_yaml(CONFIGS, config_path)
+    else:
+        load_config_from_yaml(CONFIGS, config_path)
+
+
 if __name__ == "__main__":
-    save_config_to_yaml(MainConfig, "main_config.yaml")
-    load_config_from_yaml(MainConfig, "main_config.yaml")
+    save_config_to_yaml(CONFIGS, "config.yaml")
+    load_config_from_yaml(CONFIGS, "config.yaml")

@@ -28,7 +28,7 @@ from config import (
 )
 
 from camera_engine import camera_engine
-from find_target import find_target, around_find_target
+from find_target import find_target, find_around_target, find_lost_target
 from adjust_camera import adjust_exposure2, adjust_exposure3
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
@@ -177,15 +177,14 @@ def main() -> None:
         #-------------------- 模板匹配 --------------------#
         logger.info("image find target start")
         target_number: int = MatchTemplateConfig.getattr("target_number")
-        ratios, scores, boxes, got_target_number = find_target(rectified_image)
-        logger.info(f"image find target ratios: \n{ratios}")
-        logger.info(f"image find target scores: \n{scores}")
-        logger.info(f"image find target boxes: \n{boxes}")
+        id2boxstate, got_target_number = find_target(rectified_image)
+        logger.info(f"image find target id2boxstate: \n{id2boxstate}")
         logger.info(f"image find target number: {got_target_number}")
         if got_target_number < target_number:
             # 数量不够，发送告警
             ...
 
+        boxes = [boxestate['box'] for boxestate in id2boxstate.values()]
         # 绘制boxes
         image_draw = image.copy()
         # image_draw = undistorted_image.copy()
@@ -214,9 +213,9 @@ def main() -> None:
     # 主循环
     i = 0
     # 一个周期内的结果
-    cycle_results = []
+    cycle_results = {}
     # 初始的坐标
-    cycle_centers = None
+    init_cycle_results = None
     # 一个周期内总循环次数
     total_cycle_loop_count = 0
     # 一个周期内循环计数
@@ -251,7 +250,10 @@ def main() -> None:
                     #-------------------- 畸变矫正 --------------------#
 
                     #-------------------- 小区域模板匹配 --------------------#
-                    around_find_target(rectified_image)
+                    _, got_target_number = find_around_target(rectified_image)
+                    if got_target_number == 0:
+                        logger.warning("no target found in the image")
+                        continue
                     #-------------------- 小区域模板匹配 --------------------#
                 except queue.Empty:
                     logger.error("get picture timeout")
@@ -259,18 +261,18 @@ def main() -> None:
 
                 #-------------------- 调整 box 曝光 --------------------#
                 logger.info("boxes ajust exposure start")
-                boxes = MatchTemplateConfig.getattr("boxes")
+                id2boxstate = MatchTemplateConfig.getattr("id2boxstate")
                 # 每次开始调整曝光
                 # ex: {72000: array([[1327, 1697, 1828, 2198]]), 78000: array([[1781,  811, 2100, 1130]])}
-                exposure2boxes = adjust_exposure3(camera_queue, boxes)
-                cycle_exposure_times = list(exposure2boxes.keys())
-                logger.info(f"exposure2boxes: {exposure2boxes}")
+                exposure2id2boxstate = adjust_exposure3(camera_queue, id2boxstate)
+                cycle_exposure_times = list(exposure2id2boxstate.keys())
+                logger.info(f"exposure2boxes: {exposure2id2boxstate}")
                 logger.info("boxes ajust exposure end")
                 #-------------------- 调整 box 曝光 --------------------#
 
                 #-------------------- 设定循环 --------------------##
                 # 总的循环轮数为 1 + 曝光次数
-                total_cycle_loop_count = 1 + len(exposure2boxes)
+                total_cycle_loop_count = 1 + len(exposure2id2boxstate)
                 logger.critical(f"During this cycle, there will be {total_cycle_loop_count} iters.")
                 # 当前周期，采用从 0 开始
                 cycle_loop_count = 0
@@ -325,9 +327,9 @@ def main() -> None:
                         #-------------------- single box location --------------------#
                         # for循环，截取图像
                         exposure_time = cycle_exposure_times[cycle_loop_count]
-                        _boxes = exposure2boxes[exposure_time]
-                        centers = []
-                        for j, _box in enumerate(_boxes):
+                        id2boxstate = exposure2id2boxstate[exposure_time]
+                        for j, boxestate in id2boxstate.items():
+                            _box = boxestate['box']
                             x1, y1, x2, y2 = _box
                             target = rectified_image[y1:y2, x1:x2]
 
@@ -352,7 +354,12 @@ def main() -> None:
                                 logger.success(f"{result = }")
                                 logger.success(f"box {j} rings location success")
                                 center = np.array([result['center_x_mean'] + _box[0], result['center_y_mean'] + _box[1]])
-                                centers.append(center)
+                                cycle_results[j] = {
+                                    'image_timestamp': f"image--{image_timestamp}--{j}",
+                                    'box': _box,
+                                    'center': center,
+                                    'exposure_time': exposure_time,
+                                }
                                 # 保存到文件
                                 string = json.dumps(result, ensure_ascii=False)
                                 with open(camera_result_save_path, mode='a', encoding='utf-8') as f:
@@ -360,17 +367,14 @@ def main() -> None:
                             except Exception as e:
                                 logger.error(e)
                                 logger.error(f"box {j} rings location failed")
-                                center = None
-                                centers.append(center)
+                                cycle_results[j] = {
+                                    'image_timestamp': f"image--{image_timestamp}--{j}",
+                                    'box': _box,
+                                    'center': None, # 丢失目标, 置为 None
+                                    'exposure_time': exposure_time,
+                                }
                         #-------------------- single box location --------------------#
 
-                        logger.success(f"{centers = }")
-                        cycle_results.append({
-                            'image_timestamp': image_timestamp,
-                            'boxes': _boxes,
-                            'centers': centers,
-                            'exposure_time': exposure_time,
-                        })
                         #------------------------- 检测目标 -------------------------#
 
                     except queue.Empty:
@@ -397,7 +401,7 @@ def main() -> None:
                                     #-------------------- 畸变矫正 --------------------#
 
                                     #-------------------- 模板匹配 --------------------#
-                                    find_target(rectified_image)
+                                    find_lost_target(rectified_image)
                                     #-------------------- 模板匹配 --------------------#
 
                                     _target_number = MatchTemplateConfig.getattr("target_number")
@@ -419,43 +423,38 @@ def main() -> None:
                             #------------------------- 整理检测结果 -------------------------#
                             logger.success(f"{cycle_results = }")
 
-                            some_ring_locate_failed = False
-                            # 判断有没有目标没有检测到
-                            for result in cycle_results:
-                                for center in result:
-                                    if center is None:
-                                        some_ring_locate_failed = True
-                                        # 有目标没有检测到
-                                        continue
+                            # [n, 2] n个目标中心坐标
+                            # init_cycle_centers: {0: array([1830.03952661, 1097.25685946]), 1: array([2090.1380529 , 2148.12593385])}
+                            # new_cycle_centers: {0: array([1830.05961465, 1097.2564746 ]), 1: array([2090.13342415, 2148.12260239])}
 
-                            if some_ring_locate_failed:
-                                # 有目标没有检测到
-                                logger.warning("Some ring location failed")
-                            else:
-                                # [n, 2] n个目标中心坐标
-                                new_cycle_centers = np.concatenate([result['centers'] for result in cycle_results])
-                                # 初始化 cycle_centers
-                                if cycle_centers is None:
-                                    cycle_centers = new_cycle_centers
-                                    logger.info(f"init cycle_centers: {cycle_centers}")
+                            # 初始化 init_cycle_centers
+                            if init_cycle_results is None:
+                                new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
+                                if any(v is None for v in new_cycle_centers.values()):
+                                    logger.warning("Some box not found in new_cycle_centers, can't init init_cycle_centers.")
                                 else:
-                                    move_threshold = RingsLocationConfig.getattr("move_threshold")
-                                    # 计算移动距离
-                                    cycle_centers = np.array(cycle_centers)
-                                    # 需要调整框的index
-                                    move_distance = abs(new_cycle_centers - cycle_centers)             # [n, 2]
-                                    over_threshold = move_distance > move_threshold                             # [n, 2]
-                                    over_threshold = np.bitwise_or(over_threshold[:, 0], over_threshold[:, 1])  # [n]
-                                    over_threshold_index = np.where(over_threshold)[0]
-                                    if len(over_threshold_index) > 0:
-                                        logger.warning(f"found over threshold index: {over_threshold_index}, move_distance: {move_distance[over_threshold_index]}")
+                                    init_cycle_results = cycle_results
+                                    logger.info(f"init init_cycle_results: {init_cycle_results}")
+                            else:
+                                move_threshold = RingsLocationConfig.getattr("move_threshold")
+                                init_cycle_centers = {k: result['center'] for k, result in init_cycle_results.items()}
+                                new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
+                                # 计算移动距离
+                                for l in init_cycle_results.keys():
+                                    if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
+                                        for n in range(2): # 0 1 代表 x y
+                                            move_distance = abs(init_cycle_centers[l][n] - new_cycle_centers[l][n])
+                                            if move_distance > move_threshold:
+                                                logger.warning(f"box {l} {'x' if n == 0 else 'y'} move distance {move_distance} is over threshold {move_threshold}.")
+                                            else:
+                                                logger.info(f"box {l} {'x' if n == 0 else 'y'} move distance {move_distance} is under threshold {move_threshold}.")
                                     else:
-                                        logger.info(f"no over threshold index found, move_distance: {move_distance}")
+                                        logger.warning(f"box {l} not found in cycle_centers.")
 
                             #------------------------- 整理检测结果 -------------------------#
 
                             #------------------------- 结束周期 -------------------------#
-                            cycle_results = [] # 重置周期内结果
+                            cycle_results = {} # 重置周期内结果
                             cycle_loop_count = -1   # 重置周期内循环计数
                             logger.success(f"The cycle is over.")
                             #------------------------- 结束周期 -------------------------#

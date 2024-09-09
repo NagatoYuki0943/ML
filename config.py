@@ -45,6 +45,8 @@ class MainConfig(BaseConfig):
     left_camera_result_save_path = save_dir / "left_result.jsonl"
     right_camera_result_save_path = save_dir / "right_result.jsonl"
     calibration_result_save_path = save_dir / "calibration_result.jsonl"
+    history_save_path = save_dir / "history.jsonl"
+    standard_save_path = save_dir / "standard.jsonl"
     get_picture_timeout: int = 10       # 获取图片超时时间 s
     cycle_time_interval: int = 10000    # 主循环时间 ms
 
@@ -195,12 +197,28 @@ class FTPConfig(BaseConfig):
     password: str = ""
 
 
-def save_config_to_yaml(configs: list[BaseConfig], config_path: str | Path):
+ALL_CONFIGS = [
+    MainConfig,
+    CameraConfig,
+    AdjustCameraConfig,
+    StereoCalibrationConfig,
+    MatchTemplateConfig,
+    RingsLocationConfig,
+    SerialCommConfig,
+    MQTTConfig,
+    FTPConfig,
+]
+
+
+def save_config_to_yaml(
+    configs: list[BaseConfig] = ALL_CONFIGS,
+    config_path: str | Path = "config.yaml"
+):
     """
     Save a configuration class to a YAML file.
 
-    :param config: The configuration class to save
-    :param config_path: The path to save the YAML file
+    :param configs: The configuration class to update. If None, all configuration classes will be updated. default: ALL_CONFIGS
+    :param config_path: The path to the YAML file to load. default: "config.yaml"
     """
     class2data = {}
     for config in configs:
@@ -217,12 +235,15 @@ def save_config_to_yaml(configs: list[BaseConfig], config_path: str | Path):
         yaml.dump(class2data, file, default_flow_style=False)
 
 
-def load_config_from_yaml(configs: list[BaseConfig], config_path: str | Path):
+def load_config_from_yaml(
+    configs: list[BaseConfig] = ALL_CONFIGS,
+    config_path: str | Path = "config.yaml"
+):
     """
     Load configuration from a YAML file and update the given configuration class.
 
-    :param config: The configuration class to update
-    :param config_path: The path to the YAML file to load
+    :param configs: The configuration class to update. If None, all configuration classes will be updated. default: ALL_CONFIGS
+    :param config_path: The path to the YAML file to load. default: "config.yaml"
     """
     with open(config_path, 'r') as file:
         class2data = yaml.load(file, Loader=yaml.FullLoader)
@@ -236,19 +257,20 @@ def load_config_from_yaml(configs: list[BaseConfig], config_path: str | Path):
                 config.setattr(key, value)
 
 
-CONFIGS = [MainConfig, CameraConfig, AdjustCameraConfig, StereoCalibrationConfig, MatchTemplateConfig, RingsLocationConfig, SerialCommConfig, MQTTConfig, FTPConfig]
-
-
-def init_config(config_path: str | Path = "config.yaml"):
+def init_config_from_yaml(
+    configs: list[BaseConfig] = ALL_CONFIGS,
+    config_path: str | Path = "config.yaml"
+):
     """
     初始化配置
     """
     if not Path(config_path).exists():
-        save_config_to_yaml(CONFIGS, config_path)
+        save_config_to_yaml(configs, config_path)
     else:
-        load_config_from_yaml(CONFIGS, config_path)
+        load_config_from_yaml(configs, config_path)
 
 
 if __name__ == "__main__":
-    save_config_to_yaml(CONFIGS, "config.yaml")
-    load_config_from_yaml(CONFIGS, "config.yaml")
+    save_config_to_yaml(ALL_CONFIGS, "config.yaml")
+    load_config_from_yaml(ALL_CONFIGS, "config.yaml")
+    init_config_from_yaml(ALL_CONFIGS)

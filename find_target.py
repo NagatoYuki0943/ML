@@ -200,9 +200,9 @@ def find_target(image: np.ndarray) -> tuple[dict, int]:
     id2boxstate = {}
     for i, (ratio, score, box) in enumerate(zip(sorted_ratios, sorted_scores, sorted_boxes)):
         id2boxstate[i] = {
-            "ratio": ratio,
-            "score": score,
-            "box": box
+            "ratio": float(ratio),
+            "score": float(score),
+            "box": box.tolist()
         }
 
     MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
@@ -268,11 +268,11 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
         if len(match_results) > 0:
             # 找到目标
             new_score, new_box = match_results[0]
-            new_x1, new_y1, new_x2, new_y2 = new_box
+            new_x1, new_y1, new_x2, new_y2 = new_box.tolist()
             new_id2boxstate[i] = {
-                "ratio": ratio,
-                "score": new_score,
-                "box": np.array([box_x1 + new_x1, box_y1 + new_y1, box_x1 + new_x2, box_y1 + new_y2])
+                "ratio": float(ratio),
+                "score": float(new_score),
+                "box": [box_x1 + new_x1, box_y1 + new_y1, box_x1 + new_x2, box_y1 + new_y2]
             }
             logger.info(f"original target {i}, {ratio = }, {box = } is ok")
         else:
@@ -293,17 +293,17 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
             if len(match_results) > 0:
                 # 找到目标
                 new_score, new_box = match_results[0]
-                new_x1, new_y1, new_x2, new_y2 = new_box
+                new_x1, new_y1, new_x2, new_y2 = new_box.tolist()
                 new_id2boxstate[i] = {
-                    "ratio": ratio,
-                    "score": new_score,
-                    "box": np.array([box_x1 + new_x1, box_y1 + new_y1, box_x1 + new_x2, box_y1 + new_y2])
+                    "ratio": float(ratio),
+                    "score": float(new_score),
+                    "box": [box_x1 + new_x1, box_y1 + new_y1, box_x1 + new_x2, box_y1 + new_y2]
                 }
                 logger.info(f"original target {i}, {ratio = }, {box = } not found, but found in box around, {new_box = }")
             else:
                 # 没有找到目标
                 new_id2boxstate[i] = {
-                    "ratio": ratio,
+                    "ratio": float(ratio),
                     "score": 0,
                     "box": None
                 }
@@ -386,9 +386,9 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
 
     for i, (ratio, score, box) in enumerate(zip(ratios, scores, boxes)):
         id2boxstate[loss_id[i]] = {
-            "ratio": ratio,
-            "score": score,
-            "box": box
+            "ratio": float(ratio),
+            "score": float(score),
+            "box": box.tolist(),
         }
 
     MatchTemplateConfig.setattr("id2boxstate", id2boxstate)

@@ -25,6 +25,9 @@ from config import (
     AdjustCameraConfig,
     MQTTConfig,
     SerialCommConfig,
+    ALL_CONFIGS,
+    init_config_from_yaml,
+    save_config_to_yaml,
 )
 
 from camera_engine import camera_engine
@@ -32,7 +35,7 @@ from find_target import find_target, find_around_target, find_lost_target
 from adjust_camera import adjust_exposure2, adjust_exposure3
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
-from utils import clear_queue
+from utils import clear_queue, save_to_jsonl, load_standard_cycle_results
 
 
 # 将日志输出到文件
@@ -43,15 +46,19 @@ handler_id = logger.add('log/runtime_{time}.log', rotation='00:00')
 def main() -> None:
     #------------------------------ 初始化 ------------------------------#
     logger.info("init start")
+    init_config_from_yaml()
+    logger.success("init config success")
 
     #-------------------- 基础 --------------------#
     # 主线程消息队列
     main_queue = queue.Queue()
 
     save_dir: Path = MainConfig.getattr("save_dir")
-    location_save_dir = MainConfig.getattr("location_save_dir")
-    camera_result_save_path = MainConfig.getattr("camera_result_save_path")
-    get_picture_timeout = MainConfig.getattr("get_picture_timeout")
+    location_save_dir: Path = MainConfig.getattr("location_save_dir")
+    camera_result_save_path: Path = MainConfig.getattr("camera_result_save_path")
+    history_save_path: Path = MainConfig.getattr("history_save_path")
+    standard_save_path: Path = MainConfig.getattr("standard_save_path")
+    get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
     #-------------------- 基础 --------------------#
 
     #-------------------- 运行时配置 --------------------#
@@ -207,6 +214,8 @@ def main() -> None:
     except queue.Empty:
         logger.error("get picture timeout")
 
+    # 尝试保存
+    save_config_to_yaml()
     #------------------------------ 找到目标 ------------------------------#
 
     #-------------------- 循环变量 --------------------#
@@ -215,7 +224,8 @@ def main() -> None:
     # 一个周期内的结果
     cycle_results = {}
     # 初始的坐标
-    init_cycle_results = None
+    standard_cycle_results = load_standard_cycle_results(standard_save_path)
+    logger.info(f"standard_cycle_results: {standard_cycle_results}")
     # 一个周期内总循环次数
     total_cycle_loop_count = 0
     # 一个周期内循环计数
@@ -329,7 +339,7 @@ def main() -> None:
                         exposure_time = cycle_exposure_times[cycle_loop_count]
                         id2boxstate = exposure2id2boxstate[exposure_time]
                         for j, boxestate in id2boxstate.items():
-                            _box = boxestate['box']
+                            _box: list = boxestate['box']
                             x1, y1, x2, y2 = _box
                             target = rectified_image[y1:y2, x1:x2]
 
@@ -351,19 +361,17 @@ def main() -> None:
                                     gradient_threshold_percent,
                                 )
                                 result['metadata'] = image_metadata
+                                # 保存到文件
+                                save_to_jsonl(result, camera_result_save_path)
                                 logger.success(f"{result = }")
                                 logger.success(f"box {j} rings location success")
-                                center = np.array([result['center_x_mean'] + _box[0], result['center_y_mean'] + _box[1]])
+                                center = [result['center_x_mean'] + _box[0], result['center_y_mean'] + _box[1]]
                                 cycle_results[j] = {
                                     'image_timestamp': f"image--{image_timestamp}--{j}",
                                     'box': _box,
                                     'center': center,
                                     'exposure_time': exposure_time,
                                 }
-                                # 保存到文件
-                                string = json.dumps(result, ensure_ascii=False)
-                                with open(camera_result_save_path, mode='a', encoding='utf-8') as f:
-                                    f.write(string + "\n")
                             except Exception as e:
                                 logger.error(e)
                                 logger.error(f"box {j} rings location failed")
@@ -422,25 +430,28 @@ def main() -> None:
 
                             #------------------------- 整理检测结果 -------------------------#
                             logger.success(f"{cycle_results = }")
+                            # 保存到文件
+                            save_to_jsonl(cycle_results, history_save_path)
 
                             # [n, 2] n个目标中心坐标
                             # init_cycle_centers: {0: array([1830.03952661, 1097.25685946]), 1: array([2090.1380529 , 2148.12593385])}
                             # new_cycle_centers: {0: array([1830.05961465, 1097.2564746 ]), 1: array([2090.13342415, 2148.12260239])}
 
                             # 初始化 init_cycle_centers
-                            if init_cycle_results is None:
+                            if standard_cycle_results is None:
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
                                 if any(v is None for v in new_cycle_centers.values()):
                                     logger.warning("Some box not found in new_cycle_centers, can't init init_cycle_centers.")
                                 else:
-                                    init_cycle_results = cycle_results
-                                    logger.info(f"init init_cycle_results: {init_cycle_results}")
+                                    standard_cycle_results = cycle_results
+                                    save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
+                                    logger.info(f"init standard_cycle_results: {standard_cycle_results}")
                             else:
                                 move_threshold = RingsLocationConfig.getattr("move_threshold")
-                                init_cycle_centers = {k: result['center'] for k, result in init_cycle_results.items()}
+                                init_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
                                 # 计算移动距离
-                                for l in init_cycle_results.keys():
+                                for l in standard_cycle_results.keys():
                                     if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
                                         for n in range(2): # 0 1 代表 x y
                                             move_distance = abs(init_cycle_centers[l][n] - new_cycle_centers[l][n])
@@ -462,6 +473,9 @@ def main() -> None:
                             # 不是结束周期，设置下一轮的曝光值
                             exposure_time = cycle_exposure_times[cycle_loop_count]
                             CameraConfig.setattr("exposure_time", exposure_time)
+
+        # 尝试保存
+        save_config_to_yaml()
 
         # 主循环休眠
         main_sleep_interval: int = MainConfig.getattr("main_sleep_interval")

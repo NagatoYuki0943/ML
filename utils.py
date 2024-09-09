@@ -1,6 +1,8 @@
 from queue import Queue
 import cv2
 import numpy as np
+import json
+from pathlib import Path
 
 
 def clear_queue(*queues: Queue):
@@ -28,3 +30,33 @@ def enhance_contrast_clahe(image: np.ndarray, clip_limit=2.0, tile_grid_size=(8,
     enhanced_image = clahe.apply(image)
 
     return enhanced_image
+
+
+def save_to_jsonl(data, file_path: str | Path, mode: str = 'a'):
+    """
+    Save data to a JSON lines file.
+    """
+    string = json.dumps(data, ensure_ascii=False)
+    with open(file_path, mode=mode, encoding='utf-8') as f:
+        f.write(string + "\n")
+
+
+def load_standard_cycle_results(file_path: str | Path) -> dict | None:
+    file_path = Path(file_path)
+    if file_path.exists():
+        with open(file_path, mode='r', encoding='utf-8') as f:
+            # 读取第一行数据
+            line = f.readline()
+            if line:
+                data = json.loads(line)
+                data = {eval(k): v for k, v in data.items()}
+                return data
+
+
+def test_load_standard_cycle_results():
+    data = load_standard_cycle_results('results/history.jsonl')
+    print(data)
+
+
+if __name__ == '__main__':
+    test_load_standard_cycle_results()

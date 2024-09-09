@@ -237,7 +237,7 @@ def match_template_filter_by_threshold(
     match_threshold: float = 0.8,
     iou_threshold: float = 0.5,
     mask: np.ndarray | None = None,
-) -> list[tuple[float, list[int]]]:
+) -> list[tuple[float, np.ndarray]]:
     """模板匹配根据匹配阈值过滤, 配合 iou 过滤
 
     Args:
@@ -258,7 +258,7 @@ def match_template_filter_by_threshold(
             如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
 
     Returns:
-        list[tuple[float, list[int]]]: [(得分, 框的坐标), ...]
+        list[tuple[float, np.ndarray]]: [(得分, 框的坐标), ...]
                                        当找不到时，返回 []
     """
     if mask is not None:

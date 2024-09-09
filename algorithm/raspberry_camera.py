@@ -1,6 +1,6 @@
 import numpy as np
 import time
-import datetime
+from datetime import datetime
 from typing import Literal
 from loguru import logger
 from picamera2 import Picamera2, Preview
@@ -25,6 +25,7 @@ class RaspberryCameras:
 
         Picamera2.set_logging(log_level)
         camera_indexes = [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        self.camera_indexes = camera_indexes
 
         # 相机
         self.picam2s = {}
@@ -217,7 +218,7 @@ class RaspberryCameras:
 
     def capture(
         self,
-        camera_index: int = 0,
+        camera_index: int | None = None,
         ExposureTime: int | None = None,
         AnalogueGain: float | None = None,
         timestamp: str | None = None,
@@ -225,7 +226,7 @@ class RaspberryCameras:
         """拍照
 
         Args:
-            camera_index (int, optional): 相机 index . Defaults to 0.
+            camera_index (int | None, optional): 相机 index . Defaults to None, 代表使用 indexes 中的第一个相机.
             ExposureTime (int | None, optional): 曝光时间，单位微秒. Defaults to None.
             AnalogueGain (float | None, optional): 模拟增益. Defaults to None.
             timestamp (str | None, optional): 时间戳. Defaults to None.
@@ -235,6 +236,7 @@ class RaspberryCameras:
         """
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S.%f") if timestamp is None else timestamp
 
+        camera_index = self.camera_indexes[0] if camera_index is None else camera_index
         picam2: Picamera2 = self.picam2s[camera_index]
         # 在这种情况下，我们注意到with构造的使用。虽然您通常可以不用它（只需直接设置picam2.controls），但这并不能绝对保证这两个控件都应用于同一帧。
         with picam2.controls as controls:
@@ -358,5 +360,5 @@ def test_raspberry_cameras_speed() -> None:
 
 if __name__ == "__main__":
     test_raspberry_cameras_single()
-    test_raspberry_cameras_double()
+    # test_raspberry_cameras_double()
     test_raspberry_cameras_speed()

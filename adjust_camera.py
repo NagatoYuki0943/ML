@@ -442,13 +442,13 @@ def adjust_exposure2(
 
 def adjust_exposure3(
     camera_queue: queue.Queue,
-    id2boxestate: dict | None = None,
+    id2boxstate: dict | None = None,
 ) -> dict[int, dict | None]:
     """使用递归实现快速调节曝光，全程使用高分辨率拍摄
 
     Args:
         camera_queue (queue.Queue): 相机队列
-        id2boxestate (dict | None, optional): id对应box的状态，包括box和状态. Defaults to None.
+        id2boxstate (dict | None, optional): id对应box的状态，包括box和状态. Defaults to None.
             {
                 i: {
                     "ratio": ratio,
@@ -476,7 +476,7 @@ def adjust_exposure3(
 
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
     exposure2id2boxstate: dict[int, dict | None] = {
-        CameraConfig.getattr("exposure_time"): id2boxestate
+        CameraConfig.getattr("exposure_time"): id2boxstate
     }
 
     #-------------------- 高分辨率快速拍摄 --------------------#
@@ -501,7 +501,7 @@ def adjust_exposure3(
         logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
 
         # 全图
-        if id2boxestate is None:
+        if id2boxstate is None:
             new_exposure_time, direction = adjust_exposure_by_mean(
                 image,
                 image_metadata['ExposureTime'],
@@ -514,7 +514,7 @@ def adjust_exposure3(
             # 可以
             if direction == 0:
                 exposure2id2boxstate = {
-                    new_exposure_time: id2boxestate
+                    new_exposure_time: id2boxstate
                 }
                 logger.success(f"full picture exposure time {new_exposure_time} us is ok")
             # 需要调节
@@ -527,8 +527,8 @@ def adjust_exposure3(
             # directions 和 new_exposure_times 的 key 对应 boxid
             directions = {}
             new_exposure_times = {}
-            for i, boxestate in id2boxestate.items():
-                box = boxestate["box"]
+            for i, boxstate in id2boxstate.items():
+                box = boxstate["box"]
                 # 空box不处理
                 if box is None:
                     continue
@@ -551,9 +551,9 @@ def adjust_exposure3(
             if all(direction == 0 for direction in directions.values()):
                 new_exposure_time = list(new_exposure_times.values())[0]
                 exposure2id2boxstate = {
-                    new_exposure_time: id2boxestate
+                    new_exposure_time: id2boxstate
                 }
-                logger.success(f"id2boxestate: {id2boxestate}, original exposure time {new_exposure_time} us is ok")
+                logger.success(f"id2boxstate: {id2boxstate}, original exposure time {new_exposure_time} us is ok")
             # 需要分组
             else:
                 # exampe:
@@ -584,18 +584,18 @@ def adjust_exposure3(
                     # 获取对应的曝光值
                     exposure_time_low = new_exposure_times[directions_low_keys[0]]
                     CameraConfig.setattr("exposure_time", exposure_time_low)
-                    # 根据 keys 获取 boxestate
-                    id2boxestate_low = {int(i): id2boxestate[i] for i in directions_low_keys}
-                    exposure2boxes_low = adjust_exposure3(camera_queue, id2boxestate_low)
+                    # 根据 keys 获取 boxstate
+                    id2boxstate_low = {int(i): id2boxstate[i] for i in directions_low_keys}
+                    exposure2boxes_low = adjust_exposure3(camera_queue, id2boxstate_low)
                     exposure2id2boxstate.update(exposure2boxes_low)
 
                 if directions_ok_keys.size > 0:
                     # 获取对应的曝光值
                     exposure_time_ok = new_exposure_times[directions_ok_keys[0]]
-                    # 根据 keys 获取 boxestate
-                    id2boxestate_ok = {int(i): id2boxestate[i] for i in directions_ok_keys}
+                    # 根据 keys 获取 boxstate
+                    id2boxstate_ok = {int(i): id2boxstate[i] for i in directions_ok_keys}
                     exposure2boxes_ok = {
-                        exposure_time_ok: id2boxestate_ok
+                        exposure_time_ok: id2boxstate_ok
                     }
                     exposure2id2boxstate.update(exposure2boxes_ok)
 
@@ -604,9 +604,9 @@ def adjust_exposure3(
                     # 获取对应的曝光值
                     exposure_time_high = new_exposure_times[directions_high_keys[0]]
                     CameraConfig.setattr("exposure_time", exposure_time_high)
-                    # 根据 keys 获取 boxestate
-                    id2boxestate_high = {int(i): id2boxestate[i] for i in directions_high_keys}
-                    exposure2boxes_high = adjust_exposure3(camera_queue, id2boxestate_high)
+                    # 根据 keys 获取 boxstate
+                    id2boxstate_high = {int(i): id2boxstate[i] for i in directions_high_keys}
+                    exposure2boxes_high = adjust_exposure3(camera_queue, id2boxstate_high)
                     exposure2id2boxstate.update(exposure2boxes_high)
 
     except queue.Empty:

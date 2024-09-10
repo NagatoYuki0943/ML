@@ -32,7 +32,7 @@ from config import (
 
 from camera_engine import camera_engine
 from find_target import find_target, find_around_target, find_lost_target
-from adjust_camera import adjust_exposure2, adjust_exposure3
+from adjust_camera import adjust_exposure_full_res_recursive, adjust_exposure_full_res_for_loop
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import clear_queue, save_to_jsonl, load_standard_cycle_results
@@ -157,7 +157,7 @@ def main() -> None:
         logger.error("get picture timeout")
 
     logger.info("ajust exposure 1 start")
-    adjust_exposure3(camera_queue)
+    adjust_exposure_full_res_for_loop(camera_queue)
     logger.success("ajust exposure 1 end")
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
@@ -254,7 +254,7 @@ def main() -> None:
                 logger.success(f"The cycle is started.")
                 #-------------------- 调整全图曝光 --------------------#
                 logger.info("full image ajust exposure start")
-                adjust_exposure3(camera_queue)
+                adjust_exposure_full_res_for_loop(camera_queue)
                 logger.info("full image ajust exposure end")
                 #-------------------- 调整全图曝光 --------------------#
 
@@ -283,7 +283,7 @@ def main() -> None:
                 id2boxstate = MatchTemplateConfig.getattr("id2boxstate")
                 # 每次开始调整曝光
                 # ex: {72000: array([[1327, 1697, 1828, 2198]]), 78000: array([[1781,  811, 2100, 1130]])}
-                exposure2id2boxstate = adjust_exposure3(camera_queue, id2boxstate)
+                exposure2id2boxstate = adjust_exposure_full_res_for_loop(camera_queue, id2boxstate)
                 cycle_exposure_times = list(exposure2id2boxstate.keys())
                 logger.info(f"exposure2boxes: {exposure2id2boxstate}")
                 logger.info("boxes ajust exposure end")

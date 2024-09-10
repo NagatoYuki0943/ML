@@ -115,6 +115,10 @@ class StereoCalibrationConfig(BaseConfig):
     pixel_width_mm = sensor_width_mm / image_width_pixels
 
 
+def get_reference_target_ids():
+    return [0]
+
+
 @dataclass
 class MatchTemplateConfig(BaseConfig):
     """模板匹配配置
@@ -130,12 +134,13 @@ class MatchTemplateConfig(BaseConfig):
     use_threshold_match: bool = True            # 是否使用阈值匹配
     threshold_match_threshold: float = 0.6      # 阈值匹配阈值
     threshold_iou_threshold: float = 0.5        # 阈值匹配 iou 阈值
-    # ratios: np.ndarray = None                   # 模板缩放比率 [...]
-    # scores: np.ndarray = None                   # 匹配得分 [...]
-    # boxes: np.ndarray = None                    # 匹配的 boxes [[x1, y1, x2, y2], ...]
-    # boxes_status: np.ndarray = None             # 当前 box 状态，用 True 代表找得到，False 代表丢失
+    # ratios: np.ndarray = None                 # 模板缩放比率 [...]
+    # scores: np.ndarray = None                 # 匹配得分 [...]
+    # boxes: np.ndarray = None                  # 匹配的 boxes [[x1, y1, x2, y2], ...]
+    # boxes_status: np.ndarray = None           # 当前 box 状态，用 True 代表找得到，False 代表丢失
     id2boxstate: dict[int, dict] | None = None  # 靶标 id 到 boxes 的映射
-    search_range: float = 1                     # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
+    reference_target_ids: list[int] = field(default_factory=get_reference_target_ids)   # 参考靶标 id
+    search_range: float = 1                                                             # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
 
 
 @dataclass

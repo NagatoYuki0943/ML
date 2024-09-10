@@ -262,6 +262,9 @@ def main() -> None:
     cycle_time_interval: int = MainConfig.getattr("cycle_time_interval")
     cycle_before_time = time.time()
 
+    # 是否需要发送部署信息
+    need_send_devicedeploying_msg = False
+
     #-------------------- 循环变量 --------------------#
 
     while True:
@@ -506,35 +509,194 @@ def main() -> None:
 
         # 检测周期外
         if cycle_loop_count == -1:
+            # 需要发送设备部署消息
+            if need_send_devicedeploying_msg:
+                {
+                    "cmd":"devicedeploying",
+                    "result":"succ/fail",
+                    "body":{
+                        "code":200,
+                        "msg":"deployed succeed",
+                        "did":"458796",
+                        "type":"deploying",
+                        "at":"2023-08-09T16:08:46Z",
+                        "sw_version":"230704180", # 版本号
+                        "code":200,
+                        "msg":"device starting",
+                        "data": { # 靶标初始位置
+                            "L1_SJ_1":{"X":19.01,"Y":18.31,"Z":10.8},
+                            "L1_SJ_2":{"X":4.09,"Y":8.92,"Z":6.7},
+                            "L1_SJ_3":{"X":2.02,"Y":5.09,"Z":14.6}
+                        },
+                        "ftpurl":"/5654/20240810160846",
+                        "img":["1.jpg","2.jpg"]
+                    },
+                    "msgid": "bb6f3eeb2"
+                }
+                ...
+                need_send_devicedeploying_msg = False
+
             # 获取消息
+            while not main_queue.empty():
+                received_msg = main_queue.get()
+                cmd = received_msg.get('cmd')
 
+                # 设备部署消息
+                if cmd == 'devicedeploying':
+                    # {
+                    #     "cmd":"devicedeploying",
+                    #     "msgid":"bb6f3eeb2",
+                    # }
+                    logger.info("device deploying, reset config and init target")
+                    # 设备部署，重置配置和初始靶标
+                    load_config_from_yaml(config_path=original_config_path)
+                    standard_cycle_results = None
+                    logger.success("reset config and init target success")
+                    # 发送部署消息
+                    need_send_devicedeploying_msg = True
 
-            # 设备部署，重置配置和初始靶标
-            # load_config_from_yaml(config_path=original_config_path)
-            # standard_cycle_results = None
+                # 靶标校正消息
+                elif cmd == 'targetcorrection':
+                    # msg: {
+                    #     "cmd":"targetcorrection",
+                    #     "msgid":"bb6f3eeb2",
+                    #     "body":{
+                    #         "boxes":{
+                    #             "box_id1":[x1, y1, x2, y2],
+                    #             "box_id2":[x1, y1, x2, y2],
+                    #         },
+                    #     }
+                    # }
+                    logger.info("target correction, update target")
+                    # 靶标丢失，传递来新靶标
+                    # {
+                    #     i: {
+                    #         "ratio": ratio,
+                    #         "score": score,
+                    #         "box": box
+                    #     }
+                    # }
+                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+                    new_boxes: dict[int, list] = msg['body']['boxes']
+                    for box_id, new_box in new_boxes.values():
+                        if box_id in id2boxstate.keys():
+                            id2boxstate[box_id]['box'] = new_box
+                        else:
+                            id2boxstate[box_id] = {
+                                'ratio': None, # None 代表未知
+                                'score': 0,
+                                'box': new_box,
+                            }
+                    MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
+                    send_msg = {
+                        "cmd":"targetcorrection",
+                        "result":"succ/fail",
+                        "body":{
+                            "code":200,
+                            "msg":"correction succeed"
+                        },
+                        "msgid": "bb6f3eeb2"
+                    }
+                    # 发送更新靶标消息
+                    raise NotImplementedError("target correction send msg not implemented")
+                    logger.success(f"update target success, new id2boxstate: {id2boxstate}")
 
+                # 参考靶标设定消息
+                elif cmd == 'setreferencetarget':
+                    logger.info("set reference target")
+                    # {
+                    #     "cmd":"setreferencetarget",
+                    #     "msgid":"bb6f3eeb2",
+                    #     "apikey":"e343f59e9a1b426aa435",
+                    #     "body":{
+                    #         "reference_target":"L1_SJ_1"
+                    #     }
+                    # }
+                    reference_target = received_msg['body']['reference_target']
+                    reference_target_id = int(reference_target.split('_')[-1])
+                    MatchTemplateConfig.setattr("reference_target_ids", [reference_target_id])
+                    send_msg = {
+                        "cmd":"setreferencetarget",
+                        "result":"succ/fail",
+                        "body":{
+                            "code":200,
+                            "msg":"set succeed"
+                        },
+                        "msgid": "bb6f3eeb2"
+                    }
+                    raise NotImplementedError("set reference target send msg not implemented")
+                    logger.success(f"set reference target success, reference_target_id: {reference_target_id}")
 
+                # 设备状态查询消息
+                elif cmd == 'getstatus':
+                    ...
+                    send_msg = {
+                        "cmd":"getstatus",
+                        "body":{
+                            "ext_power_volt":38.3,# 供电电压
+                            "temp":20,# 环境温度
+                            "signal_4g":-84.0,# 4g信号强度
+                            "sw_version":"230704180",# 固件版本号
+                            "sensor_state":{
+                                "sensor1":0,# 0表示无错误，-1供电异常，
+                                "sensor2":0,# -2传感器数据异常，-3采样间隔内没有采集到数据
+                                "sensor3":0,
+                                "sensor4":0,
+                                "sensor5":0,
+                                "sensor6":0, # sensor1~6为温度传感器，其余为靶标
+                                "sensor7":0,
+                                "sensor8":0,
+                                "sensor9":0,
+                            }
+                        },
+                        "msgid": "bb6f3eeb2"
+                    }
+                    raise NotImplementedError("get status send msg not implemented")
+
+                # 现场图像查询消息
+                elif cmd == 'getimage':
+                    logger.warning(f"get image")
+                    # {
+                    #     "cmd":"getimage",
+                    #     "msgid":"bb6f3eeb2"
+                    # }
+                    try:
+                        _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+                        image_path = save_dir / f"image_send.jpg"
+                        cv2.imwrite(image_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+                        send_msg = {
+                            "cmd":"setconfig",
+                            "result":"succ",
+                            "body":{
+                                "code":200,
+                                "msg":"upload succeed",
+                                "ftpurl":"/5654/20240810160846",# ftp上传路径
+                                "img":[image_path]# 文件名称
+                            },
+                            "msgid": "bb6f3eeb2"
+                        }
+
+                        logger.success(f"get image success, image_path: {image_path}")
+                    except queue.Empty:
+                        send_msg = {
+                            "cmd":"setconfig",
+                            "result":"succ",
+                            "body":{
+                                "code":200,
+                                "msg":"upload succeed",
+                                "ftpurl":"/5654/20240810160846",# ftp上传路径
+                                "img":[]# 文件名称
+                            },
+                            "msgid": "bb6f3eeb2"
+                        }
+                        logger.error("get picture timeout")
+                    raise NotImplementedError("get image send msg not implemented")
+
+                else:
+                    logger.warning(f"unknown cmd: {cmd}")
+                    logger.warning(f"unknown msg: {received_msg}")
             # 下载新配置
-
-
-            # 靶标丢失，传递来新靶标
-            # {
-            #     i: {
-            #         "ratio": ratio,
-            #         "score": score,
-            #         "box": box
-            #     }
-            # }
-            # id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
-            # for new_box in new_boxes:
-            #     if new_box['id'] not in id2boxstate.keys():
-            #         id2boxstate[new_box['id']] = {
-            #             'ratio': None, # None 代表未知
-            #             'score': 0,
-            #             'box': new_box['box'],
-            #         }
-            #     else:
-            #         id2boxstate[new_box['id']]['box'] = new_box['box']
 
 
             # 保存运行时配置

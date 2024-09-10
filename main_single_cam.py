@@ -577,7 +577,7 @@ def main() -> None:
                     #     }
                     # }
                     id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
-                    new_boxes: dict[int, list] = msg['body']['boxes']
+                    new_boxes: dict[int, list] = received_msg['body']['boxes']
                     for box_id, new_box in new_boxes.values():
                         if box_id in id2boxstate.keys():
                             id2boxstate[box_id]['box'] = new_box

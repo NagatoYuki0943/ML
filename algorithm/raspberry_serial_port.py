@@ -2,6 +2,7 @@ import serial
 import re
 from datetime import datetime
 import json
+from threading import Lock
 
 
 class RaspberrySerialPort:
@@ -27,10 +28,12 @@ class RaspberrySerialPort:
         self.buffer = ""
         self.BUFFER_SIZE = BUFFER_SIZE
         self.temperature_logger = temperature_logger
+        self.lock = Lock()
 
         # 预编译表达式
-        self.cmd_pattern = re.compile(r'\$cmd')
+        self.cmd_pattern = re.compile(r'\$cmd=([^&]+)')
         self.msgid_pattern = re.compile(r'&msgid=(\d+)')
+        self.param_pattern = re.compile(r'&param({.*})')
 
         # 开启串口
         self.comm = serial.Serial(
@@ -46,9 +49,10 @@ class RaspberrySerialPort:
     def message_reception(self):
         """获取串口消息, 放入缓冲区"""
         if self.comm.in_waiting > 0:
-            temperature_message = self.comm.read(self.comm.in_waiting).decode().strip()
-            self.buffer += temperature_message
-            self.temperature_logger.info(f"Received temperature message: {temperature_message}")
+            with self.lock:
+                temperature_message = self.comm.read(self.comm.in_waiting).decode().strip()
+                self.buffer += temperature_message
+                self.temperature_logger.info(f"Received temperature message: {temperature_message}")
 
     def subcontracting(self):
         """处理串口数据包"""
@@ -72,7 +76,7 @@ class RaspberrySerialPort:
         else:
             # 确保有包头包尾的情况下再检查是否多个包粘连
             match_mid = self.cmd_pattern.search(self.buffer, match_head.end())
-            if match_mid and match_mid.start() > match_end.start():
+            if match_mid and match_mid.start() < match_end.start():
                 self.buffer = self.buffer[match_mid.start():]
                 return None
 
@@ -95,38 +99,32 @@ class RaspberrySerialPort:
         """
         # 获取当前时间，表示此消息获取的时间
         time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        result = {}
 
-        # 找出cmd参数所在位置
-        cmd_start = message.find('cmd=') + len('cmd=')
-        cmd_end = message.find('&param')
-
-        # 找出param参数（温度数据）所在位置
-        param_start = cmd_end + len('&param')
-        param_end = message.find('&msgid=')
-        if cmd_start == -1 or cmd_end == -1 or \
-        param_start == -1 or param_end == -1:
-            return None
-
-        # 找出cmd、param、msgid的对应参数
-        cmd = message[cmd_start:cmd_end]
-        param_str = message[param_start:param_end].strip()
-        msgid = message[param_end + len('&msgid='):]
-
-        # contro_way转换成标准json格式
-        if 'control_way' in param_str:
-            param_str = param_str.replace('"control_way":warm', '"control_way":"warm"').\
-                replace('"control_way":cold', '"control_way":"cold"')
+        cmd_match = self.cmd_pattern.search(message)
+        if cmd_match:
+            result['cmd'] = cmd_match.group(1)
+        
+        param_match = self.param_pattern.search(message)
+        if param_match:
+            param_json = param_match.group(1)
+            try:
+                result['param'] = json.loads(param_json)
+            except json.JSONDecodeError:
+                result['param'] = param_json
+                
+        msgid_match = self.msgid_pattern.search(message)
+        if msgid_match:
+            result['msgid'] = msgid_match.group(1)
 
         # 合并参数为字典
-        data = {
-            "cmd": cmd,
-            "param": json.loads(param_str),
-            "msgid": int(msgid),
-            "timestamp": time
-        }
+        result['times'] = time
+
+        camera = "1" if self.port == "/dev/ttyAMA1" else "2"
+        result['camera'] = camera
 
         # 转为JSON串
-        return data
+        return result
 
     def message_sending(self, command_message):
         """发送串口消息
@@ -134,8 +132,10 @@ class RaspberrySerialPort:
         Args:
             command_message (str): 控制指令消息.
         """
-        self.comm.write(command_message.encode().strip())
-        self.temperature_logger.info(f"Sending control message: {command_message}")
+        with self.lock:
+            self.comm.write(command_message.encode().strip())
+            self.temperature_logger.info(f"Sending control message: {command_message}")
+            self.temperature_logger.info(f"sending to {self.port}")
 
     def process_command(self, command_data):
         """合并控制指令与数据
@@ -143,9 +143,9 @@ class RaspberrySerialPort:
         Args:
             command_data (dict): 控制指令与数据.
         """
-        cmd = command_data['cmd']
-        param = command_data['param']
-        msgid = command_data['msgid']
+        cmd = command_data.get('cmd', "unknown")
+        param = command_data.get('param', {})
+        msgid = command_data.get('msgid', "unknown")
         param_str = json.dumps(param, separators=(',', ':')).strip()
         command_message = f"$cmd={cmd}&param{param_str}&msgid={msgid}"
         return command_message

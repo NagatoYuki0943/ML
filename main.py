@@ -100,49 +100,64 @@ def main() -> None:
     #-------------------- 畸变矫正 --------------------#
 
     #-------------------- 初始化串口 --------------------#
-    # logger.info("开始初始化串口")
-    # serial_comm = RaspberrySerialPort(
-    #     SerialCommConfig.temperature_logger,
-    #     SerialCommConfig.port,
-    #     SerialCommConfig.baudrate,
-    #     SerialCommConfig.timeout,
-    #     SerialCommConfig.BUFFER_SIZE,
-    # )
-    # serial_send_thread = ThreadWrapper(
-    #     target_func = serial_send,
-    #     ser = serial_comm,
-    # )
-    # serial_receive_thread = Thread(
-    #     target = serial_receive,
-    #     kwargs={'ser':serial_comm, 'queue':main_queue}
-    # )
-    # serial_send_queue = serial_send_thread.queue
-    # serial_receive_thread.start()
-    # serial_send_thread.start()
-    # logger.success("初始化串口完成")
+    logger.info("开始初始化串口")
+    serial_objects = []
+
+    for port in SerialCommConfig.getattr('ports'):
+        object = RaspberrySerialPort(
+            SerialCommConfig.getattr('temperature_logger'),
+            port,
+            SerialCommConfig.getattr('baudrate'),
+            SerialCommConfig.getattr('timeout'),
+            SerialCommConfig.getattr('BUFFER_SIZE'),
+        )
+        serial_objects.append(object)
+
+    serial_send_thread = ThreadWrapper(
+        target_func = serial_send,
+        ser = serial_objects,
+    )
+    serial_receive_thread = Thread(
+        target = serial_receive,
+        kwargs={
+            'ser':serial_objects,
+            'queue':main_queue,
+        },
+    )
+    serial_send_queue = serial_send_thread.queue
+    serial_receive_thread.start()
+    serial_send_thread.start()
+    logger.success("初始化串口完成")
     #-------------------- 初始化串口 --------------------#
 
     #-------------------- 初始化MQTT客户端 --------------------#
-    # logger.info("开始初始化MQTT客户端")
-    # mqtt_comm = RaspberryMQTT(
-    #     MQTTConfig.broker,
-    #     MQTTConfig.port,
-    #     MQTTConfig.timeout,
-    #     MQTTConfig.topic,
-    # )
-    # mqtt_receive_thread = Thread(
-    #     target = mqtt_receive,
-    #     kwargs={'client':mqtt_comm, 'queue':main_queue},
-    #     daemon=True
-    # )
-    # mqtt_send_thread = ThreadWrapper(
-    #     target_func = mqtt_send,
-    #     client = mqtt_comm,
-    # )
-    # mqtt_send_queue = mqtt_send_thread.queue
-    # mqtt_receive_thread.start()
-    # mqtt_send_thread.start()
-    # logger.success("初始化MQTT客户端完成")
+    logger.info("开始初始化MQTT客户端")
+    mqtt_comm = RaspberryMQTT(
+        MQTTConfig.getattr('broker'),
+        MQTTConfig.getattr('port'),
+        MQTTConfig.getattr('timeout'),
+        MQTTConfig.getattr('topic'),
+        MQTTConfig.getattr('username'),
+        MQTTConfig.getattr('password'),
+        MQTTConfig.getattr('clientId'),
+        MainConfig.getattr('apikey'),
+    )
+    mqtt_send_thread = ThreadWrapper(
+        target_func = mqtt_send,
+        client = mqtt_comm,
+    )
+    mqtt_send_queue = mqtt_send_thread.queue
+    mqtt_receive_thread = Thread(
+        target = mqtt_receive,
+        kwargs={
+            'client':mqtt_comm,
+            'main_queue':main_queue,
+            'send_queue':mqtt_send_queue,
+        },
+    )
+    mqtt_receive_thread.start()
+    mqtt_send_thread.start()
+    logger.success("初始化MQTT客户端完成")
     #-------------------- 初始化MQTT客户端 --------------------#
 
     logger.success("init end")

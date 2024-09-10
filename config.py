@@ -47,7 +47,8 @@ class MainConfig(BaseConfig):
     calibration_result_save_path = save_dir / "calibration_result.jsonl"
     history_save_path = save_dir / "history.jsonl"
     standard_save_path = save_dir / "standard.jsonl"
-    config_path: Path = Path("config.yaml")
+    original_config_path = save_dir / "config_original.yaml"   # 原始 config, 用于重置
+    runtime_config_path = save_dir / "config_runtime.yaml" # 运行时 config, 用于临时修改配置
     get_picture_timeout: int = 10       # 获取图片超时时间 s
     cycle_time_interval: int = 10000    # 主循环时间 ms
 
@@ -272,6 +273,6 @@ def init_config_from_yaml(
 
 
 if __name__ == "__main__":
-    save_config_to_yaml(ALL_CONFIGS, "config.yaml")
-    load_config_from_yaml(ALL_CONFIGS, "config.yaml")
-    init_config_from_yaml(ALL_CONFIGS)
+    save_config_to_yaml(ALL_CONFIGS, MainConfig.original_config_path)
+    load_config_from_yaml(ALL_CONFIGS, MainConfig.original_config_path)
+    init_config_from_yaml(ALL_CONFIGS, MainConfig.original_config_path)

@@ -254,8 +254,8 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
 
     # 循环box，截取box区域进行匹配
     for i, boxestate in id2boxstate.items():
-        ratio: float = boxestate["ratio"]
-        box: list = boxestate["box"]
+        ratio: float | None = boxestate["ratio"]
+        box: list | None = boxestate["box"]
 
         # box 为 None 则跳过
         if box is None:
@@ -265,6 +265,14 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
                 "box": None
             }
             continue
+
+        # ratio 为 None 代表这个 box 是强制指定的，需要计算 ratio
+        if ratio is None:
+            box_x1, box_y1, box_x2, box_y2 = box
+            box_h = box_y2 - box_y1
+            box_w = box_x2 - box_x1
+            # 求出 ratio 比例
+            ratio = min(box_h, box_w) / min(template_h, template_w)
 
         # 匹配区域
         box_x1, box_y1, box_x2, box_y2 = box

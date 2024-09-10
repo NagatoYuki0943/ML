@@ -27,12 +27,16 @@ from config import (
     SerialCommConfig,
     ALL_CONFIGS,
     init_config_from_yaml,
+    load_config_from_yaml,
     save_config_to_yaml,
 )
 
 from camera_engine import camera_engine
 from find_target import find_target, find_around_target, find_lost_target
-from adjust_camera import adjust_exposure_full_res_recursive, adjust_exposure_full_res_for_loop
+from adjust_camera import (
+    adjust_exposure_full_res_for_loop,
+    adjust_exposure_low_res_for_loop, # 调整分辨率需要一段时间才能获取调整后的图片分辨率
+)
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import clear_queue, save_to_jsonl, load_standard_cycle_results
@@ -52,10 +56,14 @@ def main() -> None:
     camera_result_save_path: Path = MainConfig.getattr("camera_result_save_path")
     history_save_path: Path = MainConfig.getattr("history_save_path")
     standard_save_path: Path = MainConfig.getattr("standard_save_path")
-    config_path: Path = MainConfig.getattr("config_path")
+    original_config_path: Path = MainConfig.getattr("original_config_path")                   # 默认 config, 用于重置
+    runtime_config_path: Path = MainConfig.getattr("runtime_config_path")   # 运行时 config, 用于临时修改配置
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
 
-    init_config_from_yaml(config_path=config_path)
+    # 保存原始配置
+    save_config_to_yaml(config_path=original_config_path)
+    # 从运行时 config 加载配置
+    init_config_from_yaml(config_path=runtime_config_path)
     logger.success("init config success")
 
     #-------------------- 基础 --------------------#
@@ -186,8 +194,22 @@ def main() -> None:
 
         #-------------------- 模板匹配 --------------------#
         logger.info("image find target start")
+
         target_number: int = MatchTemplateConfig.getattr("target_number")
-        id2boxstate, got_target_number = find_target(rectified_image)
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+        # {
+        #     i: {
+        #         "ratio": ratio,
+        #         "score": score,
+        #         "box": box
+        #     }
+        # }
+        if id2boxstate is None:
+            logger.warning("id2boxstate is None, use find_target instead of find_around_target")
+            id2boxstate, got_target_number = find_target(rectified_image)
+        else:
+            logger.info("id2boxstate is not None, use find_around_target")
+            id2boxstate, got_target_number = find_around_target(rectified_image)
         logger.info(f"image find target id2boxstate: \n{id2boxstate}")
         logger.info(f"image find target number: {got_target_number}")
         if got_target_number < target_number:
@@ -220,8 +242,8 @@ def main() -> None:
     except queue.Empty:
         logger.error("get picture timeout")
 
-    # 尝试保存
-    save_config_to_yaml(config_path=config_path)
+    # 保存运行时配置
+    save_config_to_yaml(config_path=runtime_config_path)
     #------------------------------ 找到目标 ------------------------------#
 
     #-------------------- 循环变量 --------------------#
@@ -348,11 +370,12 @@ def main() -> None:
                         exposure_time = cycle_exposure_times[cycle_loop_count]
                         id2boxstate = exposure2id2boxstate[exposure_time]
                         for j, boxestate in id2boxstate.items():
-                            _box: list = boxestate['box']
-                            x1, y1, x2, y2 = _box
-                            target = rectified_image[y1:y2, x1:x2]
-
+                            _box: list | None = boxestate['box']
                             try:
+                                # box 可能为 None, 使用 try except 处理
+                                x1, y1, x2, y2 = _box
+                                target = rectified_image[y1:y2, x1:x2]
+
                                 logger.info(f"box {j} rings location start")
                                 result = adaptive_threshold_rings_location(
                                     target,
@@ -483,8 +506,39 @@ def main() -> None:
 
         # 检测周期外
         if cycle_loop_count == -1:
-            # 尝试保存
-            save_config_to_yaml(config_path=config_path)
+            # 获取消息
+
+
+            # 设备部署，重置配置和初始靶标
+            # load_config_from_yaml(config_path=original_config_path)
+            # standard_cycle_results = None
+
+
+            # 下载新配置
+
+
+            # 靶标丢失，传递来新靶标
+            # {
+            #     i: {
+            #         "ratio": ratio,
+            #         "score": score,
+            #         "box": box
+            #     }
+            # }
+            # id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+            # for new_box in new_boxes:
+            #     if new_box['id'] not in id2boxstate.keys():
+            #         id2boxstate[new_box['id']] = {
+            #             'ratio': None, # None 代表未知
+            #             'score': 0,
+            #             'box': new_box['box'],
+            #         }
+            #     else:
+            #         id2boxstate[new_box['id']]['box'] = new_box['box']
+
+
+            # 保存运行时配置
+            save_config_to_yaml(config_path=runtime_config_path)
 
         # 主循环休眠
         main_sleep_interval: int = MainConfig.getattr("main_sleep_interval")

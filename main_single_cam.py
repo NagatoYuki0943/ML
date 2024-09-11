@@ -582,11 +582,12 @@ def main() -> None:
 
                                     if target_number > got_target_number:
                                         # ❌️❌️❌️ 重新查找完成之后仍然不够 ❌️❌️❌️
-                                        logger.critical(f"The target number {target_number} is not enough, got {got_target_number} targets, loss box ids: {loss_ids}.")
-
                                         # 获取丢失的box id
                                         id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
                                         loss_ids = [i for i, boxestate in id2boxstate.items() if boxestate['box'] is None]
+
+                                        logger.critical(f"The target number {target_number} is not enough, got {got_target_number} targets, loss box ids: {loss_ids}.")
+
                                         # 保存丢失的图片
                                         image_path = save_dir / f"target_loss.jpg"
                                         save_image(image, image_path)

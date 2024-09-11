@@ -217,6 +217,8 @@ def find_target(image: np.ndarray) -> tuple[dict, int]:
 
     if got_target_number < target_number:
         logger.error(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
+    elif got_target_number > target_number:
+        logger.warning(f"find target number more than target number, got_target_number: {got_target_number}, target_number: {target_number}, please update config")
     else:
         logger.success(f"find target number {got_target_number} = set target number {target_number}")
 
@@ -231,11 +233,13 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
     template_path: Path = MatchTemplateConfig.getattr("template_path")
     match_method: int = MatchTemplateConfig.getattr("match_method")
     target_number: int = MatchTemplateConfig.getattr("target_number")
+    new_target_scales: tuple[float] = MatchTemplateConfig.getattr("new_target_scales")
+    threshold_match_threshold: float = MatchTemplateConfig.getattr("threshold_match_threshold")
     search_range: float = MatchTemplateConfig.getattr("search_range")
     template = cv2.imread(template_path, 0)
 
     # 获取之前的匹配结果
-    # {
+    # id2boxstate: {
     #     i: {
     #         "ratio": ratio,
     #         "score": score,
@@ -255,6 +259,7 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
     # 循环box，截取box区域进行匹配
     for i, boxestate in id2boxstate.items():
         ratio: float | None = boxestate["ratio"]
+        score: float | None = boxestate["score"]
         box: list | None = boxestate["box"]
 
         # box 为 None 则跳过
@@ -273,35 +278,50 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
             box_w = box_x2 - box_x1
             # 求出 ratio 比例
             ratio = min(box_h, box_w) / min(template_h, template_w)
+            new_scales = np.arange(new_target_scales[0], new_target_scales[1] + 1e-8, new_target_scales[2])
+            ratios = (ratio * new_scales).tolist()
+        else:
+            ratios = [ratio]
 
         # 匹配区域
         box_x1, box_y1, box_x2, box_y2 = box
         box_target = image[box_y1:box_y2, box_x1:box_x2]
 
-        # 根据最终比率得到模板的尺寸
-        resized_h = int(ratio * template_h)
-        resized_w = int(ratio * template_w)
-        # 使用最终尺寸一次 resize 模板
-        template_resized = cv2.resize(template, (resized_w, resized_h))
+        # 多个 ratio 尝试匹配
+        match_results = []
+        for _ratio in ratios:
+            # 根据最终比率得到模板的尺寸
+            resized_h = int(_ratio * template_h)
+            resized_w = int(_ratio * template_w)
+            # 使用最终尺寸一次 resize 模板
+            template_resized = cv2.resize(template, (resized_w, resized_h))
 
-        # 需要调整模板尺度
-        match_results = match_template_filter_by_threshold(
-            box_target,
-            template_resized,
-            match_method,
-        )
+            # 需要调整模板尺度
+            match_result = match_template_filter_by_threshold(
+                box_target,
+                template_resized,
+                match_method,
+                threshold_match_threshold,
+            )
+            match_result = [[_ratio] + list(_match_result) for _match_result in match_result]
+            match_results.extend(match_result)
+
+        # 按照 score 降序排序 match_results
+        match_results = sorted(match_results, key=lambda x: x[1], reverse=True)
 
         if len(match_results) > 0:
             # 找到目标
-            new_score, new_box = match_results[0]
+            new_ratio, new_score, new_box = match_results[0]
             new_x1, new_y1, new_x2, new_y2 = new_box.tolist()
+            new_box = [box_x1 + new_x1, box_y1 + new_y1, box_x1 + new_x2, box_y1 + new_y2]
             new_id2boxstate[i] = {
-                "ratio": float(ratio),
+                "ratio": float(new_ratio),
                 "score": float(new_score),
-                "box": [box_x1 + new_x1, box_y1 + new_y1, box_x1 + new_x2, box_y1 + new_y2]
+                "box": new_box
             }
-            logger.info(f"original target {i}, {ratio = }, {box = } is ok")
+            logger.info(f"original target {i}, {new_ratio = }, {new_score = }, {new_box = } is ok")
         else:
+            logger.warning(f"original target {i}, {ratio = }, {score = }, {box = } not found, dilate search range")
             # 没有找到目标,扩大匹配区域
             box_h = box_y2 - box_y1
             box_w = box_x2 - box_x1
@@ -310,30 +330,48 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
             box_y1_dilate = max(int(box_y1 - search_range * box_h), 0)
             box_y2_dilate = min(int(box_y2 + search_range * box_h), image_h)
             box_target_dilate = image[box_y1_dilate:box_y2_dilate, box_x1_dilate:box_x2_dilate]
-            # 需要调整模板尺度
-            match_results = match_template_filter_by_threshold(
-                box_target_dilate,
-                template_resized,
-                match_method,
-            )
+
+            # 多个 ratio 尝试匹配
+            match_results = []
+            for _ratio in ratios:
+                # 根据最终比率得到模板的尺寸
+                resized_h = int(_ratio * template_h)
+                resized_w = int(_ratio * template_w)
+                # 使用最终尺寸一次 resize 模板
+                template_resized = cv2.resize(template, (resized_w, resized_h))
+
+                # 需要调整模板尺度
+                match_result = match_template_filter_by_threshold(
+                    box_target_dilate,
+                    template_resized,
+                    match_method,
+                    threshold_match_threshold,
+                )
+                match_result = [[_ratio] + list(_match_result) for _match_result in match_result]
+                match_results.extend(match_result)
+
+            # 按照 score 降序排序 match_results
+            match_results = sorted(match_results, key=lambda x: x[1], reverse=True)
+
             if len(match_results) > 0:
                 # 找到目标
-                new_score, new_box = match_results[0]
+                new_ratio, new_score, new_box = match_results[0]
                 new_x1, new_y1, new_x2, new_y2 = new_box.tolist()
+                new_box = [box_x1 + new_x1, box_y1 + new_y1, box_x1 + new_x2, box_y1 + new_y2]
                 new_id2boxstate[i] = {
-                    "ratio": float(ratio),
+                    "ratio": float(new_ratio),
                     "score": float(new_score),
-                    "box": [box_x1 + new_x1, box_y1 + new_y1, box_x1 + new_x2, box_y1 + new_y2]
+                    "box": new_box
                 }
-                logger.info(f"original target {i}, {ratio = }, {box = } not found, but found in box around, {new_box = }")
+                logger.info(f"original target {i}, {ratio = }, {score = }, {box = } not found, but found in dilate range, {new_ratio = }, {new_box = }")
             else:
                 # 没有找到目标
                 new_id2boxstate[i] = {
                     "ratio": float(ratio),
-                    "score": 0,
+                    "score": float(score),
                     "box": None
                 }
-                logger.warning(f"original target {i}, {ratio = }, {box = } not found")
+                logger.warning(f"in dilate range, original target {i}, {ratio = }, {score = }, {box = } not found")
 
     # 如果检测不到全部的 box, 则不设置全局变量
     if all((True if boxestate["box"] is None else False) for boxestate in new_id2boxstate.values()):
@@ -347,6 +385,8 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
 
     if got_target_number < target_number:
         logger.error(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
+    elif got_target_number > target_number:
+        logger.warning(f"find target number more than target number, got_target_number: {got_target_number}, target_number: {target_number}, please update config")
     else:
         logger.success(f"find target number {got_target_number} = set target number {target_number}")
 
@@ -371,7 +411,7 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
     template = cv2.imread(template_path, 0)
 
     # 获取之前的匹配结果
-    # {
+    # id2boxstate: {
     #     i: {
     #         "ratio": ratio,
     #         "score": score,
@@ -384,19 +424,19 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
         return find_target(image)
 
     image = image.copy()
-    loss_id = []
+    loss_ids = []
     # 循环box，将box区域屏蔽
     for i, boxestate in id2boxstate.items():
         box = boxestate["box"]
         if box is None:
-            loss_id.append(i)
+            loss_ids.append(i)
             continue
         # 屏蔽其他box
         box_x1, box_y1, box_x2, box_y2 = box
         image[box_y1:box_y2, box_x1:box_x2] = 0
 
     # 查找丢失的目标
-    loss_target_number = len(loss_id)
+    loss_target_number = len(loss_ids)
     # ratios: [...]
     # scores: [...]
     # boxes: [[x_min, y_min, x_max, y_max], ...]
@@ -424,17 +464,18 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
     sorted_scores = scores[sorted_index]
     sorted_boxes = boxes[sorted_index]
 
-    if len(sorted_ratios) <= len(loss_id):
-        logger.error(f"find lost target number less than loss target number, find_lost_target_number: {len(sorted_ratios)}, loss_target_number: {len(loss_id)}")
+    if len(sorted_ratios) < len(loss_ids):
+        logger.error(f"find lost target number less than loss target number, find_lost_target_number: {len(sorted_ratios)}, loss_target_number: {len(loss_ids)}")
     else:
-        logger.success(f"find_lost_target_number {len(sorted_ratios)} = loss_target_number {len(loss_id)}")
+        logger.success(f"find_lost_target_number {len(sorted_ratios)} = loss_target_number {len(loss_ids)}")
 
     for i, (ratio, score, box) in enumerate(zip(sorted_ratios, sorted_scores, sorted_boxes)):
-        id2boxstate[loss_id[i]] = {
+        id2boxstate[loss_ids[i]] = {
             "ratio": float(ratio),
             "score": float(score),
             "box": box.tolist(),
         }
+        logger.info(f"find lost target {loss_ids[i]}, {ratio = }, {score = }, {box = }")
 
     MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
     # 更新got_target_number

@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import json
 from pathlib import Path
+from datetime import datetime
 
 
 def clear_queue(*queues: Queue):
@@ -56,6 +57,18 @@ def load_standard_cycle_results(file_path: str | Path) -> dict | None:
 def test_load_standard_cycle_results():
     data = load_standard_cycle_results('results/history.jsonl')
     print(data)
+
+
+def get_now_time():
+    return datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def save_image(image: np.ndarray, file_path: str | Path):
+    image = image.copy()
+    if len(image.shape) == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+    cv2.imwrite(str(object=file_path), image)
 
 
 if __name__ == '__main__':

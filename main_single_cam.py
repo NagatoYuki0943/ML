@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+from datetime import datetime
 import cv2
 import json
 from threading import Lock, Thread
@@ -8,6 +9,7 @@ import queue
 from loguru import logger
 from typing import Literal
 from pathlib import Path
+import sys
 
 from algorithm import (
     ThreadWrapper,
@@ -39,7 +41,7 @@ from adjust_camera import (
 )
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
-from utils import clear_queue, save_to_jsonl, load_standard_cycle_results
+from utils import clear_queue, save_to_jsonl, load_standard_cycle_results, get_now_time, save_image
 
 
 # 将日志输出到文件
@@ -153,13 +155,26 @@ def main() -> None:
     # logger.success("初始化MQTT客户端完成")
     #-------------------- 初始化MQTT客户端 --------------------#
 
+    # 设备启动消息
+    send_msg = {
+        "cmd":"devicestate",
+        "body":{
+            "did": "458796",
+            "type": "startup",
+            "at": get_now_time(),
+            "sw_version": "230704180", # 版本号
+            "code": 200,
+            "msg": "device starting"
+        }
+    }
+
     logger.success("init end")
     #------------------------------ 初始化 ------------------------------#
 
     #------------------------------ 调整曝光 ------------------------------#
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_default.jpg", image)
+        save_image(image, save_dir / "image_default.jpg")
     except queue.Empty:
         logger.error("get picture timeout")
 
@@ -168,7 +183,7 @@ def main() -> None:
     logger.success("ajust exposure 1 end")
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_adjust_exposure.jpg", image)
+        save_image(image, save_dir / "image_adjust_exposure.jpg")
     except queue.Empty:
         logger.error("get picture timeout")
     #------------------------------ 调整曝光 ------------------------------#
@@ -202,6 +217,9 @@ def main() -> None:
         if id2boxstate is None:
             logger.warning("id2boxstate is None, use find_target instead of find_around_target")
             id2boxstate, got_target_number = find_target(rectified_image)
+            # 初始化时将 target_number 设置为找到的 target 数量
+            MatchTemplateConfig.setattr("target_number", got_target_number)
+            logger.success(f"update target_number to {got_target_number}")
         else:
             logger.success("id2boxstate is not None, use find_around_target")
             id2boxstate, got_target_number = find_around_target(rectified_image)
@@ -259,6 +277,10 @@ def main() -> None:
 
     # 是否需要发送部署信息
     need_send_devicedeploying_msg = False
+    # 是否收到温控回复命令
+    received_temp_control_msg = True
+    # 温度是否平稳
+    is_temp_stable = False
 
     #-------------------- 循环变量 --------------------#
 
@@ -278,6 +300,29 @@ def main() -> None:
                 logger.info("full image ajust exposure end")
                 #-------------------- 调整全图曝光 --------------------#
 
+                #-------------------- 补光灯 --------------------#
+                if False:
+                    # 补光灯控制命令
+                    send_msg = {
+                        "cmd":"adjustLEDlevel",
+                        "param":{
+                            "level":10,
+                            "times":1
+                        },
+                        "msgid":1
+                    }
+
+                    # 回复补光灯调节指令
+                    {
+                        "cmd":" askadjustLEDlevel ",
+                        "times": "2024-09-11T15:45:30",
+                        "param": {
+                            "result": "OK/NOT"
+                        },
+                        "msgid": 1
+                    }
+                #-------------------- 补光灯 --------------------#
+
                 #-------------------- 找到目标 --------------------#
                 try:
                     _, image, _ = camera_queue.get(timeout=get_picture_timeout)
@@ -288,6 +333,7 @@ def main() -> None:
                     #-------------------- 小区域模板匹配 --------------------#
                     _, got_target_number = find_around_target(rectified_image)
                     if got_target_number == 0:
+                        # ⚠️⚠️⚠️ 本次循环没有找到目标，尝试寻找遗失的目标 ⚠️⚠️⚠️
                         logger.warning("no target found in the image, start find_lost_target")
                         _, got_target_number = find_lost_target(rectified_image)
                         if got_target_number == 0:
@@ -300,7 +346,7 @@ def main() -> None:
 
                 #-------------------- 调整 box 曝光 --------------------#
                 logger.info("boxes ajust exposure start")
-                id2boxstate = MatchTemplateConfig.getattr("id2boxstate")
+                id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
                 # 每次开始调整曝光
                 # ex: {72000: array([[1327, 1697, 1828, 2198]]), 78000: array([[1781,  811, 2100, 1130]])}
                 exposure2id2boxstate = adjust_exposure_full_res_for_loop(camera_queue, id2boxstate)
@@ -395,7 +441,7 @@ def main() -> None:
                                 save_to_jsonl(result, camera_result_save_path)
                                 logger.success(f"{result = }")
                                 logger.success(f"box {j} rings location success")
-                                center = [result['center_x_mean'] + _box[0], result['center_y_mean'] + _box[1]]
+                                center = [float(result['center_x_mean'] + _box[0]), float(result['center_y_mean'] + _box[1])]
                                 cycle_results[j] = {
                                     'image_timestamp': f"image--{image_timestamp}--{j}",
                                     'box': _box,
@@ -425,45 +471,14 @@ def main() -> None:
 
                         # 正常判断是否结束周期
                         if cycle_loop_count == total_cycle_loop_count - 1:
-                            # 结束周期
-                            #------------------------- 检查是否丢失目标 -------------------------#
-                            _target_number = MatchTemplateConfig.getattr("target_number")
-                            got_target_number = MatchTemplateConfig.getattr("got_target_number")
-                            if _target_number > got_target_number:
-                                logger.warning(f"The target number {_target_number} is not enough, got {got_target_number} targets, start to find lost target.")
-                                # 丢失目标
-                                try:
-                                    _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-                                    #-------------------- 畸变矫正 --------------------#
-                                    rectified_image = image
-                                    #-------------------- 畸变矫正 --------------------#
-
-                                    #-------------------- 模板匹配 --------------------#
-                                    _, got_target_number = find_lost_target(rectified_image)
-                                    #-------------------- 模板匹配 --------------------#
-
-                                    if _target_number > got_target_number:
-                                        # 重新查找完成之后仍然不够, 发送告警
-                                        logger.critical(f"The target number {_target_number} is not enough, got {got_target_number} targets.")
-                                    else:
-                                        # 丢失目标重新找回
-                                        logger.success(f"The lost target has been found, the target number {_target_number} is enough, got {got_target_number} targets.")
-
-                                except queue.Empty:
-                                    logger.error("get picture timeout")
-                            else:
-                                # 目标数量正常
-                                logger.success(f"The target number {_target_number} is enough, got {got_target_number} targets.")
-                            #------------------------- 检查是否丢失目标 -------------------------#
-
                             #------------------------- 整理检测结果 -------------------------#
                             logger.success(f"{cycle_results = }")
                             # 保存到文件
                             save_to_jsonl(cycle_results, history_save_path)
 
                             # [n, 2] n个目标中心坐标
-                            # init_cycle_centers: {0: array([1830.03952661, 1097.25685946]), 1: array([2090.1380529 , 2148.12593385])}
-                            # new_cycle_centers: {0: array([1830.05961465, 1097.2564746 ]), 1: array([2090.13342415, 2148.12260239])}
+                            # init_cycle_centers: {0: [1830.03952661, 1097.25685946]), 1: [2090.1380529 , 2148.12593385]}
+                            # new_cycle_centers: {0: [1830.05961465, 1097.2564746 ]), 1: [2090.13342415, 2148.12260239]}
 
                             # 初始化 init_cycle_centers
                             if standard_cycle_results is None:
@@ -478,19 +493,126 @@ def main() -> None:
                                 move_threshold = RingsLocationConfig.getattr("move_threshold")
                                 init_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
+
+                                # 超出距离的 box id
+                                distance_result = {}
+                                over_distance_ids = set()
                                 # 计算移动距离
                                 for l in standard_cycle_results.keys():
                                     if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
-                                        for n in range(2): # 0 1 代表 x y
-                                            move_distance = abs(init_cycle_centers[l][n] - new_cycle_centers[l][n])
-                                            if move_distance > move_threshold:
-                                                logger.warning(f"box {l} {'x' if n == 0 else 'y'} move distance {move_distance} is over threshold {move_threshold}.")
-                                            else:
-                                                logger.info(f"box {l} {'x' if n == 0 else 'y'} move distance {move_distance} is under threshold {move_threshold}.")
+                                        # for n in range(2): # 0 1 代表 x y
+                                        #     move_distance = abs(init_cycle_centers[l][n] - new_cycle_centers[l][n])
+                                        #     if move_distance > move_threshold:
+                                        #         over_distance_ids.add(l)
+                                        #         logger.warning(f"box {l} {'x' if n == 0 else 'y'} move distance {move_distance} is over threshold {move_threshold}.")
+                                        #     else:
+                                        #         logger.info(f"box {l} {'x' if n == 0 else 'y'} move distance {move_distance} is under threshold {move_threshold}.")
+                                        x_move_distance = abs(init_cycle_centers[l][0] - new_cycle_centers[l][0])
+                                        y_move_distance = abs(init_cycle_centers[l][1] - new_cycle_centers[l][1])
+                                        distance_result[l] = (x_move_distance, y_move_distance)
+                                        if x_move_distance > move_threshold:
+                                            over_distance_ids.add(l)
+                                            logger.warning(f"box {l} x move distance {x_move_distance} is over threshold {move_threshold}.")
+                                        else:
+                                            logger.info(f"box {l} x move distance {x_move_distance} is under threshold {move_threshold}.")
+                                        if y_move_distance > move_threshold:
+                                            over_distance_ids.add(l)
+                                            logger.warning(f"box {l} y move distance {y_move_distance} is over threshold {move_threshold}.")
+                                        else:
+                                            logger.info(f"box {l} y move distance {y_move_distance} is under threshold {move_threshold}.")
                                     else:
+                                        # box没找到将移动距离设置为 1e6
+                                        distance_result[l] = (1e6, 1e6)
+                                        over_distance_ids.add(l)
                                         logger.warning(f"box {l} not found in cycle_centers.")
 
+                                logger.info(f"distance_result: {distance_result}")
+                                logger.info(f"over_distance_ids: {over_distance_ids}")
+                                send_msg_data = {f"L1_SJ_{k}": {'X': v[0], 'Y': v[1]} for k, v in distance_result.items()}
+                                logger.info(f"send_msg_data: {send_msg_data}")
+                                if len(over_distance_ids) > 0:
+                                    # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
+                                    logger.warning(f"box {over_distance_ids} move distance is over threshold {move_threshold}.")
+
+                                    # 保存丢失的图片
+                                    image_path = save_dir / f"target_displacement.jpg"
+                                    save_image(image, image_path)
+                                    # 位移告警消息
+                                    send_msg = {
+                                        "cmd": "alarm",
+                                        "body": {
+                                            "did": "458796",
+                                            "type": "displacement",
+                                            "at": get_now_time(),
+                                            "number": [1],# 表示异常的靶标编号
+                                            "data": send_msg_data,
+                                            "ftpurl": "/5654/20240810160846",# ftp上传路径
+                                            "img": [image_path]# 文件名称
+                                        }
+                                    }
+                                else:
+                                    # ✅️✅️✅️ 所有 box 移动距离都小于阈值 ✅️✅️✅️
+                                    logger.success(f"All box move distance is under threshold {move_threshold}.")
+                                    # 正常数据消息
+                                    send_msg = {
+                                        "cmd": "update",
+                                        "did": "458796",
+                                        "data": send_msg_data
+                                    }
+
                             #------------------------- 整理检测结果 -------------------------#
+
+                            #------------------------- 检查是否丢失目标 -------------------------#
+                            target_number = MatchTemplateConfig.getattr("target_number")
+                            got_target_number = MatchTemplateConfig.getattr("got_target_number")
+
+                            # 丢失目标
+                            if target_number > got_target_number:
+                                logger.warning(f"The target number {target_number} is not enough, got {got_target_number} targets, start to find lost target.")
+
+                                try:
+                                    _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+                                    #-------------------- 畸变矫正 --------------------#
+                                    rectified_image = image
+                                    #-------------------- 畸变矫正 --------------------#
+
+                                    #-------------------- 模板匹配 --------------------#
+                                    _, got_target_number = find_lost_target(rectified_image)
+                                    #-------------------- 模板匹配 --------------------#
+
+                                    if target_number > got_target_number:
+                                        # ❌️❌️❌️ 重新查找完成之后仍然不够 ❌️❌️❌️
+                                        logger.critical(f"The target number {target_number} is not enough, got {got_target_number} targets, loss box ids: {loss_ids}.")
+
+                                        # 获取丢失的box id
+                                        id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
+                                        loss_ids = [i for i, boxestate in id2boxstate.items() if boxestate['box'] is None]
+                                        # 保存丢失的图片
+                                        image_path = save_dir / f"target_loss.jpg"
+                                        save_image(image, image_path)
+                                        send_msg = {
+                                            "cmd":"alarm",
+                                            "body":{
+                                                "did": "458796",
+                                                "type": "target_loss",
+                                                "at": get_now_time(),
+                                                "number": loss_ids,# 异常的靶标编号
+                                                "data": send_msg_data,
+                                                "ftpurl": "/5654/20240810160846",# ftp上传路径
+                                                "img": [image_path]# 文件名称
+                                            }
+                                        }
+                                    else:
+                                        # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
+                                        logger.success(f"The lost target has been found, the target number {target_number} is enough, got {got_target_number} targets.")
+
+                                except queue.Empty:
+                                    logger.error("get picture timeout")
+
+                            # 目标数量正常
+                            else:
+                                logger.success(f"The target number {target_number} is enough, got {got_target_number} targets.")
+                            #------------------------- 检查是否丢失目标 -------------------------#
 
                             #------------------------- 结束周期 -------------------------#
                             cycle_results = {} # 重置周期内结果
@@ -531,10 +653,11 @@ def main() -> None:
                 ...
                 need_send_devicedeploying_msg = False
 
-            # 获取消息
+            #------------------------- 获取消息 -------------------------#
             while not main_queue.empty():
                 received_msg = main_queue.get()
                 cmd = received_msg.get('cmd')
+                logger.info(f"received msg: {received_msg}")
 
                 # 设备部署消息
                 if cmd == 'devicedeploying':
@@ -552,19 +675,20 @@ def main() -> None:
 
                 # 靶标校正消息
                 elif cmd == 'targetcorrection':
-                    # msg: {
+                    # {
                     #     "cmd":"targetcorrection",
                     #     "msgid":"bb6f3eeb2",
                     #     "body":{
-                    #         "boxes":{
-                    #             "box_id1":[x1, y1, x2, y2],
-                    #             "box_id2":[x1, y1, x2, y2],
-                    #         },
+                    #         "add_boxes":[
+                    #             [x1, y1, x2, y2],
+                    #             [x1, y1, x2, y2],
+                    #         ],
+                    #         "remove_box_ids":["L1_SJ_3","L1_SJ_4"]
                     #     }
                     # }
                     logger.info("target correction, update target")
                     # 靶标丢失，传递来新靶标
-                    # {
+                    # id2boxstate: {
                     #     i: {
                     #         "ratio": ratio,
                     #         "score": score,
@@ -572,26 +696,39 @@ def main() -> None:
                     #     }
                     # }
                     id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
-                    new_boxes: dict[int, list] = received_msg['body']['boxes']
-                    for box_id, new_box in new_boxes.values():
-                        if box_id in id2boxstate.keys():
-                            id2boxstate[box_id]['box'] = new_box
-                        else:
-                            id2boxstate[box_id] = {
-                                'ratio': None, # None 代表未知
-                                'score': 0,
-                                'box': new_box,
-                            }
+                    remove_box_ids: dict[int, list] = received_msg['body']['remove_box_ids']
+                    # 去除多余的 box
+                    for remove_box_id in remove_box_ids:
+                        id2boxstate.pop(int(remove_box_id.split('_')[-1]))
+
+                    # 将新的 box 转换为列表
+                    new_boxstates = [{"ratio": None, "score": None, "box": box} for box in received_msg['body']['add_boxes']]
+                    # 旧的 box 也转换为列表，并合并
+                    old_boxstates = list(id2boxstate.values())
+                    old_boxstates.extend(new_boxstates)
+                    # 合并后的 box 生成新的 id2boxstate
+                    id2boxstate = {i: boxstate for i, boxstate in enumerate(old_boxstates)}
+
+                    # 设置新目标数量和靶标信息
+                    MatchTemplateConfig.setattr("target_number", len(id2boxstate))
                     MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
-                    send_msg = {
-                        "cmd":"targetcorrection",
-                        "result":"succ/fail",
-                        "body":{
-                            "code":200,
-                            "msg":"correction succeed"
-                        },
-                        "msgid": "bb6f3eeb2"
-                    }
+
+                    # 因为重设了靶标，所以需要重新初始化标准靶标
+                    standard_cycle_results = None
+
+                    # send_msg = {
+                    #     "cmd":"targetcorrection",
+                    #     "body":{
+                    #         "code":200,
+                    #         "msg":"correction succeed"
+                    #         "data": {
+                    #             "L1_SJ_1":{"X":19.01,"Y":18.31,"Z":10.8},
+                    #             "L1_SJ_2":{"X":4.09,"Y":8.92,"Z":6.7},
+                    #             "L1_SJ_3":{"X":2.02,"Y":5.09,"Z":14.6}
+                    #         },
+                    #     },
+                    #     "msgid": "bb6f3eeb2"
+                    # }
                     # 发送更新靶标消息
                     raise NotImplementedError("target correction send msg not implemented")
                     logger.success(f"update target success, new id2boxstate: {id2boxstate}")
@@ -611,11 +748,11 @@ def main() -> None:
                     reference_target_id = int(reference_target.split('_')[-1])
                     MatchTemplateConfig.setattr("reference_target_ids", [reference_target_id])
                     send_msg = {
-                        "cmd":"setreferencetarget",
-                        "result":"succ/fail",
-                        "body":{
-                            "code":200,
-                            "msg":"set succeed"
+                        "cmd": "setreferencetarget",
+                        "result": "succ/fail",
+                        "body": {
+                            "code": 200,
+                            "msg": "set succeed"
                         },
                         "msgid": "bb6f3eeb2"
                     }
@@ -624,24 +761,23 @@ def main() -> None:
 
                 # 设备状态查询消息
                 elif cmd == 'getstatus':
-                    ...
                     send_msg = {
-                        "cmd":"getstatus",
-                        "body":{
-                            "ext_power_volt":38.3,# 供电电压
-                            "temp":20,# 环境温度
-                            "signal_4g":-84.0,# 4g信号强度
-                            "sw_version":"230704180",# 固件版本号
+                        "cmd": "getstatus",
+                        "body": {
+                            "ext_power_volt": 38.3,# 供电电压
+                            "temp": 20,# 环境温度
+                            "signal_4g": -84.0,# 4g信号强度
+                            "sw_version": "230704180",# 固件版本号
                             "sensor_state":{
-                                "sensor1":0,# 0表示无错误，-1供电异常，
-                                "sensor2":0,# -2传感器数据异常，-3采样间隔内没有采集到数据
-                                "sensor3":0,
-                                "sensor4":0,
-                                "sensor5":0,
-                                "sensor6":0, # sensor1~6为温度传感器，其余为靶标
-                                "sensor7":0,
-                                "sensor8":0,
-                                "sensor9":0,
+                                "sensor1": 0,# 0表示无错误，-1供电异常，
+                                "sensor2": 0,# -2传感器数据异常，-3采样间隔内没有采集到数据
+                                "sensor3": 0,
+                                "sensor4": 0,
+                                "sensor5": 0,
+                                "sensor6": 0, # sensor1~6为温度传感器，其余为靶标
+                                "sensor7": 0,
+                                "sensor8": 0,
+                                "sensor9": 0,
                             }
                         },
                         "msgid": "bb6f3eeb2"
@@ -656,18 +792,19 @@ def main() -> None:
                     #     "msgid":"bb6f3eeb2"
                     # }
                     try:
-                        _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-                        image_path = save_dir / f"image_send.jpg"
-                        cv2.imwrite(image_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+                        image_timestamp, image, _ = camera_queue.get(timeout=get_picture_timeout)
+                        # 保存图片
+                        image_path = save_dir / f"upload_image.jpg"
+                        save_image(image, image_path)
 
                         send_msg = {
-                            "cmd":"setconfig",
-                            "result":"succ",
+                            "cmd": "setconfig",
+                            "result": "succ",
                             "body":{
-                                "code":200,
-                                "msg":"upload succeed",
-                                "ftpurl":"/5654/20240810160846",# ftp上传路径
-                                "img":[image_path]# 文件名称
+                                "code": 200,
+                                "msg": "upload succeed",
+                                "ftpurl": "/5654/20240810160846",# ftp上传路径
+                                "img": [image_path]# 文件名称
                             },
                             "msgid": "bb6f3eeb2"
                         }
@@ -688,10 +825,173 @@ def main() -> None:
                         logger.error("get picture timeout")
                     raise NotImplementedError("get image send msg not implemented")
 
+                # 温控板回复控温指令, 回复可能延期
+                elif cmd == 'askadjusttempdata':
+                    {
+                        "cmd": "askadjusttempdata",
+                        "times": "2024-09-11T15:45:30",
+                        "camera": "2",
+                        "param": {
+                            "result": "OK/NOT"
+                        },
+                        "msgid": 1
+                    }
+                    logger.info("received askadjusttempdata response")
+                    received_temp_control_msg = True
+
+                # 日常温度数据
+                elif cmd =='sendtempdata':
+                    {
+                        "cmd":"sendtempdata",
+                        "camera":"2",
+                        "times":"2024-09-11T15:45:30",
+                        "param":{
+                            "inside_air_t":10,
+                            "exterior_air_t":10,
+                            "sensor1_t":10,
+                            "sensor2_t":10,
+                            "sensor3_t":10,
+                            "sensor4_t":257,
+                            "sensor5_t":257,
+                            "sensor6_t":257
+                        },
+                        "msgid":1
+                    }
+                    logger.info("received temp data")
+
+                # 温度调节过程数据
+                elif cmd == 'sendadjusttempdata':
+                    {
+                        "cmd":"sendadjusttempdata",
+                        "camera":"2",
+                        "times":"2024-09-11T15:45:30",
+                        "param":{
+                            "parctical_t":10,
+                            "control_t":10,
+                            "control_way":"warm/cold",
+                            "pwm_data":10
+                        },
+                        "msgid":1
+                    }
+                    logger.info("received just temp data")
+
+                # 温控停止消息
+                elif cmd == 'stopadjusttemp':
+                    logger.info("received stop adjust temp data")
+                    {
+                        "cmd":"stopadjusttemp",
+                        "camera":"2",
+                        "times":"2024-09-11T15:45:30",
+                        "param":{
+                            "current_t":10,
+                            "control_t":10
+                        },
+                        "msgid":1
+                    }
+                    is_temp_stable = True
+                    logger.success("received stop adjust temp data")
+
+                # 重启终端设备消息
+                elif cmd =='reboot':
+                    {
+                        "cmd":"reboot",
+                        "msgid":"bb6f3eeb2",
+                    }
+                    # 重启终端设备响应消息
+                    send_msg ={
+                        "cmd":"reboot",
+                        "body":{
+                            "code":200,
+                            "did":"7804d2",
+                            "msg":"reboot succeed",
+                        },
+                        "msgid": "bb6f3eeb2"
+                    }
+                    sys.exit()
                 else:
                     logger.warning(f"unknown cmd: {cmd}")
                     logger.warning(f"unknown msg: {received_msg}")
-            # 下载新配置
+                #------------------------- 获取消息 -------------------------#
+
+                #------------------------- 发送消息 -------------------------#
+                # 温度异常告警消息
+                if False:
+                    send_msg = {
+                        "cmd": "alarm",
+                        "body": {
+                            "did": "458796",
+                            "type": "temperature",
+                            "at": get_now_time(),
+                            "number": [1, 3, 4],
+                            "data": {
+                                "L3_WK_1": 80,
+                                "L3_WK_2": 20,
+                                "L3_WK_3": 80,
+                                "L3_WK_4": 90,
+                                "L3_WK_5": 20,
+                                "L3_WK_6": 20
+                            }
+                        }
+                    }
+                    raise NotImplementedError("send msg not implemented")
+
+                # 设备异常告警消息
+                if False:
+                    send_msg = {
+                        "cmd": "alarm",
+                        "body": {
+                            "did": "458796",
+                            "type": "device",
+                            "at": get_now_time(),
+                            "code": 400,
+                            "msg": "device error"
+                        }
+                    }
+                    raise NotImplementedError("send msg not implemented")
+
+                # 设备进入工作状态消息
+                # 温度正常
+                if is_temp_stable:
+                    send_msg = {
+                        "cmd": "devicestate",
+                        "body": {
+                            "did": "458796",
+                            "type": "working",
+                            "at": get_now_time(),
+                            "code": 200,
+                            "msg": "device working"
+                        }
+                    }
+
+                # 温控变化消息
+                if False:
+                    send_msg = {
+                        "cmd":"devicestate",
+                        "body":{
+                            "did": "458796",
+                            "type": "temperature_control",
+                            "at": get_now_time(),
+                            "data": {
+                                "L3_WK_1": 20, # 内仓实际温度
+                                "control_t": 30, # 目标温度
+                                "control_way": "warm/cold",
+                                "pwm_data": 10
+                            }
+                        }
+                    }
+
+                # 温度控制命令
+                if False:
+                    send_msg = {
+                        "cmd": "adjusttempdata",
+                        "param": {
+                            "control_t": 10
+                        },
+                        "msgid": 1
+                    }
+                    received_temp_control_msg = False
+
+                #------------------------- 发送消息 -------------------------#
 
 
             # 保存运行时配置

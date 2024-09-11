@@ -35,7 +35,6 @@ class MainConfig(BaseConfig):
     """主线程配置
     """
     lock = Lock()   # 锁, 在读取或者修改配置文件时要加锁
-    main_sleep_interval: int = 500  # 主循环 sleep_time ms
     log_level: Literal['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
     save_dir: Path = Path("results")
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -49,6 +48,7 @@ class MainConfig(BaseConfig):
     standard_save_path = save_dir / "standard.jsonl"
     original_config_path = save_dir / "config_original.yaml"   # 原始 config, 用于重置
     runtime_config_path = save_dir / "config_runtime.yaml" # 运行时 config, 用于临时修改配置
+    main_sleep_interval: int = 500  # 主循环 sleep_time ms
     get_picture_timeout: int = 10       # 获取图片超时时间 s
     cycle_time_interval: int = 10000    # 主循环时间 ms
 
@@ -68,7 +68,7 @@ class CameraConfig(BaseConfig):
     camera_left_index: int = 1                              # 左侧相机 index
     camera_right_index: int = 0                             # 右侧相机 index
     output_format: Literal['rgb', 'gray'] = 'gray'          # 输出格式
-    has_filter_plate: bool = True                          # 是否有滤镜板
+    has_filter_plate: bool = True                           # 是否有滤镜板
 
 
 @dataclass
@@ -82,7 +82,7 @@ class AdjustCameraConfig(BaseConfig):
     capture_mode: Literal['preview', 'low', 'full'] = 'low'
     capture_time_interval: int = 100        # 拍照间隔 us
     return_image_time_interval: int = 100   # 返回图片间隔 us
-    adjust_total_times: int = 100
+    adjust_total_times: int = 100           # 最高调整次数
 
 
 @dataclass
@@ -128,7 +128,8 @@ class MatchTemplateConfig(BaseConfig):
     match_method: int = cv2.TM_CCOEFF_NORMED    # 匹配方法
     init_scale: float = 0.075                   # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
     scales: tuple[float] = (1.0, 4.0, 0.1)      # 缩放 scale 范围 (start, end, step)
-    target_number: int = 2                      # 靶标数量
+    new_target_scales: tuple[float] = (0.5, 1.5, 0.1)  # 新目标的缩放 scale 范围 (start, end, step)
+    target_number: int = 0                      # 默认靶标数量,初始化时为找到的靶标数量
     got_target_number: int = 0                  # 找到的靶标数量
     iou_threshold: float = 0.5                  # iou 阈值
     use_threshold_match: bool = True            # 是否使用阈值匹配

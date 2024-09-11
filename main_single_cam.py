@@ -69,16 +69,15 @@ def main() -> None:
     #-------------------- 基础 --------------------#
     # 主线程消息队列
     main_queue = queue.Queue()
+    image_timestamp: str
+    image: np.ndarray
+    image_metadata: dict
 
     #-------------------- 基础 --------------------#
 
     #-------------------- 运行时配置 --------------------#
 
     #-------------------- 运行时配置 --------------------#
-
-    #-------------------- 历史 --------------------#
-
-    #-------------------- 历史 --------------------#
 
     #-------------------- 初始化相机 --------------------#
     logger.info("开始初始化相机")
@@ -176,10 +175,6 @@ def main() -> None:
 
     #------------------------------ 找到目标 ------------------------------#
     logger.info("find target start")
-    image_timestamp: str
-    image: np.ndarray
-    image_metadata: dict
-
     #-------------------- 取图 --------------------#
     try:
         _, image, _ = camera_queue.get(timeout=get_picture_timeout)
@@ -208,7 +203,7 @@ def main() -> None:
             logger.warning("id2boxstate is None, use find_target instead of find_around_target")
             id2boxstate, got_target_number = find_target(rectified_image)
         else:
-            logger.info("id2boxstate is not None, use find_around_target")
+            logger.success("id2boxstate is not None, use find_around_target")
             id2boxstate, got_target_number = find_around_target(rectified_image)
         logger.info(f"image find target id2boxstate: \n{id2boxstate}")
         logger.info(f"image find target number: {got_target_number}")

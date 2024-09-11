@@ -609,7 +609,7 @@ def adjust_exposure_full_res_for_loop(
                 # directions 和 new_exposure_times 的 key 对应 boxid
                 directions = {}
                 new_exposure_times = {}
-                for i, boxstate in current_id2boxstate.items():
+                for j, boxstate in current_id2boxstate.items():
                     box = boxstate["box"]
                     # 空box不处理
                     if box is None:
@@ -624,9 +624,9 @@ def adjust_exposure_full_res_for_loop(
                         AdjustCameraConfig.getattr("suitable_ignore_ratio"),
                     )
 
-                    directions[i] = direction
-                    new_exposure_times[i] = new_exposure_time
-                    logger.info(f"boxid = {i}, {box = }, {new_exposure_time = }, {direction = }")
+                    directions[j] = direction
+                    new_exposure_times[j] = new_exposure_time
+                    logger.info(f"boxid = {j}, {box = }, {new_exposure_time = }, {direction = }")
 
                 logger.info(f"{new_exposure_times = }")
 
@@ -820,7 +820,7 @@ def adjust_exposure_low_res_for_loop(
                 # directions 和 new_exposure_times 的 key 对应 boxid
                 directions = {}
                 new_exposure_times = {}
-                for i, boxstate in current_id2boxstate.items():
+                for j, boxstate in current_id2boxstate.items():
                     box = boxstate["box"]
                     # 空box不处理
                     if box is None:
@@ -837,9 +837,9 @@ def adjust_exposure_low_res_for_loop(
                         AdjustCameraConfig.getattr("suitable_ignore_ratio"),
                     )
 
-                    directions[i] = direction
-                    new_exposure_times[i] = new_exposure_time
-                    logger.info(f"boxid = {i}, {box = }, {new_exposure_time = }, {direction = }")
+                    directions[j] = direction
+                    new_exposure_times[j] = new_exposure_time
+                    logger.info(f"boxid = {j}, {box = }, {new_exposure_time = }, {direction = }")
 
                 logger.info(f"{new_exposure_times = }")
 

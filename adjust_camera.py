@@ -491,9 +491,23 @@ def adjust_exposure_full_res_recursive(
     CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
     #-------------------- 高分辨率快速拍摄 --------------------#
 
-    logger.success(f"{exposure2id2boxstate = }")
+    # 去除 None box
+    _exposure2id2boxstate = exposure2id2boxstate
+    if id2boxstate is not None:
+        _exposure2id2boxstate = {}
+        for _exposure_time, _id2boxstate in exposure2id2boxstate.items():
+            __id2boxstate = {}
+            # id2boxstate: {0: {'ratio': 0.8184615384615387, 'score': 0.9265941381454468, 'box': [1509, 967, 1828, 1286]}}
+            for i, boxstate in _id2boxstate.items():
+                if boxstate['box'] is None:
+                    continue
+                __id2boxstate[i] = boxstate
+            if len(__id2boxstate):
+                _exposure2id2boxstate[_exposure_time] = __id2boxstate
+
+    logger.success(f"{_exposure2id2boxstate = }")
     logger.info("adjust exposure end")
-    return exposure2id2boxstate
+    return _exposure2id2boxstate
 
 
 def adjust_exposure_full_res_for_loop(
@@ -531,6 +545,7 @@ def adjust_exposure_full_res_for_loop(
     logger.info("adjust exposure start")
 
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
+    adjust_total_times: int = AdjustCameraConfig.getattr("adjust_total_times")
     exposure2id2boxstate: dict[int, dict | None] = {}
 
     # 备份原本配置
@@ -543,10 +558,18 @@ def adjust_exposure_full_res_for_loop(
     # 使用栈来模拟递归
     stack = [(id2boxstate, CameraConfig.getattr("exposure_time"))]
 
+    i = 0
     while stack:
-        logger.info(f"stack size: {len(stack)}")
+        logger.info(f"stack size: {len(stack)}, i: {i}")
         current_id2boxstate, current_exposure_time = stack.pop()
         CameraConfig.setattr("exposure_time", current_exposure_time)
+
+        # 超出次数, 设置为最后一次
+        i += 1
+        if i > adjust_total_times:
+            logger.warning(f"adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us")
+            exposure2id2boxstate[current_exposure_time] = current_id2boxstate
+            break
 
         try:
             # 获取图像
@@ -670,9 +693,23 @@ def adjust_exposure_full_res_for_loop(
     CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
     CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
 
-    logger.success(f"{exposure2id2boxstate = }")
+    # 去除 None box
+    _exposure2id2boxstate = exposure2id2boxstate
+    if id2boxstate is not None:
+        _exposure2id2boxstate = {}
+        for _exposure_time, _id2boxstate in exposure2id2boxstate.items():
+            __id2boxstate = {}
+            # id2boxstate: {0: {'ratio': 0.8184615384615387, 'score': 0.9265941381454468, 'box': [1509, 967, 1828, 1286]}}
+            for i, boxstate in _id2boxstate.items():
+                if boxstate['box'] is None:
+                    continue
+                __id2boxstate[i] = boxstate
+            if len(__id2boxstate):
+                _exposure2id2boxstate[_exposure_time] = __id2boxstate
+
+    logger.success(f"{_exposure2id2boxstate = }")
     logger.info("adjust exposure end")
-    return exposure2id2boxstate
+    return _exposure2id2boxstate
 
 
 def adjust_exposure_low_res_for_loop(
@@ -710,6 +747,7 @@ def adjust_exposure_low_res_for_loop(
     logger.info("adjust exposure start")
 
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
+    adjust_total_times: int = AdjustCameraConfig.getattr("adjust_total_times")
     exposure2id2boxstate: dict[int, dict | None] = {}
 
     # 备份原本配置
@@ -731,10 +769,18 @@ def adjust_exposure_low_res_for_loop(
     # 使用栈来模拟递归
     stack = [(id2boxstate, CameraConfig.getattr("exposure_time"))]
 
+    i = 0
     while stack:
-        logger.info(f"stack size: {len(stack)}")
+        logger.info(f"stack size: {len(stack)}, i: {i}")
         current_id2boxstate, current_exposure_time = stack.pop()
         CameraConfig.setattr("exposure_time", current_exposure_time)
+
+        # 超出次数, 设置为最后一次
+        i += 1
+        if i > adjust_total_times:
+            logger.warning(f"adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us")
+            exposure2id2boxstate[current_exposure_time] = current_id2boxstate
+            break
 
         try:
             # 获取图像
@@ -861,6 +907,20 @@ def adjust_exposure_low_res_for_loop(
     CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
     CameraConfig.setattr("return_image_time_interval", default_return_image_time_interval)
 
-    logger.success(f"{exposure2id2boxstate = }")
+    # 去除 None box
+    _exposure2id2boxstate = exposure2id2boxstate
+    if id2boxstate is not None:
+        _exposure2id2boxstate = {}
+        for _exposure_time, _id2boxstate in exposure2id2boxstate.items():
+            __id2boxstate = {}
+            # id2boxstate: {0: {'ratio': 0.8184615384615387, 'score': 0.9265941381454468, 'box': [1509, 967, 1828, 1286]}}
+            for i, boxstate in _id2boxstate.items():
+                if boxstate['box'] is None:
+                    continue
+                __id2boxstate[i] = boxstate
+            if len(__id2boxstate):
+                _exposure2id2boxstate[_exposure_time] = __id2boxstate
+
+    logger.success(f"{_exposure2id2boxstate = }")
     logger.info("adjust exposure end")
-    return exposure2id2boxstate
+    return _exposure2id2boxstate

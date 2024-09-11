@@ -615,7 +615,7 @@ def adjust_exposure_full_res_for_loop(
                     if box is None:
                         continue
                     target_image = image[box[1]:box[3], box[0]:box[2]]
-                    # cv2.imwrite(f"./target_image_{i}.jpg", target_image)
+                    # cv2.imwrite(f"./target_image_{j}.jpg", target_image)
                     new_exposure_time, direction = adjust_exposure_by_mean(
                         target_image,
                         image_metadata['ExposureTime'],
@@ -828,7 +828,7 @@ def adjust_exposure_low_res_for_loop(
                     # 调整 box 大小
                     _box: list[int] = [int(x * low_res_ratio) for x in box]
                     target_image = image[_box[1]:_box[3], _box[0]:_box[2]]
-                    # cv2.imwrite(f"./target_image_{i}.jpg", target_image)
+                    # cv2.imwrite(f"./target_image_{j}.jpg", target_image)
                     new_exposure_time, direction = adjust_exposure_by_mean(
                         target_image,
                         image_metadata['ExposureTime'],

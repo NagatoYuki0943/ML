@@ -3,31 +3,35 @@ import re
 from datetime import datetime
 import json
 from threading import Lock
+import os
 
 
 class RaspberrySerialPort:
     def __init__(
         self,
-        temperature_logger,
+        temperature_data_save_path: str = "/log/temperature_data.json",
         port: str = "/dev/ttyAMA2",
         baudrate: int = 115200,
         timeout: float = 0.0,
         BUFFER_SIZE: int = 2048,
+        LOG_SIZE: int = 1_000_000,
     ):
         """
         Args:
-            temperature_logger: 温度数据记录器.
+            temperature_data_save_path: 温度数据记录文件路径. Defaults to "/log/temperature_data.json".
             port (str): 端口号. Defaults to "/dev/ttyAMA2".
             baudrate (int): 波特率. Defaults to 115200.
             timeout (float): 阻塞时间. Defaults to 0.0.
-            BUFFER_SIZE(int): 消息缓冲区大小. Defaults to 2048.
+            BUFFER_SIZE(int): 消息缓冲区大小. Defaults to 2KB.
+            LOG_SIZE(int): 温度数据日志大小. Defaults to 1MB.
         """
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
         self.buffer = ""
         self.BUFFER_SIZE = BUFFER_SIZE
-        self.temperature_logger = temperature_logger
+        self.temperature_data_save_path = temperature_data_save_path
+        self.LOG_SIZE = LOG_SIZE
         self.lock = Lock()
 
         # 预编译表达式
@@ -52,7 +56,6 @@ class RaspberrySerialPort:
             with self.lock:
                 temperature_message = self.comm.read(self.comm.in_waiting).decode().strip()
                 self.buffer += temperature_message
-                self.temperature_logger.info(f"Received temperature message: {temperature_message}")
 
     def subcontracting(self):
         """处理串口数据包"""
@@ -88,7 +91,6 @@ class RaspberrySerialPort:
             temperature_data = self.extract_temperature_data(complete_message)
             # 更新缓冲区
             self.buffer = self.buffer[end_idx:]
-            self.temperature_logger.info(f"Processed temperature data: {temperature_data}")
             return temperature_data
 
     def extract_temperature_data(self, message):
@@ -119,7 +121,6 @@ class RaspberrySerialPort:
 
         # 合并参数为字典
         result['times'] = time
-
         camera = "1" if self.port == "/dev/ttyAMA1" else "2"
         result['camera'] = camera
 
@@ -134,8 +135,6 @@ class RaspberrySerialPort:
         """
         with self.lock:
             self.comm.write(command_message.encode().strip())
-            self.temperature_logger.info(f"Sending control message: {command_message}")
-            self.temperature_logger.info(f"sending to {self.port}")
 
     def process_command(self, command_data):
         """合并控制指令与数据
@@ -148,4 +147,27 @@ class RaspberrySerialPort:
         msgid = command_data.get('msgid', "unknown")
         param_str = json.dumps(param, separators=(',', ':')).strip()
         command_message = f"$cmd={cmd}&param{param_str}&msgid={msgid}"
+        time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        command_data['times'] = time
+        self.save_temperature_data(command_data)
         return command_message
+    
+    def save_temperature_data(self, data):
+        """记录温度数据
+        
+        Args:
+            data (dict): 需要记录的数据
+        """
+        self.check_file_size()
+        with open(self.temperature_data_save_path, "a") as file:
+            json.dump(data, file)
+            file.write("\n")
+    
+    def check_file_size(self):
+        """检查温度数据记录文件大小"""
+        if os.path.exists(self.temperature_data_save_path):
+            if os.path.getsize(self.temperature_data_save_path) > self.LOG_SIZE:
+                with open(self.temperature_data_save_path, "w") as file:
+                    file.truncate(0)
+            else:
+                return

@@ -27,6 +27,7 @@ def serial_send(
 ):
     while True:
         command_data = queue.get()
+        # 根据camera判断使用哪个串口
         if 'camera' in command_data:
             ser = serial_ports[0] if command_data['camera'] == "1" else serial_ports[1]
             command_message = ser.process_command(command_data)

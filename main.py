@@ -105,11 +105,12 @@ def main() -> None:
 
     for port in SerialCommConfig.getattr('ports'):
         object = RaspberrySerialPort(
-            SerialCommConfig.getattr('temperature_logger'),
+            SerialCommConfig.getattr('temperature_data_save_path'),
             port,
             SerialCommConfig.getattr('baudrate'),
             SerialCommConfig.getattr('timeout'),
             SerialCommConfig.getattr('BUFFER_SIZE'),
+            SerialCommConfig.getattr('LOG_SIZE'),
         )
         serial_objects.append(object)
 

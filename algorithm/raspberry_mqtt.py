@@ -48,7 +48,6 @@ class RaspberryMQTT:
         self.client.on_connect = on_connect
         self.client.connect(host = self.broker, port = self.port, keepalive = self.timeout )
         self.client.subscribe(self.topic, qos = 1)
-        print(repr(self.topic))
 
     def on_message(self, client, userdata, msg):
         """收到的消息传入回调函数"""
@@ -69,16 +68,17 @@ class RaspberryMQTT:
     def loop(self):
         """事件循环"""
         self.client.loop()
-        
-    def on_log(self, client, userdata, level, buf):
-        print(f"Log: {buf}")
 
     def stop(self):
         """断开服务器连接"""
         self.client.disconnect()
 
     def extract_message(self, message):
-        """解析mqtt消息"""
+        """解析mqtt消息
+
+        Args:
+            message (str): 接收的数据.
+        """
         try:
             matches = self.pattern.findall(message)
             data = {key: value for key, value in matches}
@@ -101,33 +101,29 @@ class RaspberryMQTT:
             return None
     
     def merge_message(self, data):
-        """字典组合为MQTT消息"""
-        # 判断使用哪个topic
-        if "cmd" in data:
-            cmd = data.get("cmd", "unknown")
-            if cmd == "getstatus":
-                topic = "$dr"
-            else:
-                topic = "$spepc"
-        else:
+        """线程消息组合为MQTT消息
+        
+        Args:
+            data (dict): 要发送的数据.
+        """
+        cmd = data.get("cmd")
+        if cmd == "update":
             topic = "$dp"
-
-        # 正常数据发送
-        if topic == "$dp":
             did = data.get("did", "unknown")
             sensor_data = data.get("data", {})
             data_json = json.dumps(sensor_data, separators=(',',':')).strip()
             message = f'{{"{did}":{data_json}}}'.strip()
             return topic, message
-
-        if topic == "$dr":
+        
+        if cmd == "getstatus":
+            topic = "$dr"
             status = data.get("body", {})
             status_json = json.dumps(status, separators=(",",":")).strip()
             msgid = data.get("msgid", "unknown")
             message = f"$cmd={cmd}&status={status_json}&msgid={msgid}"
             return topic, message
         
-        # 处理$spepc主题的消息
+        topic = "$spepc"
         body = data.get("body", {})
         body_json = json.dumps(body, separators=(",",":")).strip()
         # 响应消息
@@ -137,8 +133,5 @@ class RaspberryMQTT:
             message = f"$cmd={cmd}&result={result}&body={body_json}&msgid={msgid}"
         # 状态上报和告警消息
         else:
-            message = f"$cmd={cmd}&body={body_json}"
-        
-        message.strip()
-        
+            message = f"$cmd={cmd}&body={body_json}".strip()
         return topic, message

@@ -166,23 +166,15 @@ class RingsLocationConfig(BaseConfig):
 class SerialCommConfig(BaseConfig):
     """串口通讯模块配置
     """
-    lock = Lock()
     # 串口配置
     port: str = "/dev/ttyAMA2"
     baudrate: int = 115200
     BUFFER_SIZE: int = 2048
     timeout: float = 0
-    # 温度记录日志配置
-    # temperature_logger = logger.bind(temperature = True)
-    # temperature_logger.add(
-    #     "log/temperature_data.log",
-    #     format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
-    #     level="INFO",
-    #     rotation="500 MB",
-    #     retention="10 days",
-    #     compression="zip",
-    #     filter=lambda record: "temperature" in record["extra"],
-    # )
+    log_dir: Path = Path("log")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    temperature_data_save_path = log_dir / "temperature_data.json"
+    LOG_SIZE: int = 10_000_000 # 温度数据记录文件大小为10MB
 
 
 @dataclass
@@ -193,6 +185,11 @@ class MQTTConfig(BaseConfig):
     port: int = 1883
     timeout: int = 60
     topic: str = "test/topic"
+    username: str = "admin"
+    password: str = "123456"
+    clientId: str = "7804d2"
+    apikey: str = "123456"
+    did: str = "7804d2"
 
 
 @dataclass

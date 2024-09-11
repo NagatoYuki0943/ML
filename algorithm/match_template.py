@@ -388,8 +388,9 @@ def multi_scale_match_template(
             )
             # final_ratio: float
             # match_result: [[score, box], ...]  -> [[final_ratio, score, box], ...]
-            _match_result = list(zip([final_ratio] * len(match_result), *list(zip(*match_result))))
-            match_results.extend(_match_result)
+            # match_result = list(zip([final_ratio] * len(match_result), *list(zip(*match_result))))
+            match_result = [[final_ratio] + list(_match_result) for _match_result in match_result]
+            match_results.extend(match_result)
 
     if match_method == cv2.TM_SQDIFF or match_method == cv2.TM_SQDIFF_NORMED:
         reverse = False

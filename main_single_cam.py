@@ -512,37 +512,47 @@ def main() -> None:
                                 init_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
 
-                                # 超出距离的 box id
-                                distance_result = {}
-                                over_distance_ids = set()
                                 # 计算移动距离
+                                distance_result = {}
                                 for l in standard_cycle_results.keys():
                                     if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
-                                        # for n in range(2): # 0 1 代表 x y
-                                        #     move_distance = abs(init_cycle_centers[l][n] - new_cycle_centers[l][n])
-                                        #     if move_distance > move_threshold:
-                                        #         over_distance_ids.add(l)
-                                        #         logger.warning(f"box {l} {'x' if n == 0 else 'y'} move distance {move_distance} is over threshold {move_threshold}.")
-                                        #     else:
-                                        #         logger.info(f"box {l} {'x' if n == 0 else 'y'} move distance {move_distance} is under threshold {move_threshold}.")
-                                        x_move_distance = abs(init_cycle_centers[l][0] - new_cycle_centers[l][0])
-                                        y_move_distance = abs(init_cycle_centers[l][1] - new_cycle_centers[l][1])
-                                        distance_result[l] = (x_move_distance, y_move_distance)
-                                        if x_move_distance > move_threshold:
-                                            over_distance_ids.add(l)
-                                            logger.warning(f"box {l} x move distance {x_move_distance} is over threshold {move_threshold}.")
-                                        else:
-                                            logger.info(f"box {l} x move distance {x_move_distance} is under threshold {move_threshold}.")
-                                        if y_move_distance > move_threshold:
-                                            over_distance_ids.add(l)
-                                            logger.warning(f"box {l} y move distance {y_move_distance} is over threshold {move_threshold}.")
-                                        else:
-                                            logger.info(f"box {l} y move distance {y_move_distance} is under threshold {move_threshold}.")
+                                        distance_x = abs(init_cycle_centers[l][0] - new_cycle_centers[l][0])
+                                        distance_y = abs(init_cycle_centers[l][1] - new_cycle_centers[l][1])
+                                        distance_result[l] = (distance_x, distance_y)
                                     else:
                                         # box没找到将移动距离设置为 一个很大的数
                                         distance_result[l] = (defalut_error_distance, defalut_error_distance)
-                                        over_distance_ids.add(l)
                                         logger.warning(f"box {l} not found in cycle_centers.")
+
+                                # 使用参考靶标校准其他靶标
+                                reference_target_ids: tuple[int] = MatchTemplateConfig.reference_target_ids
+                                if len(reference_target_ids) > 0:
+                                    reference_target_id = reference_target_ids[0]
+                                    if reference_target_id in distance_result.keys():
+                                        logger.info(f"use reference target {reference_target_id} to calibrate other targets.")
+                                        ref_distance_x, ref_distance_y = distance_result[reference_target_id]
+                                        for idx, (distance_x, distance_y) in distance_result.items():
+                                            if idx != reference_target_id:
+                                                distance_result[idx] = (distance_x - ref_distance_x, distance_y - ref_distance_y)
+                                    else:
+                                        logger.warning(f"reference target {reference_target_id} not found in distance_result, don't calibrate other targets.")
+                                else:
+                                    logger.warning(f"no reference target set, don't calibrate other targets.")
+
+                                # 超出距离的 box idx
+                                over_distance_ids = set()
+                                for idx, (distance_x, distance_y) in distance_result.items():
+                                    if distance_x > move_threshold:
+                                        over_distance_ids.add(idx)
+                                        logger.warning(f"box {idx} x move distance {distance_x} is over threshold {move_threshold}.")
+                                    else:
+                                        logger.info(f"box {idx} x move distance {distance_x} is under threshold {move_threshold}.")
+
+                                    if distance_y > move_threshold:
+                                        over_distance_ids.add(idx)
+                                        logger.warning(f"box {idx} y move distance {distance_y} is over threshold {move_threshold}.")
+                                    else:
+                                        logger.info(f"box {idx} y move distance {distance_y} is under threshold {move_threshold}.")
 
                                 logger.info(f"distance_result: {distance_result}")
                                 logger.info(f"over_distance_ids: {over_distance_ids}")
@@ -613,12 +623,12 @@ def main() -> None:
 
                                     if target_number > got_target_number or target_number == 0:
                                         # ❌️❌️❌️ 重新查找完成之后仍然不够 ❌️❌️❌️
-                                        # 获取丢失的box id
+                                        # 获取丢失的box idx
                                         id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
                                         if id2boxstate is not None:
                                             loss_ids = [i for i, boxestate in id2boxstate.items() if boxestate['box'] is None]
                                         else:
-                                            # 假如开始没有任何 box, 则认为丢失的 box id 为 []
+                                            # 假如开始没有任何 box, 则认为丢失的 box idx 为 []
                                             loss_ids = []
 
                                         logger.critical(f"The target number {target_number} is not enough, got {got_target_number} targets, loss box ids: {loss_ids}.")
@@ -800,7 +810,7 @@ def main() -> None:
                     # }
                     reference_target = received_msg['body']['reference_target']
                     reference_target_id = int(reference_target.split('_')[-1])
-                    MatchTemplateConfig.setattr("reference_target_ids", [reference_target_id])
+                    MatchTemplateConfig.setattr("reference_target_ids", (reference_target_id,))
                     # 参考靶标设定响应消息
                     send_msg = {
                         "cmd": "setreferencetarget",

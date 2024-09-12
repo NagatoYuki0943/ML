@@ -51,6 +51,7 @@ class MainConfig(BaseConfig):
     main_sleep_interval: int = 500  # 主循环 sleep_time ms
     get_picture_timeout: int = 10       # 获取图片超时时间 s
     cycle_time_interval: int = 10000    # 主循环时间 ms
+    defalut_error_distance: float = 1e6    # 错误默认距离 m
 
 
 @dataclass

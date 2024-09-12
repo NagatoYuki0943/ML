@@ -61,6 +61,7 @@ def main() -> None:
     original_config_path: Path = MainConfig.getattr("original_config_path")                   # 默认 config, 用于重置
     runtime_config_path: Path = MainConfig.getattr("runtime_config_path")   # 运行时 config, 用于临时修改配置
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
+    defalut_error_distance: float = MainConfig.getattr("defalut_error_distance")
 
     # 保存原始配置
     save_config_to_yaml(config_path=original_config_path)
@@ -448,7 +449,7 @@ def main() -> None:
                                     cycle_results[j] = {
                                         'image_timestamp': f"image--{image_timestamp}--{j}",
                                         'box': _box,
-                                        'center': center,
+                                        'center': None if np.isnan(center[0]) or np.isnan(center[1]) else center,
                                         'exposure_time': exposure_time,
                                     }
                                 except Exception as e:
@@ -526,8 +527,8 @@ def main() -> None:
                                         else:
                                             logger.info(f"box {l} y move distance {y_move_distance} is under threshold {move_threshold}.")
                                     else:
-                                        # box没找到将移动距离设置为 1e6
-                                        distance_result[l] = (1e6, 1e6)
+                                        # box没找到将移动距离设置为 一个很大的数
+                                        distance_result[l] = (defalut_error_distance, defalut_error_distance)
                                         over_distance_ids.add(l)
                                         logger.warning(f"box {l} not found in cycle_centers.")
 

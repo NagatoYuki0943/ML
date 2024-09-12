@@ -353,13 +353,13 @@ def main() -> None:
                 # ex: {72000: array([[1327, 1697, 1828, 2198]]), 78000: array([[1781,  811, 2100, 1130]])}
                 exposure2id2boxstate = adjust_exposure_full_res_for_loop(camera_queue, id2boxstate)
                 cycle_exposure_times = list(exposure2id2boxstate.keys())
-                logger.info(f"exposure2boxes: {exposure2id2boxstate}")
+                logger.info(f"{exposure2id2boxstate = }")
                 logger.info("boxes ajust exposure end")
                 #-------------------- 调整 box 曝光 --------------------#
 
                 #-------------------- 设定循环 --------------------##
                 # 总的循环轮数为 1 + 曝光次数
-                total_cycle_loop_count = 1 + len(exposure2id2boxstate)
+                total_cycle_loop_count = 1 + len(exposure2id2boxstate) if len(exposure2id2boxstate) else 2
                 logger.critical(f"During this cycle, there will be {total_cycle_loop_count} iters.")
                 # 当前周期，采用从 0 开始
                 cycle_loop_count = 0

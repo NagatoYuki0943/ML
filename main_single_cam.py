@@ -218,9 +218,6 @@ def main() -> None:
         if id2boxstate is None:
             logger.warning("id2boxstate is None, use find_target instead of find_around_target")
             id2boxstate, got_target_number = find_target(rectified_image)
-            # 初始化时将 target_number 设置为找到的 target 数量
-            MatchTemplateConfig.setattr("target_number", got_target_number)
-            logger.success(f"update target_number to {got_target_number}")
         else:
             logger.success("id2boxstate is not None, use find_around_target")
             id2boxstate, got_target_number = find_around_target(rectified_image)
@@ -233,22 +230,23 @@ def main() -> None:
                 # 没找到任何目标，发送告警
                 ...
 
-        boxes = [boxestate['box'] for boxestate in id2boxstate.values() if boxestate['box'] is not None]
-        # 绘制boxes
-        image_draw = image.copy()
-        # image_draw = undistorted_image.copy()
-        for i in range(len(boxes)):
-            cv2.rectangle(
-                img = image_draw,
-                pt1 = (boxes[i][0], boxes[i][1]),
-                pt2 = (boxes[i][2], boxes[i][3]),
-                color = (255, 0, 0),
-                thickness = 3
-            )
-        plt.figure(figsize=(10, 10))
-        plt.imshow(image_draw, cmap='gray')
-        plt.savefig(save_dir / "image_match_template.png")
-        plt.close()
+        if id2boxstate is not None:
+            boxes = [boxestate['box'] for boxestate in id2boxstate.values() if boxestate['box'] is not None]
+            # 绘制boxes
+            image_draw = image.copy()
+            # image_draw = undistorted_image.copy()
+            for i in range(len(boxes)):
+                cv2.rectangle(
+                    img = image_draw,
+                    pt1 = (boxes[i][0], boxes[i][1]),
+                    pt2 = (boxes[i][2], boxes[i][3]),
+                    color = (255, 0, 0),
+                    thickness = 3
+                )
+            plt.figure(figsize=(10, 10))
+            plt.imshow(image_draw, cmap='gray')
+            plt.savefig(save_dir / "image_match_template.png")
+            plt.close()
         logger.success("image find target success")
         #-------------------- 模板匹配 --------------------#
 
@@ -346,10 +344,20 @@ def main() -> None:
 
                 #-------------------- 调整 box 曝光 --------------------#
                 logger.info("boxes ajust exposure start")
-                id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
-                # 每次开始调整曝光
-                # ex: {72000: array([[1327, 1697, 1828, 2198]]), 78000: array([[1781,  811, 2100, 1130]])}
-                exposure2id2boxstate = adjust_exposure_full_res_for_loop(camera_queue, id2boxstate)
+                # id2boxstate example: {
+                #     0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
+                #     1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}
+                # }
+                id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+                # exposure2id2boxstate example: {
+                #     60000: {0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
+                #     62000: {1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}}
+                # }
+                # id2boxstate 为 None 时，理解为没有任何 box，调整曝光时设定为 {}
+                exposure2id2boxstate = adjust_exposure_full_res_for_loop(
+                    camera_queue,
+                    id2boxstate if id2boxstate is not None else {},
+                )
                 cycle_exposure_times = list(exposure2id2boxstate.keys())
                 logger.info(f"{exposure2id2boxstate = }")
                 logger.info("boxes ajust exposure end")
@@ -482,8 +490,13 @@ def main() -> None:
                             # init_cycle_centers: {0: [1830.03952661, 1097.25685946]), 1: [2090.1380529 , 2148.12593385]}
                             # new_cycle_centers: {0: [1830.05961465, 1097.2564746 ]), 1: [2090.13342415, 2148.12260239]}
 
+                            # 防止值不存在
+                            send_msg_data = {}
+
                             # 初始化 init_cycle_centers
-                            if standard_cycle_results is None:
+                            target_number = MatchTemplateConfig.getattr("target_number")
+                            if standard_cycle_results is None or len(standard_cycle_results) != target_number:
+                                logger.info("try to init standard_cycle_results")
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
                                 if len(new_cycle_centers) == 0:
                                     logger.warning("No box found in new_cycle_centers, can't init init_cycle_centers.")
@@ -494,6 +507,7 @@ def main() -> None:
                                     save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
                                     logger.info(f"init standard_cycle_results: {standard_cycle_results}")
                             else:
+                                logger.info("try to compare standard_cycle_results and cycle_results")
                                 move_threshold = RingsLocationConfig.getattr("move_threshold")
                                 init_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
@@ -571,7 +585,7 @@ def main() -> None:
                             got_target_number = MatchTemplateConfig.getattr("got_target_number")
 
                             # 丢失目标
-                            if target_number > got_target_number:
+                            if target_number > got_target_number or target_number == 0:
                                 logger.warning(f"The target number {target_number} is not enough, got {got_target_number} targets, start to find lost target.")
 
                                 camera_qsize = camera_queue.qsize()
@@ -592,14 +606,20 @@ def main() -> None:
                                     #-------------------- 畸变矫正 --------------------#
 
                                     #-------------------- 模板匹配 --------------------#
-                                    _, got_target_number = find_lost_target(rectified_image)
+                                    find_lost_target(rectified_image)
+                                    target_number = MatchTemplateConfig.getattr("target_number")
+                                    got_target_number = MatchTemplateConfig.getattr("got_target_number")
                                     #-------------------- 模板匹配 --------------------#
 
-                                    if target_number > got_target_number:
+                                    if target_number > got_target_number or target_number == 0:
                                         # ❌️❌️❌️ 重新查找完成之后仍然不够 ❌️❌️❌️
                                         # 获取丢失的box id
                                         id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
-                                        loss_ids = [i for i, boxestate in id2boxstate.items() if boxestate['box'] is None]
+                                        if id2boxstate is not None:
+                                            loss_ids = [i for i, boxestate in id2boxstate.items() if boxestate['box'] is None]
+                                        else:
+                                            # 假如开始没有任何 box, 则认为丢失的 box id 为 []
+                                            loss_ids = []
 
                                         logger.critical(f"The target number {target_number} is not enough, got {got_target_number} targets, loss box ids: {loss_ids}.")
 

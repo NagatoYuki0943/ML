@@ -192,6 +192,7 @@ def find_target(image: np.ndarray) -> tuple[dict, int]:
     )
     # 没有找到任何目标
     if len(ratios) == 0:
+        logger.warning(f"can not find any target")
         MatchTemplateConfig.setattr("id2boxstate", None)
         MatchTemplateConfig.setattr("got_target_number", 0)
         return None, 0
@@ -216,9 +217,12 @@ def find_target(image: np.ndarray) -> tuple[dict, int]:
     MatchTemplateConfig.setattr("got_target_number", got_target_number)
 
     if got_target_number < target_number:
-        logger.error(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
+        logger.warning(f"find target number: {got_target_number} less than target number: {target_number}")
     elif got_target_number > target_number:
-        logger.warning(f"find target number more than target number, got_target_number: {got_target_number}, target_number: {target_number}, please update config")
+        logger.warning(f"find target number: {got_target_number} more than target number: {got_target_number}")
+        if target_number == 0:
+            logger.warning(f"target_number is 0, use got_target_number: {got_target_number} as target_number")
+            MatchTemplateConfig.setattr("target_number", got_target_number)
     else:
         logger.success(f"find target number {got_target_number} = set target number {target_number}")
 
@@ -249,6 +253,7 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
     id2boxstate: dict | None = MatchTemplateConfig.getattr("id2boxstate")
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
+        logger.warning(f"id2boxstate is None, use find_target")
         return find_target(image)
 
     image_h, image_w = image.shape[:2]
@@ -420,6 +425,7 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
     id2boxstate: dict | None = MatchTemplateConfig.getattr("id2boxstate")
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
+        logger.warning(f"id2boxstate is None, use find_target")
         return find_target(image)
 
     image = image.copy()

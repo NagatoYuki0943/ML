@@ -110,6 +110,9 @@ def split_rings_adaptive(
         group_rings = split_rings(points, rings_nums, threshold_range, min_group_size, momentum)
         # 检测到的圆环数量
         detect_rings_nums = len(group_rings)
+        if detect_rings_nums == 0:
+            raise ValueError("没有检测到圆环")
+
         logger.info(f"try time {i + 1}: {threshold_range = }, {detect_rings_nums = }")
         if detect_rings_nums == rings_nums:
             # 数量相等,就返回
@@ -123,6 +126,7 @@ def split_rings_adaptive(
 
         # 如果阈值小于等于0，就直接返回最后一次的检测结果
         if threshold_range <= 0:
+            logger.warning("threshold_range <= 0, use last result")
             return group_rings
 
     raise ValueError(f"找不到 {rings_nums = } 数量的圆环")

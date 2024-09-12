@@ -3,7 +3,6 @@ from queue import Queue
 from loguru import logger
 
 
-
 class ThreadWrapper(Thread):
     """线程封装
     会初始化一个队列，这个队列会传递给目标函数，要求目标函数接受一个queue参数

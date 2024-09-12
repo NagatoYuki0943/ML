@@ -195,7 +195,6 @@ def circle_location(
         "err_avg": err_avg,
         "err_var": err_var,
         "err_std": err_std,
-        "timestamp": timestamp,
     }
 
     return measure_result

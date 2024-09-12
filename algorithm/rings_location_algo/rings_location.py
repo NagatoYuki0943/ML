@@ -11,7 +11,7 @@ from loguru import logger
 
 from subpixel_edges import subpixel_edges
 from .fit_circle_by_least_square import fit_circle_by_least_square_filter
-from .split_rings import split_rings, split_rings_adaptive
+from .split_rings import split_rings_adaptive
 from .image_metrics import image_gradient, get_gradient_threshold
 
 

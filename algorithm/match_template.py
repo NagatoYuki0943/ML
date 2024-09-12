@@ -1,7 +1,5 @@
 import numpy as np
-from numba import jit
 import cv2
-import matplotlib.pyplot as plt
 from typing import Literal
 from loguru import logger
 
@@ -38,17 +36,18 @@ def test_box_iou():
     print(box_iou([0, 0, 1, 1], [1, 1, 2, 2]))  # 0.0
 
 
-def sort_boxes(boxes: np.ndarray, sort_by: Literal["x", "y", "xy"] = "x") -> np.ndarray:
+def sort_boxes(boxes: np.ndarray | list, sort_by: Literal["x", "y", "xy"] = "x") -> np.ndarray:
     """根据 x or y 从小到大排序对 boxes 进行排序
 
     Args:
-        boxes (np.ndarray): 未排序的box,  [[x_min, y_min, x_max, y_max],...]
+        boxes (np.ndarray | list): 未排序的box,  [[x_min, y_min, x_max, y_max], ...]
         sort_by (Literal["x", "y", "xy"], optional): 排序方式. Defaults to "x".
 
     Returns:
         np.ndarray: 排序的index
     """
     assert sort_by in ["x", "y", "xy"], f"sort_by must be 'x', 'y' or 'xy' but got {sort_by}"
+    boxes = np.array(boxes)
 
     # lexsort: 给定多个排序键, lexsort返回一个整数索引数组, 该数组按多个键描述排序顺序.序列中的最后一个键用于主排序, 倒数第二个键用于次排序, 以此类推.
     if sort_by == "x":
@@ -96,17 +95,18 @@ def test_sort_boxes():
     print()
 
 
-def sort_boxes_center(boxes: np.ndarray, sort_by: Literal["x", "y"] = "x") -> np.ndarray:
+def sort_boxes_center(boxes: np.ndarray | list, sort_by: Literal["x", "y"] = "x") -> np.ndarray:
     """根据 x or y 从小到大排序对 boxes 进行排序
 
     Args:
-        boxes (np.ndarray): 未排序的box,  [[x_min, y_min, x_max, y_max],...]
+        boxes (np.ndarray | list): 未排序的box,  [[x_min, y_min, x_max, y_max], ...]
         sort_by (Literal["x", "y"], optional): 排序方式. Defaults to "x".
 
     Returns:
         np.ndarray: 排序的index
     """
     assert sort_by in ["x", "y"], f"sort_by must be 'x' or 'y' but got {sort_by}"
+    boxes = np.array(boxes)
 
     x_center = (boxes[:, 0] + boxes[:, 2]) / 2
     y_center = (boxes[:, 1] + boxes[:, 3]) / 2
@@ -158,10 +158,10 @@ def iou_filter_by_threshold(boxes: list | np.ndarray, iou_threshold: float = 0.5
     keep_bool_index = np.full((boxes_len,), True)
     for i in range(0, boxes_len - 1):
         box1 = boxes[i]
-        if keep_bool_index[i] == False:
+        if keep_bool_index[i] is False:
             continue
         for j in range(i + 1, boxes_len):
-            if keep_bool_index[j] == False:
+            if keep_bool_index[j] is False:
                 continue
             box2 = boxes[j]
             iou = box_iou(box1, box2)
@@ -409,7 +409,7 @@ def multi_target_multi_scale_match_template(
     match_method: int = cv2.TM_CCOEFF_NORMED,
     init_scale: float = 0.125,
     scales: tuple[float] = (1.0, 4.0, 0.1),
-    target_number: int = -1,
+    target_number: int = 0,
     iou_threshold: float = 0.5,
     use_threshold_match: bool = True,
     threshold_match_threshold: float = 0.8,
@@ -431,7 +431,7 @@ def multi_target_multi_scale_match_template(
             TM_CCOEFF_NORMED: 归一化的相关系数匹配方法, 越大代表越准确, 对亮度变化不敏感
         init_scale (float, optional): 将模板的最小边长调整为图片最小边长的比例. Defaults to 0.125.
         scales (tuple[float], optional): 缩放的范围, (start, end, step), include end. Defaults to (1.0, 4.0, 0.1).
-        target_number (int, optional): 匹配目标数量, -1 表示不限制. Defaults to -1.
+        target_number (int, optional): 匹配目标数量, 0 表示不限制. Defaults to 0.
         iou_threshold (float, optional): 重叠框的 iou 阈值. Defaults to 0.5.
         use_threshold_match (bool, optional): 是否使用阈值匹配. Defaults to True.
         threshold_match_threshold (float, optional): 匹配阈值. Defaults to 0.8.

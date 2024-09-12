@@ -97,7 +97,7 @@ class RaspberryCameras:
         """
         for picam2 in self.picam2s.values():
             picam2.start_preview(preivew)
-        logger.success(f"all camera preview started!")
+        logger.success("all camera preview started!")
 
 
     def start(
@@ -119,7 +119,7 @@ class RaspberryCameras:
         """开启所有相机"""
         for picam2 in self.picam2s.values():
             picam2.start()
-        logger.success(f"all cameras started!")
+        logger.success("all cameras started!")
 
 
     def stop(
@@ -141,7 +141,7 @@ class RaspberryCameras:
         """停止所有相机"""
         for picam2 in self.picam2s.values():
             picam2.stop()
-        logger.success(f"all cameras stoped!")
+        logger.success("all cameras stoped!")
 
 
     def close(
@@ -163,7 +163,7 @@ class RaspberryCameras:
         """关闭所有相机"""
         for picam2 in self.picam2s.values():
             picam2.close()
-        logger.success(f"all cameras closed!")
+        logger.success("all cameras closed!")
 
 
     def switch_mode(
@@ -325,7 +325,6 @@ def test_raspberry_cameras_double() -> None:
 
 
 def test_raspberry_cameras_speed() -> None:
-    import cv2
     camera_index = 0
     # 初始化类
     raspberry_cameras = RaspberryCameras(camera_index)

@@ -318,9 +318,7 @@ def main() -> None:
                     {
                         "cmd":" askadjustLEDlevel ",
                         "times": "2024-09-11T15:45:30",
-                        "param": {
-                            "result": "OK/NOT"
-                        },
+                        "param": {},
                         "msgid": 1
                     }
                 #-------------------- 补光灯 --------------------#
@@ -550,7 +548,7 @@ def main() -> None:
                                             "did": "458796",
                                             "type": "displacement",
                                             "at": get_now_time(),
-                                            "number": [1],# 表示异常的靶标编号
+                                            "number": list(over_distance_ids),# 表示异常的靶标编号
                                             "data": send_msg_data,
                                             "ftpurl": "/5654/20240810160846",# ftp上传路径
                                             "img": [image_path]# 文件名称
@@ -644,12 +642,11 @@ def main() -> None:
 
         # 检测周期外
         if cycle_loop_count == -1:
-            # 需要发送设备部署消息
+            # 设备部署响应消息
             if need_send_devicedeploying_msg:
                 logger.info("send device deploying msg")
                 {
                     "cmd":"devicedeploying",
-                    "result":"succ/fail",
                     "body":{
                         "code":200,
                         "msg":"deployed succeed",
@@ -751,11 +748,13 @@ def main() -> None:
                     # 因为重设了靶标，所以需要重新初始化标准靶标
                     standard_cycle_results = None
 
-                    # send_msg = {
+                    # 靶标校正响应消息
+                    # {
                     #     "cmd":"targetcorrection",
                     #     "body":{
                     #         "code":200,
-                    #         "msg":"correction succeed"
+                    #         "did":"7804d2",
+                    #         "msg":"correction succeed",
                     #         "data": {
                     #             "L1_SJ_1":{"X":19.01,"Y":18.31,"Z":10.8},
                     #             "L1_SJ_2":{"X":4.09,"Y":8.92,"Z":6.7},
@@ -782,11 +781,12 @@ def main() -> None:
                     reference_target = received_msg['body']['reference_target']
                     reference_target_id = int(reference_target.split('_')[-1])
                     MatchTemplateConfig.setattr("reference_target_ids", [reference_target_id])
+                    # 参考靶标设定响应消息
                     send_msg = {
                         "cmd": "setreferencetarget",
-                        "result": "succ/fail",
                         "body": {
                             "code": 200,
+                            "did": "7804d2",
                             "msg": "set succeed"
                         },
                         "msgid": "bb6f3eeb2"
@@ -796,6 +796,7 @@ def main() -> None:
 
                 # 设备状态查询消息
                 elif cmd == 'getstatus':
+                    # 设备状态查询响应消息
                     send_msg = {
                         "cmd": "getstatus",
                         "body": {
@@ -803,16 +804,16 @@ def main() -> None:
                             "temp": 20,# 环境温度
                             "signal_4g": -84.0,# 4g信号强度
                             "sw_version": "230704180",# 固件版本号
-                            "sensor_state":{
-                                "sensor1": 0,# 0表示无错误，-1供电异常，
-                                "sensor2": 0,# -2传感器数据异常，-3采样间隔内没有采集到数据
-                                "sensor3": 0,
-                                "sensor4": 0,
-                                "sensor5": 0,
-                                "sensor6": 0, # sensor1~6为温度传感器，其余为靶标
-                                "sensor7": 0,
-                                "sensor8": 0,
-                                "sensor9": 0,
+                            "sensor_state": {
+                                "L3_WK_1": 0,# 0表示无错误，-1供电异常，
+                                "L3_WK_2": 0,# -2传感器数据异常，-3采样间隔内没有采集到数据
+                                "L3_WK_3": 0,
+                                "L3_WK_4": 0,
+                                "L3_WK_5": 0,
+                                "L3_WK_6": -1,
+                                "L1_SJ_1": 0,
+                                "L1_SJ_2": 0,
+                                "L1_SJ_3": 0
                             }
                         },
                         "msgid": "bb6f3eeb2"
@@ -832,11 +833,12 @@ def main() -> None:
                         image_path = save_dir / f"upload_image.jpg"
                         save_image(image, image_path)
 
+                        # 现场图像查询响应消息
                         send_msg = {
                             "cmd": "setconfig",
-                            "result": "succ",
-                            "body":{
+                            "body": {
                                 "code": 200,
+                                "did": "7804d2",
                                 "msg": "upload succeed",
                                 "ftpurl": "/5654/20240810160846",# ftp上传路径
                                 "img": [image_path]# 文件名称
@@ -846,14 +848,15 @@ def main() -> None:
 
                         logger.success(f"get image success, image_path: {image_path}")
                     except queue.Empty:
+                        # 现场图像查询响应消息
                         send_msg = {
-                            "cmd":"setconfig",
-                            "result":"succ",
-                            "body":{
-                                "code":200,
-                                "msg":"upload succeed",
-                                "ftpurl":"/5654/20240810160846",# ftp上传路径
-                                "img":[]# 文件名称
+                            "cmd": "setconfig",
+                            "body": {
+                                "code": 200,
+                                "did": "7804d2",
+                                "msg": "upload succeed",
+                                "ftpurl": "/5654/20240810160846",# ftp上传路径
+                                "img": []# 文件名称
                             },
                             "msgid": "bb6f3eeb2"
                         }
@@ -866,9 +869,7 @@ def main() -> None:
                         "cmd": "askadjusttempdata",
                         "times": "2024-09-11T15:45:30",
                         "camera": "2",
-                        "param": {
-                            "result": "OK/NOT"
-                        },
+                        "param": {},
                         "msgid": 1
                     }
                     logger.info("received askadjusttempdata response")
@@ -877,36 +878,36 @@ def main() -> None:
                 # 日常温度数据
                 elif cmd =='sendtempdata':
                     {
-                        "cmd":"sendtempdata",
-                        "camera":"2",
-                        "times":"2024-09-11T15:45:30",
-                        "param":{
-                            "inside_air_t":10,
-                            "exterior_air_t":10,
-                            "sensor1_t":10,
-                            "sensor2_t":10,
-                            "sensor3_t":10,
-                            "sensor4_t":257,
-                            "sensor5_t":257,
-                            "sensor6_t":257
+                        "cmd": "sendtempdata",
+                        "camera": "2",
+                        "times": "2024-09-11T15:45:30",
+                        "param": {
+                            "inside_air_t": 10,
+                            "exterior_air_t": 10,
+                            "sensor1_t": 10,
+                            "sensor2_t": 10,
+                            "sensor3_t": 10,
+                            "sensor4_t": 257,
+                            "sensor5_t": 257,
+                            "sensor6_t": 257
                         },
-                        "msgid":1
+                        "msgid": 1
                     }
                     logger.info("received temp data")
 
                 # 温度调节过程数据
                 elif cmd == 'sendadjusttempdata':
                     {
-                        "cmd":"sendadjusttempdata",
-                        "camera":"2",
-                        "times":"2024-09-11T15:45:30",
-                        "param":{
-                            "parctical_t":10,
-                            "control_t":10,
-                            "control_way":"warm/cold",
-                            "pwm_data":10
+                        "cmd": "sendadjusttempdata",
+                        "camera": "2",
+                        "times": "2024-09-11T15:45:30",
+                        "param": {
+                            "parctical_t": 10,
+                            "control_t": 10,
+                            "control_way": "warm/cold",
+                            "pwm_data": 10
                         },
-                        "msgid":1
+                        "msgid": 1
                     }
                     logger.info("received just temp data")
 
@@ -914,14 +915,14 @@ def main() -> None:
                 elif cmd == 'stopadjusttemp':
                     logger.info("received stop adjust temp data")
                     {
-                        "cmd":"stopadjusttemp",
-                        "camera":"2",
-                        "times":"2024-09-11T15:45:30",
-                        "param":{
-                            "current_t":10,
-                            "control_t":10
+                        "cmd": "stopadjusttemp",
+                        "camera": "2",
+                        "times": "2024-09-11T15:45:30",
+                        "param": {
+                            "current_t": 10,
+                            "control_t": 10
                         },
-                        "msgid":1
+                        "msgid": 1
                     }
                     is_temp_stable = True
                     logger.success("received stop adjust temp data")
@@ -1001,7 +1002,7 @@ def main() -> None:
                 # 温控变化消息
                 if False:
                     send_msg = {
-                        "cmd":"devicestate",
+                        "cmd": "devicestate",
                         "body":{
                             "did": "458796",
                             "type": "temperature_control",

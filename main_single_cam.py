@@ -16,6 +16,7 @@ from algorithm import (
     StereoCalibration,
     RaspberryMQTT,
     RaspberrySerialPort,
+    sort_boxes_center,
 )
 from config import (
     MainConfig,
@@ -721,15 +722,30 @@ def main() -> None:
 
                     # 将新的 box 转换为列表
                     new_boxstates = [{"ratio": None, "score": None, "box": box} for box in received_msg['body']['add_boxes']]
-                    # 旧的 box 也转换为列表，并合并
-                    old_boxstates = list(id2boxstate.values())
-                    old_boxstates.extend(new_boxstates)
+                    # 旧的 box 也转换为列表，并合并新 box
+                    new_boxstates.extend(list(id2boxstate.values()))
+
+                    # 按照 box 排序
+                    new_boxes = np.array([boxstate['box'] for boxstate in new_boxstates])
+                    new_ratios = np.array([boxstate['ratio'] for boxstate in new_boxstates])
+                    new_scores = np.array([boxstate['score'] for boxstate in new_boxstates])
+                    sorted_index = sort_boxes_center(new_boxes, sort_by='y')
+                    sorted_ratios = new_ratios[sorted_index]
+                    sorted_scores = new_scores[sorted_index]
+                    sorted_boxes = new_boxes[sorted_index]
+
                     # 合并后的 box 生成新的 id2boxstate
-                    id2boxstate = {i: boxstate for i, boxstate in enumerate(old_boxstates)}
+                    new_boxstates = {}
+                    for i, (ratio, score, box) in enumerate(zip(sorted_ratios, sorted_scores, sorted_boxes)):
+                        new_boxstates[i] = {
+                            "ratio": float(ratio),
+                            "score": float(score),
+                            "box": box.tolist()
+                        }
 
                     # 设置新目标数量和靶标信息
-                    MatchTemplateConfig.setattr("target_number", len(id2boxstate))
-                    MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
+                    MatchTemplateConfig.setattr("target_number", len(new_boxstates))
+                    MatchTemplateConfig.setattr("id2boxstate", new_boxstates)
 
                     # 因为重设了靶标，所以需要重新初始化标准靶标
                     standard_cycle_results = None

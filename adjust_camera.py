@@ -628,10 +628,14 @@ def adjust_exposure_full_res_for_loop(
                     new_exposure_times[j] = new_exposure_time
                     logger.info(f"boxid = {j}, {box = }, {new_exposure_time = }, {direction = }")
 
+                logger.info(f"{directions = }")
                 logger.info(f"{new_exposure_times = }")
 
+                # 没有 box 需要调整
+                if len(directions) == 0:
+                    logger.warning("no box can adjust")
                 # 所有 box 都合适
-                if all(direction == 0 for direction in directions.values()):
+                elif all(direction == 0 for direction in directions.values()):
                     new_exposure_time = list(new_exposure_times.values())[0]
                     exposure2id2boxstate[new_exposure_time] = current_id2boxstate
                     logger.success(f"id2boxstate: {current_id2boxstate}, exposure time {new_exposure_time} us is ok")

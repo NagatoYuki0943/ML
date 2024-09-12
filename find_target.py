@@ -376,7 +376,6 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
     # 如果检测不到全部的 box, 则不设置全局变量
     if all((True if boxestate["box"] is None else False) for boxestate in new_id2boxstate.values()):
         logger.warning("find around target failed, no target found")
-        return new_id2boxstate, 0
 
     MatchTemplateConfig.setattr("id2boxstate", new_id2boxstate)
     # 更新got_target_number
@@ -434,6 +433,7 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
         # 屏蔽其他box
         box_x1, box_y1, box_x2, box_y2 = box
         image[box_y1:box_y2, box_x1:box_x2] = 0
+    logger.warning(f"find lost target, loss_ids: {loss_ids}")
 
     # 查找丢失的目标
     loss_target_number = len(loss_ids)

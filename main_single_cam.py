@@ -9,7 +9,6 @@ import queue
 from loguru import logger
 from typing import Literal
 from pathlib import Path
-import sys
 
 from algorithm import (
     ThreadWrapper,
@@ -232,7 +231,7 @@ def main() -> None:
                 # 没找到任何目标，发送告警
                 ...
 
-        boxes = [boxestate['box'] for boxestate in id2boxstate.values()]
+        boxes = [boxestate['box'] for boxestate in id2boxstate.values() if boxestate['box'] is not None]
         # 绘制boxes
         image_draw = image.copy()
         # image_draw = undistorted_image.copy()
@@ -292,7 +291,8 @@ def main() -> None:
         # 进入周期
         # 条件为 当前时间周期大于等于前一个时间周期 或者 周期已经开始运行
         if _cycle_current_time_period > _cycle_before_time_period or cycle_loop_count > -1:
-            if cycle_loop_count == -1:  # 每个周期的第一次循环
+            # 每个周期的第一次循环
+            if cycle_loop_count == -1:
                 logger.success(f"The cycle is started.")
                 #-------------------- 调整全图曝光 --------------------#
                 logger.info("full image ajust exposure start")
@@ -333,12 +333,12 @@ def main() -> None:
                     #-------------------- 小区域模板匹配 --------------------#
                     _, got_target_number = find_around_target(rectified_image)
                     if got_target_number == 0:
-                        # ⚠️⚠️⚠️ 本次循环没有找到目标，尝试寻找遗失的目标 ⚠️⚠️⚠️
-                        logger.warning("no target found in the image, start find_lost_target")
-                        _, got_target_number = find_lost_target(rectified_image)
-                        if got_target_number == 0:
-                            logger.error("no target found in the image, exit")
-                        continue
+                        # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
+                        logger.warning("find_around_target find no target found in the image")
+                        # _, got_target_number = find_lost_target(rectified_image)
+                        # if got_target_number == 0:
+                        #     logger.error("no target found in the image, exit")
+                        # continue
                     #-------------------- 小区域模板匹配 --------------------#
                 except queue.Empty:
                     logger.error("get picture timeout")
@@ -364,15 +364,17 @@ def main() -> None:
                 logger.info(f"The {cycle_loop_count} iter within the cycle.")
 
                 # 设置下一轮的曝光值
-                exposure_time = cycle_exposure_times[cycle_loop_count]
-                CameraConfig.setattr("exposure_time", exposure_time)
+                if len(cycle_exposure_times):
+                    exposure_time = cycle_exposure_times[cycle_loop_count]
+                    CameraConfig.setattr("exposure_time", exposure_time)
                 #-------------------- 设定循环 --------------------##
 
                 # 周期设置
                 cycle_before_time = cycle_current_time
 
+            # 每个周期的其余循环
             else:
-                #-------------------- camera capture --------------------#
+                #-------------------- 获取图片 --------------------#
                 camera_qsize = camera_queue.qsize()
                 if camera_qsize > 0:
                     logger.info(f"The {cycle_loop_count + 1} iter within the cycle.")
@@ -390,7 +392,7 @@ def main() -> None:
                         # 获取照片
                         image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
                         logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
-                #-------------------- camera capture --------------------#
+                #-------------------- 获取图片 --------------------#
 
                         #------------------------- 检测目标 -------------------------#
                         # 获取检测参数
@@ -410,53 +412,53 @@ def main() -> None:
                         #-------------------- 畸变矫正 --------------------#
 
                         #-------------------- single box location --------------------#
-                        # for循环，截取图像
-                        exposure_time = cycle_exposure_times[cycle_loop_count]
-                        id2boxstate = exposure2id2boxstate[exposure_time]
-                        for j, boxestate in id2boxstate.items():
-                            _box: list | None = boxestate['box']
-                            try:
-                                # box 可能为 None, 使用 try except 处理
-                                x1, y1, x2, y2 = _box
-                                target = rectified_image[y1:y2, x1:x2]
+                        if len(cycle_exposure_times):
+                            exposure_time = cycle_exposure_times[cycle_loop_count]
+                            id2boxstate = exposure2id2boxstate[exposure_time]
+                            for j, boxestate in id2boxstate.items():
+                                _box: list | None = boxestate['box']
+                                try:
+                                    # box 可能为 None, 使用 try except 处理
+                                    x1, y1, x2, y2 = _box
+                                    target = rectified_image[y1:y2, x1:x2]
 
-                                logger.info(f"box {j} rings location start")
-                                result = adaptive_threshold_rings_location(
-                                    target,
-                                    f"image--{image_timestamp}--{j}",
-                                    iters,
-                                    order,
-                                    rings_nums,
-                                    min_group_size,
-                                    sigmas,
-                                    location_save_dir,
-                                    draw_scale,
-                                    save_grads,
-                                    save_detect_images,
-                                    save_detect_results,
-                                    gradient_threshold_percent,
-                                )
-                                result['metadata'] = image_metadata
-                                # 保存到文件
-                                save_to_jsonl(result, camera_result_save_path)
-                                logger.success(f"{result = }")
-                                logger.success(f"box {j} rings location success")
-                                center = [float(result['center_x_mean'] + _box[0]), float(result['center_y_mean'] + _box[1])]
-                                cycle_results[j] = {
-                                    'image_timestamp': f"image--{image_timestamp}--{j}",
-                                    'box': _box,
-                                    'center': center,
-                                    'exposure_time': exposure_time,
-                                }
-                            except Exception as e:
-                                logger.error(e)
-                                logger.error(f"box {j} rings location failed")
-                                cycle_results[j] = {
-                                    'image_timestamp': f"image--{image_timestamp}--{j}",
-                                    'box': _box,
-                                    'center': None, # 丢失目标, 置为 None
-                                    'exposure_time': exposure_time,
-                                }
+                                    logger.info(f"box {j} rings location start")
+                                    result = adaptive_threshold_rings_location(
+                                        target,
+                                        f"image--{image_timestamp}--{j}",
+                                        iters,
+                                        order,
+                                        rings_nums,
+                                        min_group_size,
+                                        sigmas,
+                                        location_save_dir,
+                                        draw_scale,
+                                        save_grads,
+                                        save_detect_images,
+                                        save_detect_results,
+                                        gradient_threshold_percent,
+                                    )
+                                    result['metadata'] = image_metadata
+                                    # 保存到文件
+                                    save_to_jsonl(result, camera_result_save_path)
+                                    logger.success(f"{result = }")
+                                    logger.success(f"box {j} rings location success")
+                                    center = [float(result['center_x_mean'] + _box[0]), float(result['center_y_mean'] + _box[1])]
+                                    cycle_results[j] = {
+                                        'image_timestamp': f"image--{image_timestamp}--{j}",
+                                        'box': _box,
+                                        'center': center,
+                                        'exposure_time': exposure_time,
+                                    }
+                                except Exception as e:
+                                    logger.error(e)
+                                    logger.error(f"box {j} rings location failed")
+                                    cycle_results[j] = {
+                                        'image_timestamp': f"image--{image_timestamp}--{j}",
+                                        'box': _box,
+                                        'center': None, # 丢失目标, 置为 None
+                                        'exposure_time': exposure_time,
+                                    }
                         #-------------------- single box location --------------------#
 
                         #------------------------- 检测目标 -------------------------#
@@ -470,7 +472,7 @@ def main() -> None:
                         cycle_loop_count += 1
 
                         # 正常判断是否结束周期
-                        if cycle_loop_count == total_cycle_loop_count - 1:
+                        if cycle_loop_count >= total_cycle_loop_count - 1:
                             #------------------------- 整理检测结果 -------------------------#
                             logger.success(f"{cycle_results = }")
                             # 保存到文件
@@ -483,7 +485,9 @@ def main() -> None:
                             # 初始化 init_cycle_centers
                             if standard_cycle_results is None:
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
-                                if any(v is None for v in new_cycle_centers.values()):
+                                if len(new_cycle_centers) == 0:
+                                    logger.warning("No box found in new_cycle_centers, can't init init_cycle_centers.")
+                                elif any(v is None for v in new_cycle_centers.values()):
                                     logger.warning("Some box not found in new_cycle_centers, can't init init_cycle_centers.")
                                 else:
                                     standard_cycle_results = cycle_results
@@ -570,8 +574,19 @@ def main() -> None:
                             if target_number > got_target_number:
                                 logger.warning(f"The target number {target_number} is not enough, got {got_target_number} targets, start to find lost target.")
 
+                                camera_qsize = camera_queue.qsize()
+                                # 忽略多余的图片
+                                if camera_qsize > 1:
+                                    logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
+                                    for _ in range(camera_qsize - 1):
+                                        try:
+                                            camera_queue.get(timeout=get_picture_timeout)
+                                        except queue.Empty:
+                                            logger.error("get picture timeout")
                                 try:
+                                    # 获取照片
                                     _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+
                                     #-------------------- 畸变矫正 --------------------#
                                     rectified_image = image
                                     #-------------------- 畸变矫正 --------------------#
@@ -629,6 +644,7 @@ def main() -> None:
         if cycle_loop_count == -1:
             # 需要发送设备部署消息
             if need_send_devicedeploying_msg:
+                logger.info("send device deploying msg")
                 {
                     "cmd":"devicedeploying",
                     "result":"succ/fail",
@@ -653,6 +669,7 @@ def main() -> None:
                 }
                 ...
                 need_send_devicedeploying_msg = False
+                logger.success("send device deploying msg success")
 
             #------------------------- 获取消息 -------------------------#
             while not main_queue.empty():
@@ -893,22 +910,22 @@ def main() -> None:
                     logger.success("received stop adjust temp data")
 
                 # 重启终端设备消息
-                elif cmd =='reboot':
-                    {
-                        "cmd":"reboot",
-                        "msgid":"bb6f3eeb2",
-                    }
-                    # 重启终端设备响应消息
-                    send_msg ={
-                        "cmd":"reboot",
-                        "body":{
-                            "code":200,
-                            "did":"7804d2",
-                            "msg":"reboot succeed",
-                        },
-                        "msgid": "bb6f3eeb2"
-                    }
-                    sys.exit()
+                # elif cmd =='reboot':
+                #     {
+                #         "cmd":"reboot",
+                #         "msgid":"bb6f3eeb2",
+                #     }
+                #     # 重启终端设备响应消息
+                #     send_msg ={
+                #         "cmd":"reboot",
+                #         "body":{
+                #             "code":200,
+                #             "did":"7804d2",
+                #             "msg":"reboot succeed",
+                #         },
+                #         "msgid": "bb6f3eeb2"
+                #     }
+                #     sys.exit()
                 else:
                     logger.warning(f"unknown cmd: {cmd}")
                     logger.warning(f"unknown msg: {received_msg}")

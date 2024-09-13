@@ -2,6 +2,7 @@ import time
 from algorithm import RaspberryMQTT
 from queue import Queue
 from config import MQTTConfig, RingsLocationConfig, CameraConfig, MatchTemplateConfig
+from loguru import logger
 
 # MQTT 客户端接收线程
 def mqtt_receive(
@@ -13,6 +14,7 @@ def mqtt_receive(
 ):
     def message_handler(message):
         """MQTT客户端消息回调"""
+        logger.info(f"Received MQTT message: {message}")
         cmd_handlers = {
             'setconfig': config_setter,
             'getconfig': config_getter
@@ -39,6 +41,7 @@ def mqtt_send(
     while True:
         message = queue.get()
         topic, payload = client.merge_message(message)
+        logger.info(f"Send MQTT message: {payload} in topic: {topic}")
         client.publish(topic, payload)
 
 

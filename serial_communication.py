@@ -2,6 +2,7 @@ from queue import Queue
 import time
 from algorithm import RaspberrySerialPort
 from queue import Queue
+from datetime import datetime
 from loguru import logger
 
 # 接收线程
@@ -40,3 +41,73 @@ def serial_send(
                 command_message = ser.process_command(command_data)
                 logger.info(f"Send serial port message: {command_message}")
                 ser.message_sending(command_message)
+
+def serial_for_test(
+    serial_ports: list[RaspberrySerialPort],
+    main_queue: Queue,
+    send_queue: Queue,
+    *args,
+    **kwargs,
+):
+    mode = 1
+    i = 1
+    while True:
+        response = None
+        if not send_queue.empty():
+            command_data = send_queue.get()
+            logger.info(f"Received serial message: {command_data}")
+            cmd = command_data['cmd']
+            if cmd == "adjusttempdata":
+                mode = 2
+                response = {
+                    "cmd":"askadjusttempdata",
+                    "times":datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
+                    "camera":"1",
+                    "param":{
+                        "result":"OK"
+                    },
+                    "msgid":command_data['msgid']
+                }
+            if cmd == "adjustLEDlevel":
+                response = {
+                    "cmd":"askadjustLEDlevel",
+                    "times":datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
+                    "param":{
+                        "result":"OK"
+                    },
+                    "msgid":command_data['msgid']
+                }
+        if mode == 1:
+            response = {
+                "cmd":"sendtempdata",
+                "camera":"1",
+                "times":datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
+                "param":{
+                    "inside_air_t":10,
+                    "exterior_air_t":10,
+                    "sensor1_t":10,
+                    "sensor2_t":10,
+                    "sensor3_t":10,
+                    "sensor4_t":257,
+                    "sensor5_t":257,
+                    "sensor6_t":257
+                },
+                "msgid":i
+            }
+        elif mode == 2:
+            response = {
+                "cmd":"sendadjusttempdata",
+                "camera":"1",
+                "times":datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
+                "param":{
+                    "parctical_t":10,
+                    "control_t":10,
+                    "control_way":"warm",
+                    "pwm_data":10
+                },
+                "msgid":i
+            }
+        if response:
+            main_queue.put(response)
+        i = 1 if i > 100 else i + 1
+        time.sleep(3)

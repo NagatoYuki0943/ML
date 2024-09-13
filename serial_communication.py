@@ -55,7 +55,7 @@ def serial_for_test(
         response = None
         if not send_queue.empty():
             command_data = send_queue.get()
-            logger.info(f"Received serial message: {command_data}")
+            logger.info(f"Send serial message: {command_data}")
             cmd = command_data['cmd']
             if cmd == "adjusttempdata":
                 mode = 2
@@ -108,6 +108,7 @@ def serial_for_test(
                 "msgid":i
             }
         if response:
+            logger.info(f"Received serial port message: {response}")
             main_queue.put(response)
         i = 1 if i > 100 else i + 1
         time.sleep(3)

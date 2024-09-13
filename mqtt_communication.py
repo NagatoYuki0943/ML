@@ -14,7 +14,6 @@ def mqtt_receive(
 ):
     def message_handler(message):
         """MQTT客户端消息回调"""
-        logger.info(f"Received MQTT message: {message}")
         cmd_handlers = {
             'setconfig': config_setter,
             'getconfig': config_getter
@@ -25,6 +24,7 @@ def mqtt_receive(
             handler(message, send_queue)
         else:
             main_queue.put(message)
+            logger.info(f"Sent message to Master Controller: {message}")
     # 设置消息回调
     client.set_message_callback(message_handler)
     while True:
@@ -40,8 +40,8 @@ def mqtt_send(
 ):
     while True:
         message = queue.get()
+        logger.info(f"Received message from Master Controller: {message}")
         topic, payload = client.merge_message(message)
-        logger.info(f"Send MQTT message: {payload} in topic: {topic}")
         client.publish(topic, payload)
 
 

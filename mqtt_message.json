@@ -1,0 +1,219 @@
+{
+    "cmd_normal_data":{
+        "cmd":"update",
+        "did":"7804d2",
+        "data":{
+            "L3_WK_1":20,
+            "L3_WK_2":20,
+            "L3_WK_3":20,
+            "L3_WK_4":20,
+            "L3_WK_5":20,
+            "L3_WK_6":20,
+            "L1_SJ_1":{"X":9.01,"Y":8.01},
+            "L1_SJ_2":{"X":4.09,"Y":8.92},
+            "L1_SJ_3":{"X":2.02,"Y":5.09}
+        }
+    },
+
+    "alarm_displacement":{
+        "cmd":"alarm",
+        "body":{
+            "did":"7804d2",
+            "type":"displacement",
+            "at":"2023-08-09T16:08:46Z",
+            "number":[1],
+            "data":{
+                "L1_SJ_1":{"X":19.01,"Y":18.31},
+                "L1_SJ_2":{"X":4.09,"Y":8.92},
+                "L1_SJ_3":{"X":2.02,"Y":5.09}
+            },
+            "ftpurl":"/5654/20240810160846",
+            "img":["1.jpg","2.jpg"]
+        }
+    },
+
+    "alarm_target_loss":{
+        "cmd":"alarm",
+        "body":{
+            "did":"7804d2",
+            "type":"target_loss",
+            "at":"2023-08-09T16:08:46Z",
+            "number":[2],
+            "data":{
+                "L1_SJ_1":{"X":3.01,"Y":2.31},
+                "L1_SJ_2":{"X":0,"Y":0},
+                "L1_SJ_3":{"X":2.02,"Y":5.09}
+            },
+            "ftpurl":"/5654/20240810160846",
+            "img":["1.jpg","2.jpg"]
+        }
+    },
+
+    "alarm_temperature":{
+        "cmd":"alarm",
+        "body":{
+            "did":"7804d2",
+            "type":"temperature",
+            "at":"2023-08-09T16:08:46Z",
+            "number":[1,3,4],
+            "data":{
+                "L3_WK_1":80,
+                "L3_WK_2":20,
+                "L3_WK_3":80,
+                "L3_WK_4":90,
+                "L3_WK_5":20,
+                "L3_WK_6":20
+            }
+        }
+    },
+
+    "alarm_device":{
+        "cmd":"alarm",
+        "body":{
+            "did":"7804d2",
+            "type":"device",
+            "at":"2023-08-09T16:08:46Z",
+            "code":400,
+            "msg":"device error"
+        }
+    },
+
+    "devicestate_deploying":{
+        "cmd":"devicestate",
+        "body":{
+            "did":"7804d2",
+            "type":"deploying",
+            "at":"2023-08-09T16:08:46Z",
+            "sw_version":"230704180",
+            "code":200,
+            "msg":"device starting",
+            "data":{
+                "L1_SJ_1":{"X":19.01,"Y":18.31,"Z":10.8},
+                "L1_SJ_2":{"X":4.09,"Y":8.92,"Z":6.7},
+                "L1_SJ_3":{"X":2.02,"Y":5.09,"Z":14.6}
+            },
+            "ftpurl":"/5654/20240810160846",
+            "img":["1.jpg","2.jpg"]
+        }
+    },
+
+    "devicestate_startup":{
+        "cmd":"devicestate",
+        "body":{
+            "did":"7804d2",
+            "type":"startup",
+            "at":"2023-08-09T16:08:46Z",
+            "sw_version":"230704180",
+            "code":200,
+            "msg":"device starting"
+        }
+    },
+
+    "devicestate_working":{
+        "cmd":"devicestate",
+        "body":{
+            "did":"7804d2",
+            "type":"working",
+            "at":"2023-08-09T16:08:46Z",
+            "code":200,
+            "msg":"device working"
+        }
+    },
+
+    "devicestate_temperature_control":{
+        "cmd":"devicestate",
+        "body":{
+            "did":"7804d2",
+            "type":"temperature_control",
+            "at":"2023-08-09T16:08:46Z",
+            "data":{
+                "L3_WK_1":20,
+                "control_t":30,
+                "control_way":"warm/cold",
+                "pwm_data":10
+            }
+        }
+    },
+
+    "setreferencetarget":{
+        "cmd":"setreferencetarget",
+        "result":"succ",
+        "body":{
+            "code":200,
+            "msg":"set succeed"
+        },
+        "msgid":1
+    },
+
+
+    "getstatus_dr":{
+        "cmd":"getstatus",
+        "body":{
+            "ext_power_volt":38.3,
+            "temp":20,
+            "signal_4g":-84.0,
+            "sw_version":"230704180",
+            "sensor_state":{
+                "sensor1":0,
+                "sensor2":0,
+                "sensor3":0,
+                "sensor4":0,
+                "sensor5":0,
+                "sensor6":0,
+                "sensor7":0,
+                "sensor8":0,
+                "sensor9":0
+            }
+        },
+        "msgid":1
+    },
+
+    "setconfig":{
+        "cmd":"setconfig",
+        "result":"succ",
+        "body":{
+            "code":200,
+            "msg":"set succeed"
+        },
+        "msgid":1
+    },
+
+    "getconfig":{
+        "cmd":"getconfig",
+        "result":"succ",
+        "body":{
+            "displacement_threshold":"5",
+            "target_number":"10",
+            "target_size":"5",
+            "data_report_interval":"3000",
+            "capture_interval":"1000",
+            "device_sn":"458796",
+            "max_target_number":"20",
+            "log_level":"INFO"
+        },
+        "msgid":1
+    },
+
+    "reboot":{
+        "cmd":"reboot",
+        "result":"succ",
+        "body":{
+            "code":200,
+            "msg":"reboot succeed"
+        },
+        "msgid":1
+    },
+
+    "getimage":{
+        "cmd":"getimage",
+        "result":"succ",
+        "body":{
+            "code":200,
+            "msg":"upload succeed",
+            "ftpurl":"/5654/20240810160846",
+            "img":["1.jpg","2.jpg"]
+        },
+        "msgid":1
+    }
+    
+}

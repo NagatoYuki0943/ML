@@ -43,9 +43,8 @@ def serial_send(
                 ser.message_sending(command_message)
 
 def serial_for_test(
-    serial_ports: list[RaspberrySerialPort],
+    queue: Queue,
     main_queue: Queue,
-    send_queue: Queue,
     *args,
     **kwargs,
 ):
@@ -53,8 +52,8 @@ def serial_for_test(
     i = 1
     while True:
         response = None
-        if not send_queue.empty():
-            command_data = send_queue.get()
+        if not queue.empty():
+            command_data = queue.get()
             logger.info(f"Send serial message: {command_data}")
             cmd = command_data['cmd']
             if cmd == "adjusttempdata":
@@ -77,6 +76,10 @@ def serial_for_test(
                     },
                     "msgid":command_data['msgid']
                 }
+            if response:
+                logger.info(f"Received serial port message: {response}")
+                main_queue.put(response)
+                continue
         if mode == 1:
             response = {
                 "cmd":"sendtempdata",

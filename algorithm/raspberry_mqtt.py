@@ -44,7 +44,10 @@ class RaspberryMQTT:
     def connect_mqtt(self):
         """与服务器建立连接并订阅主题"""
         def on_connect(client, userdata, flags, rc):
-            logger.info(f"MQTT connection status:{rc}")
+            if rc == 0:
+                logger.info(f"MQTT server connected")
+            else:
+                logger.error(f"MQTT server connection error")
         self.client.on_connect = on_connect
         self.client.connect(host = self.broker, port = self.port, keepalive = self.timeout )
         self.client.subscribe(self.topic, qos = 1)
@@ -52,6 +55,7 @@ class RaspberryMQTT:
     def on_message(self, client, userdata, msg):
         """收到的消息传入回调函数"""
         message = msg.payload.decode('utf-8')
+        logger.info(f"Received message from server: {message}")
         data = self.extract_message(message)
         if data is not None:
             if self.message_callback:
@@ -63,6 +67,7 @@ class RaspberryMQTT:
 
     def publish(self, topic, payload):
         """发送消息"""
+        logger.info(f"Sent message to server: {payload} in topic {topic}")
         self.client.publish(topic, payload)
 
     def loop(self):

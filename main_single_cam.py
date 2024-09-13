@@ -39,7 +39,7 @@ from adjust_camera import (
     adjust_exposure_full_res_for_loop,
     adjust_exposure_low_res_for_loop, # 调整分辨率需要一段时间才能获取调整后的图片分辨率
 )
-from serial_communication import serial_receive, serial_send
+from serial_communication import serial_receive, serial_send, serial_for_test
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import clear_queue, save_to_jsonl, load_standard_cycle_results, get_now_time, save_image
 
@@ -139,6 +139,7 @@ def main() -> None:
     # serial_send_queue = serial_send_thread.queue
     # serial_receive_thread.start()
     # serial_send_thread.start()
+    # 串口消息测试线程
     # logger.success("初始化串口完成")
     #-------------------- 初始化串口 --------------------#
 

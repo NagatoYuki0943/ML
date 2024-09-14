@@ -75,7 +75,7 @@ def split_rings(
     # 输出分组结果
     for i, group_index in enumerate(group_indexes):
         if len(group_index) < min_group_size:
-            logger.info(f"ignore {len(group_index)} points")
+            # logger.info(f"ignore {len(group_index)} points")
             continue
         group_rings.append(points[group_index])
     return group_rings
@@ -113,7 +113,7 @@ def split_rings_adaptive(
         if detect_rings_nums == 0:
             raise ValueError("没有检测到圆环")
 
-        logger.info(f"try time {i + 1}: {threshold_range = }, {detect_rings_nums = }")
+        # logger.info(f"try time {i + 1}: {threshold_range = }, {detect_rings_nums = }")
         if detect_rings_nums == rings_nums:
             # 数量相等,就返回
             return group_rings

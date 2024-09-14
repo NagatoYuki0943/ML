@@ -136,7 +136,7 @@ def rings_location(
     fit_rings = []
     ignore_rings = []
     for i, group_circle in enumerate(group_rings):
-        logger.info(f"split ring: {i}, pixel numbers = {group_circle.shape[0]}")
+        # logger.info(f"split ring: {i}, pixel numbers = {group_circle.shape[0]}")
         center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err, fit_circle, ignore_circle = \
             fit_circle_by_least_square_filter(group_circle, sigmas)
         center_xs.append(center_x)

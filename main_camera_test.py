@@ -39,7 +39,7 @@ from adjust_camera import (
 )
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
-from utils import clear_queue, save_to_jsonl, load_standard_cycle_results
+from utils import clear_queue, save_to_jsonl, load_standard_cycle_results, drop_excessive_queue_items
 
 
 # 将日志输出到文件
@@ -150,14 +150,8 @@ def main() -> None:
                 if camera_qsize > 0:
                     logger.info(f"The {cycle_loop_count + 1} iter within the cycle.")
 
-                    # 忽略多余的图片
-                    if camera_qsize > 1:
-                        logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-                        for _ in range(camera_qsize - 1):
-                            try:
-                                camera_queue.get(timeout=get_picture_timeout)
-                            except queue.Empty:
-                                logger.error("get picture timeout")
+                    # 忽略多于图像
+                    drop_excessive_queue_items(camera_queue)
 
                     try:
                         # 获取照片

@@ -5,7 +5,7 @@ from config import MainConfig, CameraConfig, AdjustCameraConfig
 import queue
 from loguru import logger
 
-from utils import clear_queue
+from utils import clear_queue, drop_excessive_queue_items
 
 
 def adjust_exposure_by_mean(
@@ -45,16 +45,11 @@ def adjust_exposure_by_mean(
 
 #     #-------------------- 第一次全分辨率拍摄 --------------------#
 #     # 第一次拍摄不调整相机的 capture_mode，因此使用的是原始分辨率
-#     try:
-#         camera_qsize = camera_queue.qsize()
-#         if camera_qsize > 1:
-#             logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-#             for _ in range(camera_qsize - 1):
-#                 try:
-#                     camera_queue.get(timeout=get_picture_timeout)
-#                 except queue.Empty:
-#                     logger.error("get picture timeout")
 
+#     # 忽略多于图像
+#     drop_excessive_queue_items(camera_queue)
+
+#     try:
 #         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
 
 #         # 全图
@@ -129,16 +124,11 @@ def adjust_exposure_by_mean(
 #     # 调整次数上限
 #     adjust_total_times = AdjustCameraConfig.getattr("adjust_total_times")
 #     for j in range(adjust_total_times):
-#         try:
-#             camera_qsize = camera_queue.qsize()
-#             if camera_qsize > 1:
-#                 logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-#                 for _ in range(camera_qsize - 1):
-#                     try:
-#                         camera_queue.get(timeout=get_picture_timeout)
-#                     except queue.Empty:
-#                         logger.error("get picture timeout")
 
+#         # 忽略多于图像
+#         drop_excessive_queue_items(camera_queue)
+
+#         try:
 #             _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
 #             image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
@@ -231,16 +221,11 @@ def adjust_exposure_by_mean(
 #     # 调整次数上限
 #     adjust_total_times = AdjustCameraConfig.getattr("adjust_total_times")
 #     for j in range(adjust_total_times):
-#         try:
-#             camera_qsize = camera_queue.qsize()
-#             if camera_qsize > 1:
-#                 logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-#                 for _ in range(camera_qsize - 1):
-#                     try:
-#                         camera_queue.get(timeout=get_picture_timeout)
-#                     except queue.Empty:
-#                         logger.error("get picture timeout")
 
+#         # 忽略多于图像
+#         drop_excessive_queue_items(camera_queue)
+
+#         try:
 #             image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
 #             logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
 
@@ -361,16 +346,10 @@ def adjust_exposure_full_res_recursive(
     CameraConfig.setattr("capture_time_interval", AdjustCameraConfig.getattr("capture_time_interval"))
     CameraConfig.setattr("return_image_time_interval", AdjustCameraConfig.getattr("return_image_time_interval"))
 
-    try:
-        camera_qsize = camera_queue.qsize()
-        if camera_qsize > 1:
-            logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-            for _ in range(camera_qsize - 1):
-                try:
-                    camera_queue.get(timeout=get_picture_timeout)
-                except queue.Empty:
-                    logger.error("get picture timeout")
+    # 忽略多于图像
+    drop_excessive_queue_items(camera_queue)
 
+    try:
         image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
         logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
 
@@ -571,17 +550,10 @@ def adjust_exposure_full_res_for_loop(
             exposure2id2boxstate[current_exposure_time] = current_id2boxstate
             break
 
-        try:
-            # 获取图像
-            camera_qsize = camera_queue.qsize()
-            if camera_qsize > 1:
-                logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-                for _ in range(camera_qsize - 1):
-                    try:
-                        camera_queue.get(timeout=get_picture_timeout)
-                    except queue.Empty:
-                        logger.error("get picture timeout")
+        # 忽略多于图像
+        drop_excessive_queue_items(camera_queue)
 
+        try:
             image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
             logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
 
@@ -786,17 +758,10 @@ def adjust_exposure_low_res_for_loop(
             exposure2id2boxstate[current_exposure_time] = current_id2boxstate
             break
 
-        try:
-            # 获取图像
-            camera_qsize = camera_queue.qsize()
-            if camera_qsize > 1:
-                logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-                for _ in range(camera_qsize - 1):
-                    try:
-                        camera_queue.get(timeout=get_picture_timeout)
-                    except queue.Empty:
-                        logger.error("get picture timeout")
+        # 忽略多于图像
+        drop_excessive_queue_items(camera_queue)
 
+        try:
             image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
             logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
 

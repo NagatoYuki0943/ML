@@ -4,6 +4,9 @@ import numpy as np
 import json
 from pathlib import Path
 from datetime import datetime
+from loguru import logger
+
+from config import MainConfig
 
 
 def clear_queue(*queues: Queue):
@@ -20,6 +23,18 @@ def clear_queue(*queues: Queue):
         except Exception as e:
             # 处理其他可能的异常
             print(f"An error occurred: {e}")
+
+
+def drop_excessive_queue_items(queue: Queue):
+    camera_qsize = queue.qsize()
+    # 忽略多余的图片
+    if camera_qsize > 1:
+        logger.warning(f"got {camera_qsize} items, ignore {camera_qsize - 1} itmes")
+        for _ in range(camera_qsize - 1):
+            try:
+                queue.get(timeout=MainConfig.getattr("get_picture_timeout"))
+            except queue.Empty:
+                logger.error("get item timeout")
 
 
 def enhance_contrast_clahe(image: np.ndarray, clip_limit=2.0, tile_grid_size=(8, 8)) -> np.ndarray:

@@ -285,6 +285,7 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
             ratio = min(box_h, box_w) / min(template_h, template_w)
             new_scales = np.arange(new_target_scales[0], new_target_scales[1] + 1e-8, new_target_scales[2])
             ratios = (ratio * new_scales).tolist()
+            logger.info(f"find around target {i = } original ratio is None, use {ratios = } to search")
         else:
             ratios = [ratio]
 

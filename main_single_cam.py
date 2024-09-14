@@ -175,9 +175,10 @@ def main() -> None:
     #-------------------- 初始化MQTT客户端 --------------------#
 
     # 设备启动消息
+    logger.info("send device startup message")
     send_msg = {
-        "cmd":"devicestate",
-        "body":{
+        "cmd": "devicestate",
+        "body": {
             "did": MQTTConfig.getattr("did"),
             "type": "startup",
             "at": get_now_time(),

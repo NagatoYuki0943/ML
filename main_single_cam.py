@@ -47,7 +47,7 @@ from utils import clear_queue, save_to_jsonl, load_standard_cycle_results, get_n
 
 # 将日志输出到文件
 # 每天 0 点新创建一个 log 文件
-handler_id = logger.add('log/runtime_{time}.log', rotation='00:00')
+handler_id = logger.add('log/runtime_{time}.log', level=MainConfig.getattr("log_level"), rotation='00:00')
 
 
 def main() -> None:
@@ -555,7 +555,7 @@ def main() -> None:
                                     else:
                                         # box没找到将移动距离设置为 一个很大的数
                                         distance_result[l] = (defalut_error_distance, defalut_error_distance)
-                                        logger.warning(f"box {l} not found in cycle_centers.")
+                                        logger.error(f"box {l} not found in cycle_centers.")
 
                                 # 使用参考靶标校准其他靶标
                                 reference_target_ids: tuple[int] = MatchTemplateConfig.reference_target_ids
@@ -742,7 +742,7 @@ def main() -> None:
                     #             [x1, y1, x2, y2],
                     #             [x1, y1, x2, y2],
                     #         ],
-                    #         "remove_box_ids":["L1_SJ_3","L1_SJ_4"]
+                    #         "remove_box_ids": ["L1_SJ_3", "L1_SJ_4"]
                     #     }
                     # }
                     logger.info("target correction, update target")
@@ -755,14 +755,25 @@ def main() -> None:
                     #     }
                     # }
                     id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
-                    remove_box_ids: dict[int, list] = received_msg['body'].get('remove_box_ids', [])
-                    # 去除多余的 box
-                    for remove_box_id in remove_box_ids:
-                        id2boxstate.pop(int(remove_box_id.split('_')[-1]) - 1) # -1 因为 id 从 0 开始
+                    remove_box_ids: list[str] = received_msg['body'].get('remove_box_ids', [])
+                    logger.info(f"remove_box_ids: {remove_box_ids}")
+                    # -1 因为 id 从 0 开始
+                    _remove_box_ids: list[int] = [int(remove_box_id.split('_')[-1]) - 1 for remove_box_id in remove_box_ids]
+                    logger.info(f"int(remove_box_ids): {_remove_box_ids}")
 
+                    # 去除多余的 box
+                    for remove_box_id in _remove_box_ids:
+                        if remove_box_id in id2boxstate.keys():
+                            logger.info(f"remove box {remove_box_id}, boxstate: {id2boxstate[remove_box_id]}")
+                            id2boxstate.pop(remove_box_id)
+                        else:
+                            logger.warning(f"box {remove_box_id} not found in id2boxstate.")
+
+                    new_boxes: list[list[int]] = received_msg['body'].get('add_boxes', [])
+                    logger.info(f"new_boxes: {new_boxes}")
                     # 将新的 box 转换为列表
                     new_boxstates = [
-                        {"ratio": None, "score": None, "box": box} for box in received_msg['body'].get('add_boxes', [])
+                        {"ratio": None, "score": None, "box": box} for box in new_boxes
                     ]
                     # 旧的 box 也转换为列表，并合并新 box
                     new_boxstates.extend(list(id2boxstate.values()))
@@ -784,9 +795,12 @@ def main() -> None:
                             "score": float(score) if score is not None else None,
                             "box": box.tolist()
                         }
+                    target_number = len(new_boxstates)
+                    logger.info(f"new_boxstates: {new_boxstates}")
+                    logger.info(f"target_number: {target_number}")
 
                     # 设置新目标数量和靶标信息
-                    MatchTemplateConfig.setattr("target_number", len(new_boxstates))
+                    MatchTemplateConfig.setattr("target_number", target_number)
                     MatchTemplateConfig.setattr("id2boxstate", new_boxstates)
 
                     # 因为重设了靶标，所以需要重新初始化标准靶标

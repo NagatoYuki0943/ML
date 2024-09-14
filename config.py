@@ -35,7 +35,7 @@ class MainConfig(BaseConfig):
     """主线程配置
     """
     lock = Lock()   # 锁, 在读取或者修改配置文件时要加锁
-    log_level: Literal['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
+    log_level: Literal['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO'
     save_dir: Path = Path("results")
     save_dir.mkdir(parents=True, exist_ok=True)
     location_save_dir = save_dir / "rings_location"
@@ -125,11 +125,13 @@ class MatchTemplateConfig(BaseConfig):
     """模板匹配配置
     """
     lock = Lock()
+    template_size: tuple[int] = (100, 100)      # 模板大小 (h, w), 单位为 mm
     template_path: Path = Path("assets/template/circles2-7.5cm-390.png")
     match_method: int = cv2.TM_CCOEFF_NORMED    # 匹配方法
     init_scale: float = 0.075                   # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
     scales: tuple[float] = (1.0, 4.0, 0.1)      # 缩放 scale 范围 (start, end, step)
     new_target_scales: tuple[float] = (0.5, 1.5, 0.1)  # 新目标的缩放 scale 范围 (start, end, step)
+    max_target_number: int = 10                 # 最大目标数量
     target_number: int = 0                      # 默认靶标数量,初始化时为找到的靶标数量
     got_target_number: int = 0                  # 找到的靶标数量
     iou_threshold: float = 0.5                  # iou 阈值
@@ -160,7 +162,7 @@ class RingsLocationConfig(BaseConfig):
     save_grads: bool = False
     save_detect_images: bool = False
     save_detect_results: bool = False
-    move_threshold: float = 0.1     # 定位误差阈值, pixel
+    move_threshold: float = 0.3     # 定位误差阈值, pixel
 
 
 @dataclass
@@ -168,7 +170,7 @@ class SerialCommConfig(BaseConfig):
     """串口通讯模块配置
     """
     # 串口配置
-    port: str = "/dev/ttyAMA2"
+    port: str ="/dev/ttyAMA2"
     baudrate: int = 115200
     BUFFER_SIZE: int = 2048
     timeout: float = 0
@@ -182,10 +184,10 @@ class SerialCommConfig(BaseConfig):
 class MQTTConfig(BaseConfig):
     """MQTT客户端配置
     """
-    broker: str = "localhost"
+    broker: str = "47.116.118.93"
     port: int = 1883
     timeout: int = 60
-    topic: str = "test/topic"
+    topic: str = "$creq/7804d2/+"
     username: str = "admin"
     password: str = "123456"
     clientId: str = "7804d2"

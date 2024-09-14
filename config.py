@@ -199,10 +199,10 @@ class MQTTConfig(BaseConfig):
 class FTPConfig(BaseConfig):
     """FTP配置
     """
-    ip: str = ""
-    port: int = 0
-    username: str = ""
-    password: str = ""
+    ip: str = "localhost"
+    port: int = 21
+    username: str = "admin"
+    password: str = "123456"
 
 
 ALL_CONFIGS = [

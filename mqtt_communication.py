@@ -1,14 +1,15 @@
 import os
 import time
-from algorithm import RaspberryMQTT
+from algorithm import RaspberryMQTT, RaspberryFTP
 from queue import Queue
-from config import MQTTConfig, RingsLocationConfig, CameraConfig, MatchTemplateConfig, MainConfig
+from config import MQTTConfig, RingsLocationConfig, CameraConfig, MatchTemplateConfig, MainConfig, FTPConfig
 from loguru import logger
 import subprocess
 
 # MQTT 客户端接收线程
 def mqtt_receive(
         client: RaspberryMQTT,
+        ftp: RaspberryFTP,
         main_queue: Queue,
         send_queue: Queue,
         *args,
@@ -16,15 +17,28 @@ def mqtt_receive(
 ):
     def message_handler(message):
         """MQTT客户端消息回调"""
+        cmd = message.get('cmd', "unknown")
         cmd_handlers = {
             'setconfig': config_setter,
-            'getconfig': config_getter
+            'getconfig': config_getter,
         }
         # 根据cmd判断消息是否发给主控处理
-        handler = cmd_handlers.get(message.get('cmd'))
+        handler = cmd_handlers.get(cmd)
         if handler:
             handler(message, send_queue)
         else:
+            # 处理配置文件下载命令
+            if cmd == "updateconfigfile":
+                msgid = message['msgid']
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                config_file_path = MainConfig.getattr("save_dir") / f"Configuration_{timestamp}.yaml"
+                try:
+                    ftp.download_file(config_file_path, message['ftpurl'])
+                    message['configuration_path'] = config_file_path
+                    message.pop('ftpurl')
+                except Exception as e:
+                    create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)
+                    return
             main_queue.put(message)
     # 设置消息回调
     client.set_message_callback(message_handler)
@@ -35,15 +49,18 @@ def mqtt_receive(
 # MQTT客户端发送线程
 def mqtt_send(
         client: RaspberryMQTT,
+        ftp: RaspberryFTP,
         queue: Queue,
         *args,
         **kwargs,
 ):
     while True:
         message = queue.get()
+        body = message.get("body")
+        if body and "img" in body:
+            ftp.upload_file(body['img'], body['ftpurl'])
         topic, payload = client.merge_message(message)
         client.publish(topic, payload)
-
 
 def config_setter(message, send_queue):
     """根据命令中携带的配置参数修改配置"""

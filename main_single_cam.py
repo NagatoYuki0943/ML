@@ -510,21 +510,21 @@ def main() -> None:
                             save_to_jsonl(cycle_results, history_save_path)
 
                             # [n, 2] n个目标中心坐标
-                            # init_cycle_centers: {0: [1830.03952661, 1097.25685946]), 1: [2090.1380529 , 2148.12593385]}
+                            # standard_cycle_centers: {0: [1830.03952661, 1097.25685946]), 1: [2090.1380529 , 2148.12593385]}
                             # new_cycle_centers: {0: [1830.05961465, 1097.2564746 ]), 1: [2090.13342415, 2148.12260239]}
 
                             # 防止值不存在
                             send_msg_data = {}
 
-                            # 初始化 init_cycle_centers
+                            # 初始化 standard_cycle_centers
                             target_number = MatchTemplateConfig.getattr("target_number")
                             if standard_cycle_results is None or len(standard_cycle_results) != target_number:
                                 logger.info("try to init standard_cycle_results")
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
                                 if len(new_cycle_centers) == 0:
-                                    logger.warning("No box found in new_cycle_centers, can't init init_cycle_centers.")
+                                    logger.warning("No box found in new_cycle_centers, can't init standard_cycle_centers.")
                                 elif any(v is None for v in new_cycle_centers.values()):
-                                    logger.warning("Some box not found in new_cycle_centers, can't init init_cycle_centers.")
+                                    logger.warning("Some box not found in new_cycle_centers, can't init standard_cycle_centers.")
                                 else:
                                     standard_cycle_results = cycle_results
                                     save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
@@ -542,15 +542,15 @@ def main() -> None:
                             else:
                                 logger.info("try to compare standard_cycle_results and cycle_results")
                                 move_threshold = RingsLocationConfig.getattr("move_threshold")
-                                init_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
+                                standard_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
                                 new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
 
                                 # 计算移动距离
                                 distance_result = {}
                                 for l in standard_cycle_results.keys():
                                     if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
-                                        distance_x = abs(init_cycle_centers[l][0] - new_cycle_centers[l][0])
-                                        distance_y = abs(init_cycle_centers[l][1] - new_cycle_centers[l][1])
+                                        distance_x = abs(standard_cycle_centers[l][0] - new_cycle_centers[l][0])
+                                        distance_y = abs(standard_cycle_centers[l][1] - new_cycle_centers[l][1])
                                         distance_result[l] = (distance_x, distance_y)
                                     else:
                                         # box没找到将移动距离设置为 一个很大的数

@@ -441,6 +441,7 @@ def main() -> None:
                     if len(cycle_exposure_times):
                         exposure_time = cycle_exposure_times[cycle_loop_count]
                         id2boxstate = exposure2id2boxstate[exposure_time]
+                        logger.info(f"cycle_loop_count: {cycle_loop_count}, {exposure_time = }, {id2boxstate = }")
                         for j, boxestate in id2boxstate.items():
                             _box: list | None = boxestate['box']
                             try:

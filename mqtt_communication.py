@@ -1,8 +1,10 @@
+import os
 import time
 from algorithm import RaspberryMQTT
 from queue import Queue
-from config import MQTTConfig, RingsLocationConfig, CameraConfig, MatchTemplateConfig
+from config import MQTTConfig, RingsLocationConfig, CameraConfig, MatchTemplateConfig, MainConfig
 from loguru import logger
+import subprocess
 
 # MQTT 客户端接收线程
 def mqtt_receive(
@@ -52,12 +54,18 @@ def config_setter(message, send_queue):
         config_body = message.get("body", {})
         for key, value in config_body.items():
             # 检查配置项是否存在于设备中
-            config = config_map()[key]
             if key not in config_map():
                 raise ValueError(f"{key} is not a valid key")
+            config = config_map()[key]
             if isinstance(config, tuple):
-                config_class, config_attr = config_map()[key]
-                config_class.setattr(config_attr, value)
+                config_class, config_attr = config
+                current_value = getattr(config_class, config_attr)
+                if isinstance(current_value, tuple):
+                    if not isinstance(value, (list, tuple)) or len(value) != len(current_value):
+                        raise ValueError(f"{key} must be a tuple with {len(current_value)} values")
+                    setattr(config_class, config_attr, tuple(value))
+                else:
+                    setattr(config_class, config_attr, value)
             else:
                 raise ValueError(f"{key} is not avaliable")
         create_message(cmd, {"code":200,"msg":f"{cmd} succeed"}, msgid, send_queue)
@@ -75,7 +83,11 @@ def config_getter(message, send_queue):
         for key, config in config_map().items():
             if isinstance(config, tuple):
                 config_class, config_attr = config
-                config_body[key] = config_class.getattr(config_attr)
+                value = getattr(config_class, config_attr)
+                if isinstance(value, tuple):
+                    config_body[key] = list(value)
+                else:
+                    config_body[key] = value
             else:
                 config_body[key] = config
         config_body['code'] = 200
@@ -99,13 +111,13 @@ def create_message(cmd, body, msgid, send_queue):
 def config_map():
     """设备中需要修改或查询的配置项"""
     return {
-        'displacement_threshold': "None",  # 尚未定义的配置
-        'target_number': (MatchTemplateConfig, 'target_number'),
-        'target_size': "None",  # 尚未定义的配置
-        'reference_target': "None",  # 尚未定义的配置
-        'data_report_interval': (CameraConfig, 'return_image_time_interval'),
-        'capture_interval': (CameraConfig, 'capture_time_interval'),
-        'did': (MQTTConfig, 'did'),
-        'max_target_number': "None",  # 尚未定义的配置
-        'log_level': "None"
+        'displacement_threshold': (RingsLocationConfig, 'move_threshold'),  # 告警位移阈值
+        'target_number': (MatchTemplateConfig, 'target_number'), # 靶标数量
+        'target_size': (MatchTemplateConfig, 'template_size'),  # 靶标尺寸
+        'reference_target': (MatchTemplateConfig, 'reference_target_ids'), # 参考靶标
+        'data_report_interval': (MainConfig, 'cycle_time_interval'), # 上报数据时间间隔
+        'capture_interval': (CameraConfig, 'capture_time_interval'), # 拍照时间间隔
+        'did': (MQTTConfig, 'did'), # divece id
+        'max_target_number': (MatchTemplateConfig, 'max_target_number'),  # 最大支持靶标个数
+        'log_level': (MainConfig, 'log_level') # 日志等级
     }

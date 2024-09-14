@@ -38,7 +38,6 @@ class RaspberryMQTT:
         self.message_callback = None
         self.client.on_message = self.on_message
         self.connect_mqtt()
-        logger.add("communication.log", level="INFO")
         self.pattern = re.compile(r'(\w+)=([^&]*)')
 
     def connect_mqtt(self):

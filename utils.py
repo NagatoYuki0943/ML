@@ -29,7 +29,7 @@ def drop_excessive_queue_items(queue: Queue):
     camera_qsize = queue.qsize()
     # 忽略多余的图片
     if camera_qsize > 1:
-        logger.warning(f"got {camera_qsize} items, ignore {camera_qsize - 1} itmes")
+        logger.warning(f"queue got {camera_qsize} items, ignore {camera_qsize - 1} itmes")
         for _ in range(camera_qsize - 1):
             try:
                 queue.get(timeout=MainConfig.getattr("get_picture_timeout"))

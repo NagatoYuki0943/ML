@@ -114,4 +114,4 @@ def serial_for_test(
             logger.info(f"Received serial port message: {response}")
             main_queue.put(response)
         i = 1 if i > 100 else i + 1
-        time.sleep(3)
+        time.sleep(10)

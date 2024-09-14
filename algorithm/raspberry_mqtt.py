@@ -37,8 +37,8 @@ class RaspberryMQTT:
         self.client.username_pw_set(username=username, password=password)
         self.message_callback = None
         self.client.on_message = self.on_message
-        self.client.on_log = self.on_log
         self.connect_mqtt()
+        logger.add("communication.log", level="INFO")
         self.pattern = re.compile(r'(\w+)=([^&]*)')
 
     def connect_mqtt(self):
@@ -59,6 +59,7 @@ class RaspberryMQTT:
         data = self.extract_message(message)
         if data is not None:
             if self.message_callback:
+                logger.info(f"Sent message to Master Control:{data}")
                 self.message_callback(data)
 
     def set_message_callback(self, callback):
@@ -111,6 +112,7 @@ class RaspberryMQTT:
         Args:
             data (dict): 要发送的数据.
         """
+        logger.info(f"Received message from Master Control:{data}")
         cmd = data.get("cmd")
         if cmd == "update":
             topic = "$dp"
@@ -134,8 +136,7 @@ class RaspberryMQTT:
         # 响应消息
         if cmd != "alarm" and cmd != "devicestate":
             msgid = data.get("msgid", "unknown")
-            result = data.get("result", "unknown")
-            message = f"$cmd={cmd}&result={result}&body={body_json}&msgid={msgid}"
+            message = f"$cmd={cmd}&body={body_json}&msgid={msgid}"
         # 状态上报和告警消息
         else:
             message = f"$cmd={cmd}&body={body_json}".strip()

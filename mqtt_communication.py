@@ -24,7 +24,6 @@ def mqtt_receive(
             handler(message, send_queue)
         else:
             main_queue.put(message)
-            logger.info(f"Sent message to Master Controller: {message}")
     # 设置消息回调
     client.set_message_callback(message_handler)
     while True:
@@ -40,7 +39,6 @@ def mqtt_send(
 ):
     while True:
         message = queue.get()
-        logger.info(f"Received message from Master Controller: {message}")
         topic, payload = client.merge_message(message)
         client.publish(topic, payload)
 
@@ -54,10 +52,14 @@ def config_setter(message, send_queue):
         config_body = message.get("body", {})
         for key, value in config_body.items():
             # 检查配置项是否存在于设备中
+            config = config_map()[key]
             if key not in config_map():
                 raise ValueError(f"{key} is not a valid key")
-            config_class, config_attr = config_map()[key]
-            config_class.setattr(config_attr, value)
+            if isinstance(config, tuple):
+                config_class, config_attr = config_map()[key]
+                config_class.setattr(config_attr, value)
+            else:
+                raise ValueError(f"{key} is not avaliable")
         create_message(cmd, {"code":200,"msg":f"{cmd} succeed"}, msgid, send_queue)
     except Exception as e:
         create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)
@@ -71,8 +73,11 @@ def config_getter(message, send_queue):
         config_body = {}
         # 遍历配置映射，获取每个配置项的当前值
         for key, config in config_map().items():
-            config_class, config_attr = config
-            config_body[key] = config_class.getattr(config_attr)
+            if isinstance(config, tuple):
+                config_class, config_attr = config
+                config_body[key] = config_class.getattr(config_attr)
+            else:
+                config_body[key] = config
         config_body['code'] = 200
         config_body['msg'] = "getconfig succeed" 
         # 返回成功的消息，包含所有配置项的当前值
@@ -102,5 +107,5 @@ def config_map():
         'capture_interval': (CameraConfig, 'capture_time_interval'),
         'did': (MQTTConfig, 'did'),
         'max_target_number': "None",  # 尚未定义的配置
-        'log_level': (MQTTConfig, 'log_level')
+        'log_level': "None"
     }

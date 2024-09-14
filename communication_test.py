@@ -33,6 +33,9 @@ def main():
         MQTTConfig.getattr('port'),
         MQTTConfig.getattr('timeout'),
         MQTTConfig.getattr('topic'),
+        MQTTConfig.getattr('username'),
+        MQTTConfig.getattr('password'),
+        MQTTConfig.getattr('clientId'),
         apikey=MQTTConfig.getattr('apikey')
     )
     mqtt_send_thread = ThreadWrapper(
@@ -48,7 +51,7 @@ def main():
         target_func = serial_for_test,
         main_queue = main_queue
     )
-    serial_test_thread.start()
+    # serial_test_thread.start()
     mqtt_receive_thread.start()
     mqtt_send_thread.start()
     logger.success("初始化MQTT客户端完成")

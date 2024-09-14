@@ -9,6 +9,7 @@ import queue
 from loguru import logger
 from typing import Literal
 from pathlib import Path
+import os
 
 from algorithm import (
     ThreadWrapper,
@@ -132,8 +133,8 @@ def main() -> None:
     # serial_receive_thread = Thread(
     #     target = serial_receive,
     #     kwargs={
-    #         'ser':serial_objects,
-    #         'queue':main_queue,
+    #         'ser': serial_objects,
+    #         'queue': main_queue,
     #     },
     # )
     # serial_send_queue = serial_send_thread.queue
@@ -144,40 +145,40 @@ def main() -> None:
     #-------------------- 初始化串口 --------------------#
 
     #-------------------- 初始化MQTT客户端 --------------------#
-    # logger.info("开始初始化MQTT客户端")
-    # mqtt_comm = RaspberryMQTT(
-    #     MQTTConfig.getattr('broker'),
-    #     MQTTConfig.getattr('port'),
-    #     MQTTConfig.getattr('timeout'),
-    #     MQTTConfig.getattr('topic'),
-    #     MQTTConfig.getattr('username'),
-    #     MQTTConfig.getattr('password'),
-    #     MQTTConfig.getattr('clientId'),
-    #     MainConfig.getattr('apikey'),
-    # )
-    # mqtt_send_thread = ThreadWrapper(
-    #     target_func = mqtt_send,
-    #     client = mqtt_comm,
-    # )
-    # mqtt_send_queue = mqtt_send_thread.queue
-    # mqtt_receive_thread = Thread(
-    #     target = mqtt_receive,
-    #     kwargs={
-    #         'client':mqtt_comm,
-    #         'main_queue':main_queue,
-    #         'send_queue':mqtt_send_queue,
-    #     },
-    # )
-    # mqtt_receive_thread.start()
-    # mqtt_send_thread.start()
-    # logger.success("初始化MQTT客户端完成")
+    logger.info("开始初始化MQTT客户端")
+    mqtt_comm = RaspberryMQTT(
+        MQTTConfig.getattr('broker'),
+        MQTTConfig.getattr('port'),
+        MQTTConfig.getattr('timeout'),
+        MQTTConfig.getattr('topic'),
+        MQTTConfig.getattr('username'),
+        MQTTConfig.getattr('password'),
+        MQTTConfig.getattr('clientId'),
+        MQTTConfig.getattr('apikey'),
+    )
+    mqtt_send_thread = ThreadWrapper(
+        target_func = mqtt_send,
+        client = mqtt_comm,
+    )
+    mqtt_send_queue = mqtt_send_thread.queue
+    mqtt_receive_thread = Thread(
+        target = mqtt_receive,
+        kwargs={
+            'client': mqtt_comm,
+            'main_queue': main_queue,
+            'send_queue': mqtt_send_queue,
+        },
+    )
+    mqtt_receive_thread.start()
+    mqtt_send_thread.start()
+    logger.success("初始化MQTT客户端完成")
     #-------------------- 初始化MQTT客户端 --------------------#
 
     # 设备启动消息
     send_msg = {
         "cmd":"devicestate",
         "body":{
-            "did": "458796",
+            "did": MQTTConfig.getattr("did"),
             "type": "startup",
             "at": get_now_time(),
             "sw_version": "230704180", # 版本号
@@ -185,7 +186,7 @@ def main() -> None:
             "msg": "device starting"
         }
     }
-    # mqtt_send_queue.put(send_msg)
+    mqtt_send_queue.put(send_msg)
 
     logger.success("init end")
     #------------------------------ 初始化 ------------------------------#
@@ -305,6 +306,11 @@ def main() -> None:
 
     #-------------------- 循环变量 --------------------#
 
+
+    #-------------------- test --------------------#
+    #-------------------- test --------------------#
+
+
     while True:
         cycle_current_time = time.time()
         # 取整为时间周期
@@ -333,7 +339,7 @@ def main() -> None:
                         },
                         "msgid":1
                     }
-                    # mqtt_send_queue.put(send_msg)
+                    mqtt_send_queue.put(send_msg)
 
                 #-------------------- 补光灯 --------------------#
 
@@ -462,10 +468,10 @@ def main() -> None:
                                         save_detect_results,
                                         gradient_threshold_percent,
                                     )
+                                    logger.success(f"{result = }")
                                     result['metadata'] = image_metadata
                                     # 保存到文件
                                     save_to_jsonl(result, camera_result_save_path)
-                                    logger.success(f"{result = }")
                                     logger.success(f"box {j} rings location success")
                                     center = [float(result['center_x_mean'] + _box[0]), float(result['center_y_mean'] + _box[1])]
                                     cycle_results[j] = {
@@ -522,14 +528,16 @@ def main() -> None:
                                     standard_cycle_results = cycle_results
                                     save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
                                     logger.info(f"init standard_cycle_results: {standard_cycle_results}")
-                                    # 正常数据消息
-                                    send_msg_data = {f"L1_SJ_{k}": {'X': 0, 'Y': 0} for k in standard_cycle_results.keys()}
+
+                                    # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
+                                    logger.success(f"send init data message.")
+                                    send_msg_data = {f"L1_SJ_{k+1}": {'X': 0, 'Y': 0} for k in standard_cycle_results.keys()}
                                     send_msg = {
                                         "cmd": "update",
-                                        "did": "458796",
+                                        "did": MQTTConfig.getattr("did"),
                                         "data": send_msg_data
                                     }
-                                    # mqtt_send_queue.put(send_msg)
+                                    mqtt_send_queue.put(send_msg)
                             else:
                                 logger.info("try to compare standard_cycle_results and cycle_results")
                                 move_threshold = RingsLocationConfig.getattr("move_threshold")
@@ -580,7 +588,7 @@ def main() -> None:
 
                                 logger.info(f"distance_result: {distance_result}")
                                 logger.info(f"over_distance_ids: {over_distance_ids}")
-                                send_msg_data = {f"L1_SJ_{k}": {'X': v[0], 'Y': v[1]} for k, v in distance_result.items()}
+                                send_msg_data = {f"L1_SJ_{k+1}": {'X': v[0], 'Y': v[1]} for k, v in distance_result.items()}
                                 logger.info(f"send_msg_data: {send_msg_data}")
                                 if len(over_distance_ids) > 0:
                                     # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
@@ -593,26 +601,26 @@ def main() -> None:
                                     send_msg = {
                                         "cmd": "alarm",
                                         "body": {
-                                            "did": "458796",
+                                            "did": MQTTConfig.getattr("did"),
                                             "type": "displacement",
                                             "at": get_now_time(),
-                                            "number": list(over_distance_ids),# 表示异常的靶标编号
+                                            "number": [i + 1 for i in over_distance_ids], # 表示异常的靶标编号
                                             "data": send_msg_data,
                                             "ftpurl": "/5654/20240810160846",# ftp上传路径
-                                            "img": [image_path]# 文件名称
+                                            "img": [str(image_path)]# 文件名称
                                         }
                                     }
-                                    # mqtt_send_queue.put(send_msg)
+                                    mqtt_send_queue.put(send_msg)
                                 else:
                                     # ✅️✅️✅️ 所有 box 移动距离都小于阈值 ✅️✅️✅️
                                     logger.success(f"All box move distance is under threshold {move_threshold}.")
                                     # 正常数据消息
                                     send_msg = {
                                         "cmd": "update",
-                                        "did": "458796",
+                                        "did": MQTTConfig.getattr("did"),
                                         "data": send_msg_data
                                     }
-                                    # mqtt_send_queue.put(send_msg)
+                                    mqtt_send_queue.put(send_msg)
 
                             #------------------------- 整理检测结果 -------------------------#
 
@@ -665,16 +673,16 @@ def main() -> None:
                                         send_msg = {
                                             "cmd":"alarm",
                                             "body":{
-                                                "did": "458796",
+                                                "did": MQTTConfig.getattr("did"),
                                                 "type": "target_loss",
                                                 "at": get_now_time(),
-                                                "number": loss_ids,# 异常的靶标编号
+                                                "number": [i + 1 for i in loss_ids],# 异常的靶标编号
                                                 "data": send_msg_data,
                                                 "ftpurl": "/5654/20240810160846",# ftp上传路径
-                                                "img": [image_path]# 文件名称
+                                                "img": [str(image_path)]# 文件名称
                                             }
                                         }
-                                        # mqtt_send_queue.put(send_msg)
+                                        mqtt_send_queue.put(send_msg)
                                     else:
                                         # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
                                         logger.success(f"The lost target has been found, the target number {target_number} is enough, got {got_target_number} targets.")
@@ -703,117 +711,6 @@ def main() -> None:
 
         # 检测周期外
         if cycle_loop_count == -1:
-            # 设备部署响应消息
-            if need_send_devicedeploying_msg:
-                logger.info("send device deploying msg")
-                if last_cycle_results is None:
-                    logger.warning("last_cycle_results is None, can't send device deploying msg, wait for next cycle.")
-                    continue
-
-                # last_cycle_results: {
-                #     1: {"image_timestamp": "image--20240912-181027.873617--1", "box": [1920, 1872, 2421, 2373], "center": [2170.8123043636415, 2123.2532707504965], "exposure_time": 102000},
-                #     2: {"image_timestamp": "image--20240912-181027.873617--2", "box": [1440, 2151, 1759, 2470], "center": [1603.7810010310484, 2320.5031554379793], "exposure_time": 102000},
-                #     0: {"image_timestamp": "image--20240912-181030.874671--0", "box": [1502, 965, 1821, 1284], "center": [1661.350502281842, 1124.590099588648], "exposure_time": 108000}
-                # }
-                _data = {
-                    f"L1_SJ_{k}": {'X': v['center'][0], 'Y': v['center'][1], "Z": 0} \
-                    for k, v in last_cycle_results.items() if v['center'] is not None
-                }
-
-                try:
-                    # 获取照片
-                    _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-                    image_path = save_dir / f"deploy.jpg"
-                    save_image(image, image_path)
-                except queue.Empty:
-                    image_path = None
-                    logger.error("get picture timeout")
-
-                send_msg = {
-                    "cmd":"devicedeploying",
-                    "body":{
-                        "code": 200,
-                        "msg": "deployed succeed",
-                        "did": "458796",
-                        "type": "deploying",
-                        "at": get_now_time(),
-                        "sw_version": "230704180", # 版本号
-                        "code": 200,
-                        "msg": "device starting",
-                        "data": _data,
-                        # "data": { # 靶标初始位置
-                        #     "L1_SJ_1": {"X": 19.01, "Y": 18.31, "Z":10.8},
-                        #     "L1_SJ_2": {"X": 4.09, "Y": 8.92, "Z":6.7},
-                        #     "L1_SJ_3": {"X": 2.02, "Y": 5.09, "Z":14.6}
-                        # },
-                        "ftpurl": "/5654/20240810160846",
-                        "img": [image_path]
-                    },
-                    "msgid": "bb6f3eeb2"
-                }
-                # mqtt_send_queue.put(send_msg)
-                need_send_devicedeploying_msg = False
-                logger.success("send device deploying msg success")
-
-            if need_send_getstatus_msg:
-                logger.info("send getstatus msg")
-                # last_cycle_results: {
-                #     1: {"image_timestamp": "image--20240912-181027.873617--1", "box": [1920, 1872, 2421, 2373], "center": [2170.8123043636415, 2123.2532707504965], "exposure_time": 102000},
-                #     2: {"image_timestamp": "image--20240912-181027.873617--2", "box": [1440, 2151, 1759, 2470], "center": [1603.7810010310484, 2320.5031554379793], "exposure_time": 102000},
-                #     0: {"image_timestamp": "image--20240912-181030.874671--0", "box": [1502, 965, 1821, 1284], "center": [1661.350502281842, 1124.590099588648], "exposure_time": 108000}
-                # }
-                sensor_state = {
-                    "L3_WK_1": 0,# 0表示无错误，-1供电异常，
-                    "L3_WK_2": 0,# -2传感器数据异常，-3采样间隔内没有采集到数据
-                    "L3_WK_3": 0,
-                    "L3_WK_4": 0,
-                    "L3_WK_5": 0,
-                    "L3_WK_6": -1,
-                }
-
-                box_sensor_state = {}
-                if standard_cycle_results is not None and last_cycle_results is not None:
-                    for k in standard_cycle_results.keys():
-                        if k in last_cycle_results.keys():
-                            v = last_cycle_results[k]
-                            if v['box'] is not None and v['center'] is not None:
-                                box_sensor_state[f"L1_SJ_{k}"] = 0
-                            else:
-                                box_sensor_state[f"L1_SJ_{k}"] = -2
-                        else:
-                            box_sensor_state[f"L1_SJ_{k}"] = -2
-                else:
-                    logger.warning("last_cycle_results or standard_cycle_results is None, wait for next cycle")
-                    continue
-                sensor_state.update(box_sensor_state)
-
-                # 设备状态查询响应消息
-                send_msg = {
-                    "cmd": "getstatus",
-                    "body": {
-                        "ext_power_volt": 38.3,# 供电电压
-                        "temp": 20,# 环境温度
-                        "signal_4g": -84.0,# 4g信号强度
-                        "sw_version": "230704180",# 固件版本号
-                        "sensor_state": sensor_state,
-                        # "sensor_state": {
-                        #     "L3_WK_1": 0,# 0表示无错误，-1供电异常，
-                        #     "L3_WK_2": 0,# -2传感器数据异常，-3采样间隔内没有采集到数据
-                        #     "L3_WK_3": 0,
-                        #     "L3_WK_4": 0,
-                        #     "L3_WK_5": 0,
-                        #     "L3_WK_6": -1,
-                        #     "L1_SJ_0": 0,
-                        #     "L1_SJ_1": 0,
-                        #     "L1_SJ_2": 0,
-                        # }
-                    },
-                    "msgid": "bb6f3eeb2"
-                }
-                # mqtt_send_queue.put(send_msg)
-                need_send_getstatus_msg = False
-                logger.success("send getstatus msg success")
-
             #------------------------- 获取消息 -------------------------#
             while not main_queue.empty():
                 received_msg = main_queue.get()
@@ -857,14 +754,14 @@ def main() -> None:
                     #     }
                     # }
                     id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
-                    remove_box_ids: dict[int, list] = received_msg['body']['remove_box_ids']
+                    remove_box_ids: dict[int, list] = received_msg['body'].get('remove_box_ids', [])
                     # 去除多余的 box
                     for remove_box_id in remove_box_ids:
-                        id2boxstate.pop(int(remove_box_id.split('_')[-1]))
+                        id2boxstate.pop(int(remove_box_id.split('_')[-1]) - 1) # -1 因为 id 从 0 开始
 
                     # 将新的 box 转换为列表
                     new_boxstates = [
-                        {"ratio": None, "score": None, "box": box} for box in received_msg['body']['add_boxes']
+                        {"ratio": None, "score": None, "box": box} for box in received_msg['body'].get('add_boxes', [])
                     ]
                     # 旧的 box 也转换为列表，并合并新 box
                     new_boxstates.extend(list(id2boxstate.values()))
@@ -882,8 +779,8 @@ def main() -> None:
                     new_boxstates = {}
                     for i, (ratio, score, box) in enumerate(zip(sorted_ratios, sorted_scores, sorted_boxes)):
                         new_boxstates[i] = {
-                            "ratio": float(ratio),
-                            "score": float(score),
+                            "ratio": float(ratio) if ratio is not None else None,
+                            "score": float(score) if score is not None else None,
                             "box": box.tolist()
                         }
 
@@ -894,10 +791,10 @@ def main() -> None:
                     # 因为重设了靶标，所以需要重新初始化标准靶标
                     standard_cycle_results = None
 
-                    box_center_xs = (sorted_scores[:, 0] + sorted_scores[:, 2]) / 2
-                    box_center_ys = (sorted_scores[:, 1] + sorted_scores[:, 3]) / 2
+                    box_center_xs = (sorted_boxes[:, 0] + sorted_boxes[:, 2]) / 2
+                    box_center_ys = (sorted_boxes[:, 1] + sorted_boxes[:, 3]) / 2
                     _data = {
-                        f"L1_SJ_{i}": {"X": float(x), "Y": float(y), "Z": 0} \
+                        f"L1_SJ_{i+1}": {"X": float(x), "Y": float(y), "Z": 0} \
                         for i, (x, y) in enumerate(zip(box_center_xs, box_center_ys))
                     }
 
@@ -906,7 +803,7 @@ def main() -> None:
                         "cmd": "targetcorrection",
                         "body": {
                             "code": 200,
-                            "did": "7804d2",
+                            "did": MQTTConfig.getattr("did"),
                             "msg": "correction succeed",
                             "data": _data,
                             # "data": {
@@ -917,7 +814,7 @@ def main() -> None:
                         },
                         "msgid": "bb6f3eeb2"
                     }
-                    # mqtt_send_queue.put(send_msg)
+                    mqtt_send_queue.put(send_msg)
                     logger.success(f"update target success, new id2boxstate: {id2boxstate}")
 
                 # 参考靶标设定消息
@@ -932,19 +829,19 @@ def main() -> None:
                     #     }
                     # }
                     reference_target = received_msg['body']['reference_target']
-                    reference_target_id = int(reference_target.split('_')[-1])
+                    reference_target_id = int(reference_target.split('_')[-1]) - 1 # -1 因为 id 从 0 开始
                     MatchTemplateConfig.setattr("reference_target_ids", (reference_target_id,))
                     # 参考靶标设定响应消息
                     send_msg = {
                         "cmd": "setreferencetarget",
                         "body": {
                             "code": 200,
-                            "did": "7804d2",
+                            "did": MQTTConfig.getattr("did"),
                             "msg": "set succeed"
                         },
                         "msgid": "bb6f3eeb2"
                     }
-                    # mqtt_send_queue.put(send_msg)
+                    mqtt_send_queue.put(send_msg)
                     logger.success(f"set reference target success, reference_target_id: {reference_target_id}")
 
                 # 设备状态查询消息
@@ -967,17 +864,17 @@ def main() -> None:
 
                         # 现场图像查询响应消息
                         send_msg = {
-                            "cmd": "setconfig",
+                            "cmd": "getimage",
                             "body": {
                                 "code": 200,
-                                "did": "7804d2",
+                                "did": MQTTConfig.getattr("did"),
                                 "msg": "upload succeed",
                                 "ftpurl": "/5654/20240810160846",# ftp上传路径
-                                "img": [image_path]# 文件名称
+                                "img": [str(image_path)]# 文件名称
                             },
                             "msgid": "bb6f3eeb2"
                         }
-                        # mqtt_send_queue.put(send_msg)
+                        mqtt_send_queue.put(send_msg)
                         logger.success(f"get image success, image_path: {image_path}")
                     except queue.Empty:
                         # 现场图像查询响应消息
@@ -985,14 +882,14 @@ def main() -> None:
                             "cmd": "setconfig",
                             "body": {
                                 "code": 200,
-                                "did": "7804d2",
+                                "did": MQTTConfig.getattr("did"),
                                 "msg": "upload succeed",
                                 "ftpurl": "/5654/20240810160846",# ftp上传路径
                                 "img": []# 文件名称
                             },
                             "msgid": "bb6f3eeb2"
                         }
-                        # mqtt_send_queue.put(send_msg)
+                        mqtt_send_queue.put(send_msg)
                         logger.error("get picture timeout")
 
                 # 温控板回复控温指令, 回复可能延期
@@ -1070,108 +967,226 @@ def main() -> None:
                     logger.success("received stop adjust temp data")
 
                 # 重启终端设备消息
-                # elif cmd =='reboot':
-                #     {
-                #         "cmd":"reboot",
-                #         "msgid":"bb6f3eeb2",
-                #     }
-                #     # 重启终端设备响应消息
-                #     send_msg ={
-                #         "cmd":"reboot",
-                #         "body":{
-                #             "code":200,
-                #             "did":"7804d2",
-                #             "msg":"reboot succeed",
-                #         },
-                #         "msgid": "bb6f3eeb2"
-                #     }
-                #     sys.exit()
+                elif cmd =='reboot':
+                    {
+                        "cmd":"reboot",
+                        "msgid":"bb6f3eeb2",
+                    }
+                    # 重启终端设备响应消息
+                    send_msg = {
+                        "cmd": "reboot",
+                        "body": {
+                            "did":MQTTConfig.getattr("did"),
+                            "msg": "reboot succeed",
+                        },
+                        "msgid": "e37e42c53"
+                    }
+                    mqtt_send_queue.put(send_msg)
+                    time.sleep(5)
+                    os._exit()
                 else:
                     logger.warning(f"unknown cmd: {cmd}")
                     logger.warning(f"unknown msg: {received_msg}")
                 #------------------------- 获取消息 -------------------------#
 
-                #------------------------- 发送消息 -------------------------#
-                # 温度异常告警消息
-                if False:
-                    send_msg = {
-                        "cmd": "alarm",
-                        "body": {
-                            "did": "458796",
-                            "type": "temperature",
-                            "at": get_now_time(),
-                            "number": [1, 3, 4],
-                            "data": {
-                                "L3_WK_1": 80,
-                                "L3_WK_2": 20,
-                                "L3_WK_3": 80,
-                                "L3_WK_4": 90,
-                                "L3_WK_5": 20,
-                                "L3_WK_6": 20
-                            }
+            #------------------------- 发送消息 -------------------------#
+            # 设备部署响应消息
+            if need_send_devicedeploying_msg:
+                logger.info("send device deploying msg")
+                if last_cycle_results is None:
+                    logger.warning("last_cycle_results is None, can't send device deploying msg, wait for next cycle.")
+                    continue
+
+                # last_cycle_results: {
+                #     1: {"image_timestamp": "image--20240912-181027.873617--1", "box": [1920, 1872, 2421, 2373], "center": [2170.8123043636415, 2123.2532707504965], "exposure_time": 102000},
+                #     2: {"image_timestamp": "image--20240912-181027.873617--2", "box": [1440, 2151, 1759, 2470], "center": [1603.7810010310484, 2320.5031554379793], "exposure_time": 102000},
+                #     0: {"image_timestamp": "image--20240912-181030.874671--0", "box": [1502, 965, 1821, 1284], "center": [1661.350502281842, 1124.590099588648], "exposure_time": 108000}
+                # }
+                _data = {
+                    f"L1_SJ_{k+1}": {'X': v['center'][0], 'Y': v['center'][1], "Z": 0} \
+                    for k, v in last_cycle_results.items() if v['center'] is not None
+                }
+
+                try:
+                    # 获取照片
+                    _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+                    image_path = save_dir / f"deploy.jpg"
+                    save_image(image, image_path)
+                except queue.Empty:
+                    image_path = None
+                    logger.error("get picture timeout")
+
+                send_msg = {
+                    "cmd":"devicedeploying",
+                    "body":{
+                        "code": 200,
+                        "msg": "deployed succeed",
+                        "did": MQTTConfig.getattr("did"),
+                        "type": "deploying",
+                        "at": get_now_time(),
+                        "sw_version": "230704180", # 版本号
+                        "code": 200,
+                        "msg": "device starting",
+                        "data": _data,
+                        # "data": { # 靶标初始位置
+                        #     "L1_SJ_1": {"X": 19.01, "Y": 18.31, "Z":10.8},
+                        #     "L1_SJ_2": {"X": 4.09, "Y": 8.92, "Z":6.7},
+                        #     "L1_SJ_3": {"X": 2.02, "Y": 5.09, "Z":14.6}
+                        # },
+                        "ftpurl": "/5654/20240810160846",
+                        "img": [str(image_path)]
+                    },
+                    "msgid": "bb6f3eeb2"
+                }
+                mqtt_send_queue.put(send_msg)
+                need_send_devicedeploying_msg = False
+                logger.success("send device deploying msg success")
+
+            # 设备状态查询响应消息
+            if need_send_getstatus_msg:
+                logger.info("send getstatus msg")
+                # last_cycle_results: {
+                #     1: {"image_timestamp": "image--20240912-181027.873617--1", "box": [1920, 1872, 2421, 2373], "center": [2170.8123043636415, 2123.2532707504965], "exposure_time": 102000},
+                #     2: {"image_timestamp": "image--20240912-181027.873617--2", "box": [1440, 2151, 1759, 2470], "center": [1603.7810010310484, 2320.5031554379793], "exposure_time": 102000},
+                #     0: {"image_timestamp": "image--20240912-181030.874671--0", "box": [1502, 965, 1821, 1284], "center": [1661.350502281842, 1124.590099588648], "exposure_time": 108000}
+                # }
+                sensor_state = {
+                    "L3_WK_1": 0,# 0表示无错误，-1供电异常，
+                    "L3_WK_2": 0,# -2传感器数据异常，-3采样间隔内没有采集到数据
+                    "L3_WK_3": 0,
+                    "L3_WK_4": 0,
+                    "L3_WK_5": 0,
+                    "L3_WK_6": -1,
+                }
+
+                box_sensor_state = {}
+                if standard_cycle_results is not None and last_cycle_results is not None:
+                    for k in standard_cycle_results.keys():
+                        if k in last_cycle_results.keys():
+                            v = last_cycle_results[k]
+                            if v['box'] is not None and v['center'] is not None:
+                                box_sensor_state[f"L1_SJ_{k+1}"] = 0
+                            else:
+                                box_sensor_state[f"L1_SJ_{k+1}"] = -2
+                        else:
+                            box_sensor_state[f"L1_SJ_{k+1}"] = -2
+                else:
+                    logger.warning("last_cycle_results or standard_cycle_results is None, wait for next cycle")
+                    continue
+                sensor_state.update(box_sensor_state)
+
+                # 设备状态查询响应消息
+                send_msg = {
+                    "cmd": "getstatus",
+                    "body": {
+                        "ext_power_volt": 38.3,# 供电电压
+                        "temp": 20,# 环境温度
+                        "signal_4g": -84.0,# 4g信号强度
+                        "sw_version": "230704180",# 固件版本号
+                        "sensor_state": sensor_state,
+                        # "sensor_state": {
+                        #     "L3_WK_1": 0,# 0表示无错误，-1供电异常，
+                        #     "L3_WK_2": 0,# -2传感器数据异常，-3采样间隔内没有采集到数据
+                        #     "L3_WK_3": 0,
+                        #     "L3_WK_4": 0,
+                        #     "L3_WK_5": 0,
+                        #     "L3_WK_6": -1,
+                        #     "L1_SJ_0": 0,
+                        #     "L1_SJ_1": 0,
+                        #     "L1_SJ_2": 0,
+                        # }
+                    },
+                    "msgid": "bb6f3eeb2"
+                }
+                mqtt_send_queue.put(send_msg)
+                need_send_getstatus_msg = False
+                logger.success("send getstatus msg success")
+
+            # 设备进入工作状态消息
+            # 温度正常
+            if is_temp_stable:
+                logger.info("send working state msg")
+                send_msg = {
+                    "cmd": "devicestate",
+                    "body": {
+                        "did": MQTTConfig.getattr("did"),
+                        "type": "working",
+                        "at": get_now_time(),
+                        "code": 200,
+                        "msg": "device working"
+                    }
+                }
+                mqtt_send_queue.put(send_msg)
+
+            # 温度异常告警消息
+            if False:
+                logger.info("send temperature alarm msg")
+                send_msg = {
+                    "cmd": "alarm",
+                    "body": {
+                        "did": MQTTConfig.getattr("did"),
+                        "type": "temperature",
+                        "at": get_now_time(),
+                        "number": [1, 3, 4],
+                        "data": {
+                            "L3_WK_1": 80,
+                            "L3_WK_2": 20,
+                            "L3_WK_3": 80,
+                            "L3_WK_4": 90,
+                            "L3_WK_5": 20,
+                            "L3_WK_6": 20
                         }
                     }
-                    # mqtt_send_queue.put(send_msg)
+                }
+                mqtt_send_queue.put(send_msg)
 
-                # 设备异常告警消息
-                if False:
-                    send_msg = {
-                        "cmd": "alarm",
-                        "body": {
-                            "did": "458796",
-                            "type": "device",
-                            "at": get_now_time(),
-                            "code": 400,
-                            "msg": "device error"
+            # 设备异常告警消息
+            if False:
+                logger.info("send device error msg")
+                send_msg = {
+                    "cmd": "alarm",
+                    "body": {
+                        "did": MQTTConfig.getattr("did"),
+                        "type": "device",
+                        "at": get_now_time(),
+                        "code": 400,
+                        "msg": "device error"
+                    }
+                }
+                mqtt_send_queue.put(send_msg)
+
+            # 设备温控变化消息
+            if False:
+                logger.info("send temperature change msg")
+                send_msg = {
+                    "cmd": "devicestate",
+                    "body":{
+                        "did": MQTTConfig.getattr("did"),
+                        "type": "temperature_control",
+                        "at": get_now_time(),
+                        "data": {
+                            "L3_WK_1": 20, # 内仓实际温度
+                            "control_t": 30, # 目标温度
+                            "control_way": "warm/cold",
+                            "pwm_data": 10
                         }
                     }
-                    # mqtt_send_queue.put(send_msg)
+                }
+                mqtt_send_queue.put(send_msg)
 
-                # 设备进入工作状态消息
-                # 温度正常
-                if is_temp_stable:
-                    send_msg = {
-                        "cmd": "devicestate",
-                        "body": {
-                            "did": "458796",
-                            "type": "working",
-                            "at": get_now_time(),
-                            "code": 200,
-                            "msg": "device working"
-                        }
-                    }
-                    # mqtt_send_queue.put(send_msg)
-
-                # 温控变化消息
-                if False:
-                    send_msg = {
-                        "cmd": "devicestate",
-                        "body":{
-                            "did": "458796",
-                            "type": "temperature_control",
-                            "at": get_now_time(),
-                            "data": {
-                                "L3_WK_1": 20, # 内仓实际温度
-                                "control_t": 30, # 目标温度
-                                "control_way": "warm/cold",
-                                "pwm_data": 10
-                            }
-                        }
-                    }
-                    # mqtt_send_queue.put(send_msg)
-
-                # 温度控制命令
-                if False:
-                    send_msg = {
-                        "cmd": "adjusttempdata",
-                        "param": {
-                            "control_t": 10
-                        },
-                        "msgid": 1
-                    }
-                    received_temp_control_msg = False
-                    # mqtt_send_queue.put(send_msg)
-                #------------------------- 发送消息 -------------------------#
+            # 温度控制命令
+            if False:
+                logger.info("send temperature control msg")
+                send_msg = {
+                    "cmd": "adjusttempdata",
+                    "param": {
+                        "control_t": 10
+                    },
+                    "msgid": 1
+                }
+                received_temp_control_msg = False
+                mqtt_send_queue.put(send_msg)
+            #------------------------- 发送消息 -------------------------#
 
 
             # 保存运行时配置

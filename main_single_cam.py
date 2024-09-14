@@ -806,8 +806,8 @@ def main() -> None:
                     # 因为重设了靶标，所以需要重新初始化标准靶标
                     standard_cycle_results = None
 
-                    box_center_xs = (sorted_boxes[:, 0] + sorted_boxes[:, 2]) / 2
-                    box_center_ys = (sorted_boxes[:, 1] + sorted_boxes[:, 3]) / 2
+                    box_center_xs: np.ndarray = (sorted_boxes[:, 0] + sorted_boxes[:, 2]) / 2
+                    box_center_ys: np.ndarray = (sorted_boxes[:, 1] + sorted_boxes[:, 3]) / 2
                     _data = {
                         f"L1_SJ_{i+1}": {"X": float(x), "Y": float(y), "Z": 0} \
                         for i, (x, y) in enumerate(zip(box_center_xs, box_center_ys))
@@ -845,19 +845,35 @@ def main() -> None:
                     # }
                     reference_target = received_msg['body']['reference_target']
                     reference_target_id = int(reference_target.split('_')[-1]) - 1 # -1 因为 id 从 0 开始
-                    MatchTemplateConfig.setattr("reference_target_ids", (reference_target_id,))
-                    # 参考靶标设定响应消息
-                    send_msg = {
-                        "cmd": "setreferencetarget",
-                        "body": {
-                            "code": 200,
-                            "did": MQTTConfig.getattr("did"),
-                            "msg": "set succeed"
-                        },
-                        "msgid": "bb6f3eeb2"
-                    }
-                    mqtt_send_queue.put(send_msg)
-                    logger.success(f"set reference target success, reference_target_id: {reference_target_id}")
+
+                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+                    if reference_target_id in id2boxstate.keys():
+                        MatchTemplateConfig.setattr("reference_target_ids", (reference_target_id,))
+                        # 参考靶标设定响应消息
+                        send_msg = {
+                            "cmd": "setreferencetarget",
+                            "body": {
+                                "code": 200,
+                                "did": MQTTConfig.getattr("did"),
+                                "msg": "set succeed"
+                            },
+                            "msgid": "bb6f3eeb2"
+                        }
+                        mqtt_send_queue.put(send_msg)
+                        logger.success(f"set reference target success, reference_target_id: {reference_target_id}")
+                    else:
+                        # 参考靶标设定响应消息
+                        send_msg = {
+                            "cmd": "setreferencetarget",
+                            "body": {
+                                "code": 200,
+                                "did": MQTTConfig.getattr("did"),
+                                "msg": "set fail, reference_target not exist"
+                            },
+                            "msgid": "bb6f3eeb2"
+                        }
+                        mqtt_send_queue.put(send_msg)
+                        logger.warning(f"reference target {reference_target} not found in id2boxstate.")
 
                 # 设备状态查询消息
                 elif cmd == 'getstatus':

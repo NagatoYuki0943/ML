@@ -42,7 +42,7 @@ from adjust_camera import (
 )
 from serial_communication import serial_receive, serial_send, serial_for_test
 from mqtt_communication import mqtt_receive, mqtt_send
-from utils import clear_queue, save_to_jsonl, load_standard_cycle_results, get_now_time, save_image
+from utils import clear_queue, drop_excessive_queue_items, save_to_jsonl, load_standard_cycle_results, get_now_time, save_image
 
 
 # 将日志输出到文件
@@ -344,9 +344,12 @@ def main() -> None:
 
                 #-------------------- 补光灯 --------------------#
 
-                #-------------------- 找到目标 --------------------#
+                # 忽略多余的图片
+                drop_excessive_queue_items(camera_queue)
+
                 try:
                     _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+
                     #-------------------- 畸变矫正 --------------------#
                     rectified_image = image
                     #-------------------- 畸变矫正 --------------------#
@@ -361,251 +364,316 @@ def main() -> None:
                         #     logger.error("no target found in the image, exit")
                         # continue
                     #-------------------- 小区域模板匹配 --------------------#
+
+                    #-------------------- 调整 box 曝光 --------------------#
+                    logger.info("boxes ajust exposure start")
+                    # id2boxstate example: {
+                    #     0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
+                    #     1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}
+                    # }
+                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+                    # exposure2id2boxstate example: {
+                    #     60000: {0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
+                    #     62000: {1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}}
+                    # }
+                    # id2boxstate 为 None 时，理解为没有任何 box，调整曝光时设定为 {}
+                    exposure2id2boxstate = adjust_exposure_full_res_for_loop(
+                        camera_queue,
+                        id2boxstate if id2boxstate is not None else {},
+                    )
+                    cycle_exposure_times = list(exposure2id2boxstate.keys())
+                    logger.info(f"{exposure2id2boxstate = }")
+                    logger.info("boxes ajust exposure end")
+                    #-------------------- 调整 box 曝光 --------------------#
+
+                    #-------------------- 设定循环 --------------------##
+                    # 总的循环轮数为 1 + 曝光次数
+                    total_cycle_loop_count = 1 + len(exposure2id2boxstate) if len(exposure2id2boxstate) else 2
+                    logger.success(f"During this cycle, there will be {total_cycle_loop_count} iters.")
+                    # 当前周期，采用从 0 开始
+                    cycle_loop_count = 0
+                    logger.info(f"The {cycle_loop_count} iter within the cycle.")
+
+                    # 设置下一轮的曝光值
+                    if len(cycle_exposure_times):
+                        exposure_time = cycle_exposure_times[cycle_loop_count]
+                        CameraConfig.setattr("exposure_time", exposure_time)
+                    #-------------------- 设定循环 --------------------##
+
+                    # 周期设置
+                    cycle_before_time = cycle_current_time
+
                 except queue.Empty:
                     logger.error("get picture timeout")
-                #-------------------- 找到目标 --------------------#
-
-                #-------------------- 调整 box 曝光 --------------------#
-                logger.info("boxes ajust exposure start")
-                # id2boxstate example: {
-                #     0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
-                #     1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}
-                # }
-                id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
-                # exposure2id2boxstate example: {
-                #     60000: {0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
-                #     62000: {1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}}
-                # }
-                # id2boxstate 为 None 时，理解为没有任何 box，调整曝光时设定为 {}
-                exposure2id2boxstate = adjust_exposure_full_res_for_loop(
-                    camera_queue,
-                    id2boxstate if id2boxstate is not None else {},
-                )
-                cycle_exposure_times = list(exposure2id2boxstate.keys())
-                logger.info(f"{exposure2id2boxstate = }")
-                logger.info("boxes ajust exposure end")
-                #-------------------- 调整 box 曝光 --------------------#
-
-                #-------------------- 设定循环 --------------------##
-                # 总的循环轮数为 1 + 曝光次数
-                total_cycle_loop_count = 1 + len(exposure2id2boxstate) if len(exposure2id2boxstate) else 2
-                logger.success(f"During this cycle, there will be {total_cycle_loop_count} iters.")
-                # 当前周期，采用从 0 开始
-                cycle_loop_count = 0
-                logger.info(f"The {cycle_loop_count} iter within the cycle.")
-
-                # 设置下一轮的曝光值
-                if len(cycle_exposure_times):
-                    exposure_time = cycle_exposure_times[cycle_loop_count]
-                    CameraConfig.setattr("exposure_time", exposure_time)
-                #-------------------- 设定循环 --------------------##
-
-                # 周期设置
-                cycle_before_time = cycle_current_time
 
             # 每个周期的其余循环
             else:
                 #-------------------- 获取图片 --------------------#
-                camera_qsize = camera_queue.qsize()
-                if camera_qsize > 0:
-                    logger.info(f"The {cycle_loop_count + 1} iter within the cycle.")
+                logger.info(f"The {cycle_loop_count + 1} iter within the cycle.")
 
-                    # 忽略多余的图片
-                    if camera_qsize > 1:
-                        logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-                        for _ in range(camera_qsize - 1):
-                            try:
-                                camera_queue.get(timeout=get_picture_timeout)
-                            except queue.Empty:
-                                logger.error("get picture timeout")
+                # 忽略多余的图片
+                drop_excessive_queue_items(camera_queue)
 
-                    try:
-                        # 获取照片
-                        image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-                        logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
+                try:
+                    # 获取照片
+                    image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
+                    logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
                 #-------------------- 获取图片 --------------------#
 
-                        #------------------------- 检测目标 -------------------------#
-                        # 获取检测参数
-                        gradient_threshold_percent: float = RingsLocationConfig.getattr("gradient_threshold_percent")
-                        iters: int = RingsLocationConfig.getattr("iters")
-                        order: int = RingsLocationConfig.getattr("order")
-                        rings_nums: int = RingsLocationConfig.getattr("rings_nums")
-                        min_group_size: int = RingsLocationConfig.getattr("min_group_size")
-                        sigmas: int = RingsLocationConfig.getattr("sigmas")
-                        draw_scale: int = RingsLocationConfig.getattr("draw_scale")
-                        save_grads: bool = RingsLocationConfig.getattr("save_grads")
-                        save_detect_images: bool = RingsLocationConfig.getattr("save_detect_images")
-                        save_detect_results: bool = RingsLocationConfig.getattr("save_detect_results")
+                    #------------------------- 检测目标 -------------------------#
+                    # 获取检测参数
+                    gradient_threshold_percent: float = RingsLocationConfig.getattr("gradient_threshold_percent")
+                    iters: int = RingsLocationConfig.getattr("iters")
+                    order: int = RingsLocationConfig.getattr("order")
+                    rings_nums: int = RingsLocationConfig.getattr("rings_nums")
+                    min_group_size: int = RingsLocationConfig.getattr("min_group_size")
+                    sigmas: int = RingsLocationConfig.getattr("sigmas")
+                    draw_scale: int = RingsLocationConfig.getattr("draw_scale")
+                    save_grads: bool = RingsLocationConfig.getattr("save_grads")
+                    save_detect_images: bool = RingsLocationConfig.getattr("save_detect_images")
+                    save_detect_results: bool = RingsLocationConfig.getattr("save_detect_results")
 
-                        #-------------------- 畸变矫正 --------------------#
-                        rectified_image = image
-                        #-------------------- 畸变矫正 --------------------#
+                    #-------------------- 畸变矫正 --------------------#
+                    rectified_image = image
+                    #-------------------- 畸变矫正 --------------------#
 
-                        #-------------------- single box location --------------------#
-                        if len(cycle_exposure_times):
-                            exposure_time = cycle_exposure_times[cycle_loop_count]
-                            id2boxstate = exposure2id2boxstate[exposure_time]
-                            for j, boxestate in id2boxstate.items():
-                                _box: list | None = boxestate['box']
-                                try:
-                                    # box 可能为 None, 使用 try except 处理
-                                    x1, y1, x2, y2 = _box
-                                    target = rectified_image[y1:y2, x1:x2]
+                    #-------------------- single box location --------------------#
+                    if len(cycle_exposure_times):
+                        exposure_time = cycle_exposure_times[cycle_loop_count]
+                        id2boxstate = exposure2id2boxstate[exposure_time]
+                        for j, boxestate in id2boxstate.items():
+                            _box: list | None = boxestate['box']
+                            try:
+                                # box 可能为 None, 使用 try except 处理
+                                x1, y1, x2, y2 = _box
+                                target = rectified_image[y1:y2, x1:x2]
 
-                                    logger.info(f"box {j} rings location start")
-                                    result = adaptive_threshold_rings_location(
-                                        target,
-                                        f"image--{image_timestamp}--{j}",
-                                        iters,
-                                        order,
-                                        rings_nums,
-                                        min_group_size,
-                                        sigmas,
-                                        location_save_dir,
-                                        draw_scale,
-                                        save_grads,
-                                        save_detect_images,
-                                        save_detect_results,
-                                        gradient_threshold_percent,
-                                    )
-                                    logger.success(f"{result = }")
-                                    result['metadata'] = image_metadata
-                                    # 保存到文件
-                                    save_to_jsonl(result, camera_result_save_path)
-                                    logger.success(f"box {j} rings location success")
-                                    center = [float(result['center_x_mean'] + _box[0]), float(result['center_y_mean'] + _box[1])]
-                                    cycle_results[j] = {
-                                        'image_timestamp': f"image--{image_timestamp}--{j}",
-                                        'box': _box,
-                                        'center': None if np.isnan(center[0]) or np.isnan(center[1]) else center,
-                                        'exposure_time': exposure_time,
-                                    }
-                                except Exception as e:
-                                    logger.error(e)
-                                    logger.error(f"box {j} rings location failed")
-                                    cycle_results[j] = {
-                                        'image_timestamp': f"image--{image_timestamp}--{j}",
-                                        'box': _box,
-                                        'center': None, # 丢失目标, 置为 None
-                                        'exposure_time': exposure_time,
-                                    }
-                        #-------------------- single box location --------------------#
+                                logger.info(f"box {j} rings location start")
+                                result = adaptive_threshold_rings_location(
+                                    target,
+                                    f"image--{image_timestamp}--{j}",
+                                    iters,
+                                    order,
+                                    rings_nums,
+                                    min_group_size,
+                                    sigmas,
+                                    location_save_dir,
+                                    draw_scale,
+                                    save_grads,
+                                    save_detect_images,
+                                    save_detect_results,
+                                    gradient_threshold_percent,
+                                )
+                                logger.success(f"{result = }")
+                                result['metadata'] = image_metadata
+                                # 保存到文件
+                                save_to_jsonl(result, camera_result_save_path)
+                                logger.success(f"box {j} rings location success")
+                                center = [float(result['center_x_mean'] + _box[0]), float(result['center_y_mean'] + _box[1])]
+                                cycle_results[j] = {
+                                    'image_timestamp': f"image--{image_timestamp}--{j}",
+                                    'box': _box,
+                                    'center': None if np.isnan(center[0]) or np.isnan(center[1]) else center,
+                                    'exposure_time': exposure_time,
+                                }
+                            except Exception as e:
+                                logger.error(e)
+                                logger.error(f"box {j} rings location failed")
+                                cycle_results[j] = {
+                                    'image_timestamp': f"image--{image_timestamp}--{j}",
+                                    'box': _box,
+                                    'center': None, # 丢失目标, 置为 None
+                                    'exposure_time': exposure_time,
+                                }
+                    #-------------------- single box location --------------------#
 
-                        #------------------------- 检测目标 -------------------------#
+                    #------------------------- 检测目标 -------------------------#
 
-                    except queue.Empty:
-                        logger.error("get picture timeout")
+                except queue.Empty:
+                    logger.error("get picture timeout")
 
-                    else:
-                        # 没有发生错误
-                        # 周期内循环计数加1
-                        cycle_loop_count += 1
+                else:
+                    # 没有发生错误
+                    # 周期内循环计数加1
+                    cycle_loop_count += 1
 
-                        # 正常判断是否结束周期
-                        if cycle_loop_count >= total_cycle_loop_count - 1:
-                            #------------------------- 整理检测结果 -------------------------#
-                            logger.success(f"{cycle_results = }")
-                            # 保存到文件
-                            save_to_jsonl(cycle_results, history_save_path)
+                    # 正常判断是否结束周期
+                    if cycle_loop_count >= total_cycle_loop_count - 1:
+                        #------------------------- 整理检测结果 -------------------------#
+                        logger.info("last cycle, try to compare and save results")
+                        logger.info(f"{cycle_results = }")
+                        # 保存到文件
+                        save_to_jsonl(cycle_results, history_save_path)
 
-                            # [n, 2] n个目标中心坐标
-                            # standard_cycle_centers: {0: [1830.03952661, 1097.25685946]), 1: [2090.1380529 , 2148.12593385]}
-                            # new_cycle_centers: {0: [1830.05961465, 1097.2564746 ]), 1: [2090.13342415, 2148.12260239]}
+                        # [n, 2] n个目标中心坐标
+                        # standard_cycle_centers: {0: [1830.03952661, 1097.25685946]), 1: [2090.1380529 , 2148.12593385]}
+                        # new_cycle_centers: {0: [1830.05961465, 1097.2564746 ]), 1: [2090.13342415, 2148.12260239]}
 
-                            # 防止值不存在
-                            send_msg_data = {}
+                        # 防止值不存在
+                        send_msg_data = {}
 
-                            # 初始化 standard_cycle_centers
-                            target_number = MatchTemplateConfig.getattr("target_number")
-                            if standard_cycle_results is None or len(standard_cycle_results) != target_number:
-                                logger.info("try to init standard_cycle_results")
-                                new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
-                                if len(new_cycle_centers) == 0:
-                                    logger.warning("No box found in new_cycle_centers, can't init standard_cycle_centers.")
-                                elif any(v is None for v in new_cycle_centers.values()):
-                                    logger.warning("Some box not found in new_cycle_centers, can't init standard_cycle_centers.")
-                                else:
-                                    standard_cycle_results = cycle_results
-                                    save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
-                                    logger.info(f"init standard_cycle_results: {standard_cycle_results}")
-
-                                    # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
-                                    logger.success(f"send init data message.")
-                                    send_msg_data = {f"L1_SJ_{k+1}": {'X': 0, 'Y': 0} for k in standard_cycle_results.keys()}
-                                    send_msg = {
-                                        "cmd": "update",
-                                        "did": MQTTConfig.getattr("did"),
-                                        "data": send_msg_data
-                                    }
-                                    mqtt_send_queue.put(send_msg)
+                        # 初始化 standard_cycle_centers
+                        target_number = MatchTemplateConfig.getattr("target_number")
+                        if standard_cycle_results is None or len(standard_cycle_results) != target_number:
+                            logger.info("try to init standard_cycle_results")
+                            new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
+                            if len(new_cycle_centers) == 0:
+                                logger.warning("No box found in new_cycle_centers, can't init standard_cycle_centers.")
+                            elif any(v is None for v in new_cycle_centers.values()):
+                                logger.warning("Some box not found in new_cycle_centers, can't init standard_cycle_centers.")
                             else:
-                                logger.info("try to compare standard_cycle_results and cycle_results")
-                                move_threshold = RingsLocationConfig.getattr("move_threshold")
-                                standard_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
-                                new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
+                                standard_cycle_results = cycle_results
+                                save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
+                                logger.info(f"init standard_cycle_results: {standard_cycle_results}")
 
-                                # 计算移动距离
-                                distance_result = {}
-                                for l in standard_cycle_results.keys():
-                                    if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
-                                        distance_x = abs(standard_cycle_centers[l][0] - new_cycle_centers[l][0])
-                                        distance_y = abs(standard_cycle_centers[l][1] - new_cycle_centers[l][1])
-                                        distance_result[l] = (distance_x, distance_y)
+                                # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
+                                logger.success(f"send init data message.")
+                                send_msg_data = {f"L1_SJ_{k+1}": {'X': 0, 'Y': 0} for k in standard_cycle_results.keys()}
+                                send_msg = {
+                                    "cmd": "update",
+                                    "did": MQTTConfig.getattr("did"),
+                                    "data": send_msg_data
+                                }
+                                mqtt_send_queue.put(send_msg)
+                        else:
+                            logger.info("try to compare standard_cycle_results and cycle_results")
+                            move_threshold = RingsLocationConfig.getattr("move_threshold")
+                            standard_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
+                            new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
+
+                            # 计算移动距离
+                            distance_result = {}
+                            for l in standard_cycle_results.keys():
+                                if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
+                                    distance_x = abs(standard_cycle_centers[l][0] - new_cycle_centers[l][0])
+                                    distance_y = abs(standard_cycle_centers[l][1] - new_cycle_centers[l][1])
+                                    distance_result[l] = (distance_x, distance_y)
+                                else:
+                                    # box没找到将移动距离设置为 一个很大的数
+                                    distance_result[l] = (defalut_error_distance, defalut_error_distance)
+                                    logger.error(f"box {l} not found in cycle_centers.")
+
+                            # 使用参考靶标校准其他靶标
+                            reference_target_ids: tuple[int] = MatchTemplateConfig.reference_target_ids
+                            if len(reference_target_ids) > 0:
+                                reference_target_id = reference_target_ids[0]
+                                if reference_target_id in distance_result.keys():
+                                    # 找到参考靶标
+                                    ref_distance_x, ref_distance_y = distance_result[reference_target_id]
+                                    if ref_distance_x >= defalut_error_distance or ref_distance_y >= defalut_error_distance:
+                                        # 参考靶标出错
+                                        logger.warning(f"reference box {reference_target_id} detect failed, can't calibrate other targets.")
                                     else:
-                                        # box没找到将移动距离设置为 一个很大的数
-                                        distance_result[l] = (defalut_error_distance, defalut_error_distance)
-                                        logger.error(f"box {l} not found in cycle_centers.")
-
-                                # 使用参考靶标校准其他靶标
-                                reference_target_ids: tuple[int] = MatchTemplateConfig.reference_target_ids
-                                if len(reference_target_ids) > 0:
-                                    reference_target_id = reference_target_ids[0]
-                                    if reference_target_id in distance_result.keys():
-                                        logger.info(f"use reference target {reference_target_id} to calibrate other targets.")
-                                        ref_distance_x, ref_distance_y = distance_result[reference_target_id]
+                                        # 参考靶标正常
+                                        logger.info(f"use reference box {reference_target_id} to calibrate other targets.")
                                         for idx, (distance_x, distance_y) in distance_result.items():
                                             if idx != reference_target_id:
                                                 distance_result[idx] = (distance_x - ref_distance_x, distance_y - ref_distance_y)
-                                    else:
-                                        logger.warning(f"reference target {reference_target_id} not found in distance_result, don't calibrate other targets.")
                                 else:
-                                    logger.warning(f"no reference target set, can't calibrate other targets.")
+                                    logger.warning(f"reference box {reference_target_id} not found in distance_result, don't calibrate other targets.")
+                            else:
+                                logger.warning(f"no reference box set, can't calibrate other targets.")
 
-                                # 超出距离的 box idx
-                                over_distance_ids = set()
-                                for idx, (distance_x, distance_y) in distance_result.items():
-                                    if distance_x > move_threshold:
-                                        over_distance_ids.add(idx)
-                                        logger.warning(f"box {idx} x move distance {distance_x} is over threshold {move_threshold}.")
+                            # 超出距离的 box idx
+                            over_distance_ids = set()
+                            for idx, (distance_x, distance_y) in distance_result.items():
+                                if distance_x > move_threshold:
+                                    over_distance_ids.add(idx)
+                                    logger.warning(f"box {idx} x move distance {distance_x} is over threshold {move_threshold}.")
+                                else:
+                                    logger.info(f"box {idx} x move distance {distance_x} is under threshold {move_threshold}.")
+
+                                if distance_y > move_threshold:
+                                    over_distance_ids.add(idx)
+                                    logger.warning(f"box {idx} y move distance {distance_y} is over threshold {move_threshold}.")
+                                else:
+                                    logger.info(f"box {idx} y move distance {distance_y} is under threshold {move_threshold}.")
+
+                            logger.info(f"distance_result: {distance_result}")
+                            logger.info(f"over_distance_ids: {over_distance_ids}")
+                            send_msg_data = {f"L1_SJ_{k+1}": {'X': v[0], 'Y': v[1]} for k, v in distance_result.items()}
+                            logger.info(f"send_msg_data: {send_msg_data}")
+                            if len(over_distance_ids) > 0:
+                                # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
+                                logger.warning(f"box {over_distance_ids} move distance is over threshold {move_threshold}.")
+
+                                # 保存丢失的图片
+                                image_path = save_dir / f"target_displacement.jpg"
+                                save_image(image, image_path)
+                                # 位移告警消息
+                                send_msg = {
+                                    "cmd": "alarm",
+                                    "body": {
+                                        "did": MQTTConfig.getattr("did"),
+                                        "type": "displacement",
+                                        "at": get_now_time(),
+                                        "number": [i + 1 for i in over_distance_ids], # 表示异常的靶标编号
+                                        "data": send_msg_data,
+                                        "ftpurl": "/5654/20240810160846",# ftp上传路径
+                                        "img": [str(image_path)]# 文件名称
+                                    }
+                                }
+                                mqtt_send_queue.put(send_msg)
+                            else:
+                                # ✅️✅️✅️ 所有 box 移动距离都小于阈值 ✅️✅️✅️
+                                logger.success(f"All box move distance is under threshold {move_threshold}.")
+                                # 正常数据消息
+                                send_msg = {
+                                    "cmd": "update",
+                                    "did": MQTTConfig.getattr("did"),
+                                    "data": send_msg_data
+                                }
+                                mqtt_send_queue.put(send_msg)
+
+                        #------------------------- 整理检测结果 -------------------------#
+
+                        #------------------------- 检查是否丢失目标 -------------------------#
+                        target_number = MatchTemplateConfig.getattr("target_number")
+                        got_target_number = MatchTemplateConfig.getattr("got_target_number")
+
+                        # 丢失目标
+                        if target_number > got_target_number or target_number == 0:
+                            logger.warning(f"The target number {target_number} is not enough, got {got_target_number} targets, start to find lost target.")
+
+                            # 忽略多余的图片
+                            drop_excessive_queue_items(camera_queue)
+
+                            try:
+                                # 获取照片
+                                _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+
+                                #-------------------- 畸变矫正 --------------------#
+                                rectified_image = image
+                                #-------------------- 畸变矫正 --------------------#
+
+                                #-------------------- 模板匹配 --------------------#
+                                find_lost_target(rectified_image)
+                                target_number = MatchTemplateConfig.getattr("target_number")
+                                got_target_number = MatchTemplateConfig.getattr("got_target_number")
+                                #-------------------- 模板匹配 --------------------#
+
+                                if target_number > got_target_number or target_number == 0:
+                                    # ❌️❌️❌️ 重新查找完成之后仍然不够 ❌️❌️❌️
+                                    # 获取丢失的box idx
+                                    id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
+                                    if id2boxstate is not None:
+                                        loss_ids = [i for i, boxestate in id2boxstate.items() if boxestate['box'] is None]
                                     else:
-                                        logger.info(f"box {idx} x move distance {distance_x} is under threshold {move_threshold}.")
+                                        # 假如开始没有任何 box, 则认为丢失的 box idx 为 []
+                                        loss_ids = []
 
-                                    if distance_y > move_threshold:
-                                        over_distance_ids.add(idx)
-                                        logger.warning(f"box {idx} y move distance {distance_y} is over threshold {move_threshold}.")
-                                    else:
-                                        logger.info(f"box {idx} y move distance {distance_y} is under threshold {move_threshold}.")
-
-                                logger.info(f"distance_result: {distance_result}")
-                                logger.info(f"over_distance_ids: {over_distance_ids}")
-                                send_msg_data = {f"L1_SJ_{k+1}": {'X': v[0], 'Y': v[1]} for k, v in distance_result.items()}
-                                logger.info(f"send_msg_data: {send_msg_data}")
-                                if len(over_distance_ids) > 0:
-                                    # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
-                                    logger.warning(f"box {over_distance_ids} move distance is over threshold {move_threshold}.")
+                                    logger.critical(f"The target number {target_number} is not enough, got {got_target_number} targets, loss box ids: {loss_ids}.")
 
                                     # 保存丢失的图片
-                                    image_path = save_dir / f"target_displacement.jpg"
+                                    image_path = save_dir / f"target_loss.jpg"
                                     save_image(image, image_path)
-                                    # 位移告警消息
                                     send_msg = {
-                                        "cmd": "alarm",
-                                        "body": {
+                                        "cmd":"alarm",
+                                        "body":{
                                             "did": MQTTConfig.getattr("did"),
-                                            "type": "displacement",
+                                            "type": "target_loss",
                                             "at": get_now_time(),
-                                            "number": [i + 1 for i in over_distance_ids], # 表示异常的靶标编号
+                                            "number": [i + 1 for i in loss_ids],# 异常的靶标编号
                                             "data": send_msg_data,
                                             "ftpurl": "/5654/20240810160846",# ftp上传路径
                                             "img": [str(image_path)]# 文件名称
@@ -613,102 +681,30 @@ def main() -> None:
                                     }
                                     mqtt_send_queue.put(send_msg)
                                 else:
-                                    # ✅️✅️✅️ 所有 box 移动距离都小于阈值 ✅️✅️✅️
-                                    logger.success(f"All box move distance is under threshold {move_threshold}.")
-                                    # 正常数据消息
-                                    send_msg = {
-                                        "cmd": "update",
-                                        "did": MQTTConfig.getattr("did"),
-                                        "data": send_msg_data
-                                    }
-                                    mqtt_send_queue.put(send_msg)
+                                    # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
+                                    logger.success(f"The lost target has been found, the target number {target_number} is enough, got {got_target_number} targets.")
 
-                            #------------------------- 整理检测结果 -------------------------#
+                            except queue.Empty:
+                                logger.error("get picture timeout")
 
-                            #------------------------- 检查是否丢失目标 -------------------------#
-                            target_number = MatchTemplateConfig.getattr("target_number")
-                            got_target_number = MatchTemplateConfig.getattr("got_target_number")
-
-                            # 丢失目标
-                            if target_number > got_target_number or target_number == 0:
-                                logger.warning(f"The target number {target_number} is not enough, got {got_target_number} targets, start to find lost target.")
-
-                                camera_qsize = camera_queue.qsize()
-                                # 忽略多余的图片
-                                if camera_qsize > 1:
-                                    logger.warning(f"camera got {camera_qsize} frames, ignore {camera_qsize - 1} frames")
-                                    for _ in range(camera_qsize - 1):
-                                        try:
-                                            camera_queue.get(timeout=get_picture_timeout)
-                                        except queue.Empty:
-                                            logger.error("get picture timeout")
-                                try:
-                                    # 获取照片
-                                    _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-
-                                    #-------------------- 畸变矫正 --------------------#
-                                    rectified_image = image
-                                    #-------------------- 畸变矫正 --------------------#
-
-                                    #-------------------- 模板匹配 --------------------#
-                                    find_lost_target(rectified_image)
-                                    target_number = MatchTemplateConfig.getattr("target_number")
-                                    got_target_number = MatchTemplateConfig.getattr("got_target_number")
-                                    #-------------------- 模板匹配 --------------------#
-
-                                    if target_number > got_target_number or target_number == 0:
-                                        # ❌️❌️❌️ 重新查找完成之后仍然不够 ❌️❌️❌️
-                                        # 获取丢失的box idx
-                                        id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
-                                        if id2boxstate is not None:
-                                            loss_ids = [i for i, boxestate in id2boxstate.items() if boxestate['box'] is None]
-                                        else:
-                                            # 假如开始没有任何 box, 则认为丢失的 box idx 为 []
-                                            loss_ids = []
-
-                                        logger.critical(f"The target number {target_number} is not enough, got {got_target_number} targets, loss box ids: {loss_ids}.")
-
-                                        # 保存丢失的图片
-                                        image_path = save_dir / f"target_loss.jpg"
-                                        save_image(image, image_path)
-                                        send_msg = {
-                                            "cmd":"alarm",
-                                            "body":{
-                                                "did": MQTTConfig.getattr("did"),
-                                                "type": "target_loss",
-                                                "at": get_now_time(),
-                                                "number": [i + 1 for i in loss_ids],# 异常的靶标编号
-                                                "data": send_msg_data,
-                                                "ftpurl": "/5654/20240810160846",# ftp上传路径
-                                                "img": [str(image_path)]# 文件名称
-                                            }
-                                        }
-                                        mqtt_send_queue.put(send_msg)
-                                    else:
-                                        # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
-                                        logger.success(f"The lost target has been found, the target number {target_number} is enough, got {got_target_number} targets.")
-
-                                except queue.Empty:
-                                    logger.error("get picture timeout")
-
-                            # 目标数量正常
-                            else:
-                                logger.success(f"The target number {target_number} is enough, got {got_target_number} targets.")
-                            #------------------------- 检查是否丢失目标 -------------------------#
-
-                            #------------------------- 结束周期 -------------------------#
-                            # 保存当前周期的结果
-                            last_cycle_results = cycle_results
-                            # 重置周期内结果
-                            cycle_results = {}
-                            # 重置周期内循环计数
-                            cycle_loop_count = -1
-                            logger.success(f"The cycle is over.")
-                            #------------------------- 结束周期 -------------------------#
+                        # 目标数量正常
                         else:
-                            # 不是结束周期，设置下一轮的曝光值
-                            exposure_time = cycle_exposure_times[cycle_loop_count]
-                            CameraConfig.setattr("exposure_time", exposure_time)
+                            logger.success(f"The target number {target_number} is enough, got {got_target_number} targets.")
+                        #------------------------- 检查是否丢失目标 -------------------------#
+
+                        #------------------------- 结束周期 -------------------------#
+                        # 保存当前周期的结果
+                        last_cycle_results = cycle_results
+                        # 重置周期内结果
+                        cycle_results = {}
+                        # 重置周期内循环计数
+                        cycle_loop_count = -1
+                        logger.success(f"The cycle is over.")
+                        #------------------------- 结束周期 -------------------------#
+                    else:
+                        # 不是结束周期，设置下一轮的曝光值
+                        exposure_time = cycle_exposure_times[cycle_loop_count]
+                        CameraConfig.setattr("exposure_time", exposure_time)
 
         # 检测周期外
         if cycle_loop_count == -1:
@@ -1218,7 +1214,6 @@ def main() -> None:
                 received_temp_control_msg = False
                 mqtt_send_queue.put(send_msg)
             #------------------------- 发送消息 -------------------------#
-
 
             # 保存运行时配置
             save_config_to_yaml(config_path=runtime_config_path)

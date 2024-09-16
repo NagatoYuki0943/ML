@@ -1,4 +1,3 @@
-
 # 错误
 def transform_list(original_list):
     # 定义一个空列表来存储转换后的数据
@@ -24,23 +23,27 @@ def transform_list(original_list):
     # 如果临时列表在最后不为空，说明最后一组图片没有对应的描述
     if temp_list:
         # 将最后一组图片的路径添加到转换列表，描述为空字符串
-        transformed_list.append((temp_list, ''))
+        transformed_list.append((temp_list, ""))
 
     return transformed_list
 
+
 # 原始列表
 original = [
-    ['你是谁', '我是你的小助手'],
-    [('./images/0001.jpg',), None],
-    ['', '这张图片中有一只猫'],
-    [('./images/0002.jpg',), None],
-    ['这张图片展示的什么内容?', '这张图片中也有一只猫'],
-    [('./images/0003.jpg',), None],
-    [('./images/0004.jpg',), None],
-    ['这2张图片展示的什么内容?', '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
-    [('./images/0005.jpg',), None],
-    [('./images/0006.jpg',), None],
-    ['', '这两张图片显示了雪山上的景色']
+    ["你是谁", "我是你的小助手"],
+    [("./images/0001.jpg",), None],
+    ["", "这张图片中有一只猫"],
+    [("./images/0002.jpg",), None],
+    ["这张图片展示的什么内容?", "这张图片中也有一只猫"],
+    [("./images/0003.jpg",), None],
+    [("./images/0004.jpg",), None],
+    [
+        "这2张图片展示的什么内容?",
+        "第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。",
+    ],
+    [("./images/0005.jpg",), None],
+    [("./images/0006.jpg",), None],
+    ["", "这两张图片显示了雪山上的景色"],
 ]
 
 # 转换列表

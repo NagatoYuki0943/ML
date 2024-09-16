@@ -15,7 +15,9 @@ input_list: list = [
     gr.Audio(sources=["microphone", "upload"], type="numpy", label="Audio File"),
     gr.Video(sources=["upload", "webcam"], label="Video"),
     gr.File(label="File", type="binary"),
-    gr.UploadButton(label="upload a file", file_types=["image", "audio", "video", "text"]),
+    gr.UploadButton(
+        label="upload a file", file_types=["image", "audio", "video", "text"]
+    ),
     gr.DataFrame(headers=["id", "name", "age"], label="Dataframe"),
 ]
 
@@ -48,6 +50,6 @@ interface = gr.Interface(
     outputs=output_list,
     title="Input and Output",
     description="Input and Output Demo",
-    live=True
+    live=True,
 )
 interface.launch()

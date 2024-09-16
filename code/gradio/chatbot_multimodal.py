@@ -48,21 +48,19 @@ def bot(history):
 
 
 with gr.Blocks() as demo:
-    chatbot = gr.Chatbot(
-        [],
-        elem_id="chatbot",
-        bubble_full_width=False
-    )
+    chatbot = gr.Chatbot([], elem_id="chatbot", bubble_full_width=False)
 
     chat_input = gr.MultimodalTextbox(
         file_types=["image"],
-        file_count='multiple', # 指的是一次上传几张,选择single也可以多次选择
+        file_count="multiple",  # 指的是一次上传几张,选择single也可以多次选择
         placeholder="Enter message or upload file...",
         label="Prompt",
         interactive=True,
     )
 
-    chat_msg = chat_input.submit(add_message, [chatbot, chat_input], [chatbot, chat_input])
+    chat_msg = chat_input.submit(
+        add_message, [chatbot, chat_input], [chatbot, chat_input]
+    )
     bot_msg = chat_msg.then(bot, chatbot, chatbot, api_name="bot_response")
     bot_msg.then(lambda: gr.MultimodalTextbox(interactive=True), None, [chat_input])
 
@@ -70,8 +68,8 @@ with gr.Blocks() as demo:
 
 demo.queue()
 demo.launch(
-    server_name = "0.0.0.0",
-    server_port = 7860,
-    share = True,
-    max_threads = 100,
+    server_name="0.0.0.0",
+    server_port=7860,
+    share=True,
+    max_threads=100,
 )

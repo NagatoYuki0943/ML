@@ -19,8 +19,8 @@ demo = gr.Interface(fn=chat, inputs=[textbox], outputs=[chatbox])
 demo.queue(max_size=100, concurrency_count=10)
 
 demo.launch(
-    server_name = "0.0.0.0",
-    server_port = 7860,
-    share = True,
-    max_threads = 100,
+    server_name="0.0.0.0",
+    server_port=7860,
+    share=True,
+    max_threads=100,
 )

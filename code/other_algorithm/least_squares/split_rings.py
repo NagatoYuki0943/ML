@@ -24,7 +24,9 @@ def split_rings(
     Returns:
         list: 分组的坐标
     """
-    assert momentum >= 0 and momentum <= 1, f"momentum should be between 0 and 1, got {momentum}"
+    assert (
+        momentum >= 0 and momentum <= 1
+    ), f"momentum should be between 0 and 1, got {momentum}"
 
     # 中心点
     # center_x, center_y = np.mean(points, axis=0)
@@ -88,7 +90,7 @@ def split_rings_adaptive(
     momentum: float = 0.9,
     init_threshold_range: float = 0.5,
     range_change: float = 0.01,
-    times: int = 100
+    times: int = 100,
 ) -> list:
     """找到的圆环数量如果大于指定的数量，要调高 threshold_range，否则减小 threshold_range
 
@@ -107,7 +109,9 @@ def split_rings_adaptive(
     threshold_range = init_threshold_range
     for i in range(times):
         # 检测圆环
-        group_rings = split_rings(points, rings_nums, threshold_range, min_group_size, momentum)
+        group_rings = split_rings(
+            points, rings_nums, threshold_range, min_group_size, momentum
+        )
         # 检测到的圆环数量
         detect_rings_nums = len(group_rings)
         logger.info(f"try time {i + 1}: {threshold_range = }, {detect_rings_nums = }")

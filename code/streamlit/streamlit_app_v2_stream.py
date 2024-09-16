@@ -11,7 +11,7 @@ from loguru import logger
 print("streamlit version: ", st.__version__)
 
 
-#----------------------------------------------------------------------#
+# ----------------------------------------------------------------------#
 # prompts (List[str] | str | List[Dict] | List[Dict]): a batch of
 #     prompts. It accepts: string prompt, a list of string prompts,
 #     a chat history in OpenAI format or a list of chat history.
@@ -37,7 +37,7 @@ print("streamlit version: ", st.__version__)
 #         "content": "You are welcome."
 #     }
 # ]
-#----------------------------------------------------------------------#
+# ----------------------------------------------------------------------#
 
 
 # App title
@@ -47,6 +47,7 @@ st.set_page_config(page_title="🦙💬 LLaMA Chatbot")
 if "messages" not in st.session_state.keys():
     print("streamlit init messages")
     st.session_state.messages = []
+
 
 def regenerate():
     """重新生成"""
@@ -68,20 +69,32 @@ def clear_chat_history():
 
 # Replicate Credentials
 with st.sidebar:
-    st.title('🦙💬 LLaMA Chatbot')
-    st.write('This chatbot is created using the open-source LLaMA LLM model from Meta.')
+    st.title("🦙💬 LLaMA Chatbot")
+    st.write("This chatbot is created using the open-source LLaMA LLM model from Meta.")
 
-    st.subheader('Models and parameters')
-    selected_model = st.sidebar.selectbox('Choose a LLaMA3 model', ['LLaMA3.1-7B', 'LLaMA3.1-70B', 'LLaMA3.1-405B'], key='selected_model')
-    max_new_tokens = st.sidebar.slider(label='max_new_tokens', min_value=1, max_value=2048, value=1024, step=1)
-    temperature = st.sidebar.slider(label='temperature', min_value=0.01, max_value=1.5, value=0.8, step=0.01)
-    top_p = st.sidebar.slider(label='top_p', min_value=0.01, max_value=1.0, value=0.8, step=0.01)
-    top_k = st.sidebar.slider(label='top_k', min_value=1, max_value=100, value=40, step=1)
+    st.subheader("Models and parameters")
+    selected_model = st.sidebar.selectbox(
+        "Choose a LLaMA3 model",
+        ["LLaMA3.1-7B", "LLaMA3.1-70B", "LLaMA3.1-405B"],
+        key="selected_model",
+    )
+    max_new_tokens = st.sidebar.slider(
+        label="max_new_tokens", min_value=1, max_value=2048, value=1024, step=1
+    )
+    temperature = st.sidebar.slider(
+        label="temperature", min_value=0.01, max_value=1.5, value=0.8, step=0.01
+    )
+    top_p = st.sidebar.slider(
+        label="top_p", min_value=0.01, max_value=1.0, value=0.8, step=0.01
+    )
+    top_k = st.sidebar.slider(
+        label="top_k", min_value=1, max_value=100, value=40, step=1
+    )
 
-    st.subheader('Chat functions')
-    st.sidebar.button('🔄 Retry', on_click=regenerate)
-    st.sidebar.button('↩️ Undo', on_click=undo)
-    st.sidebar.button('🗑️ Clear', on_click=clear_chat_history)
+    st.subheader("Chat functions")
+    st.sidebar.button("🔄 Retry", on_click=regenerate)
+    st.sidebar.button("↩️ Undo", on_click=undo)
+    st.sidebar.button("🗑️ Clear", on_click=clear_chat_history)
 
 # Display or clear chat messages
 for message in st.session_state.messages:
@@ -101,12 +114,14 @@ def chat() -> Generator[str, Any, None]:
 
     logger.info(f"{selected_model = }")
 
-    logger.info({
+    logger.info(
+        {
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
-    })
+        }
+    )
 
     response = str(np.random.randint(1, 100, 20))
     logger.info(f"response: {response}")
@@ -115,11 +130,14 @@ def chat() -> Generator[str, Any, None]:
     for i in range(len(response)):
         time.sleep(0.1)
         logger.info(response[i])
-        yield response[:i+1]
+        yield response[: i + 1]
 
 
 # Generate a new response if last message is not from assistant
-if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] != "assistant":
+if (
+    len(st.session_state.messages) > 0
+    and st.session_state.messages[-1]["role"] != "assistant"
+):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             placeholder = st.empty()

@@ -13,11 +13,10 @@
 import random
 import numpy as np
 from itertools import (
-    permutations,                   # 排列
-    combinations,                   # 组合
-    combinations_with_replacement   # 组合(包含自己)
+    permutations,  # 排列
+    combinations,  # 组合
+    combinations_with_replacement,  # 组合(包含自己)
 )
-
 
 
 def fitness_function(individual: np.ndarray) -> np.ndarray:
@@ -34,7 +33,9 @@ def fitness_function(individual: np.ndarray) -> np.ndarray:
     return std
 
 
-def selection(population: np.ndarray, fitnesses: np.ndarray, selected_size: int) -> np.ndarray:
+def selection(
+    population: np.ndarray, fitnesses: np.ndarray, selected_size: int
+) -> np.ndarray:
     """选择函数
 
     Args:
@@ -51,7 +52,9 @@ def selection(population: np.ndarray, fitnesses: np.ndarray, selected_size: int)
     return population[sort_index[:selected_size]]
 
 
-def crossover(parent1: np.ndarray, parent2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def crossover(
+    parent1: np.ndarray, parent2: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """交叉函数，这里使用单点交叉
     [1, 2, 3, 4, 5, 6] -> 交叉点为3 -> [1, 2, 3, d, e, f]
     [a, b, c, d, e, f] -> 交叉点为3 -> [a, b, c, 4, 5, 6]
@@ -64,8 +67,9 @@ def crossover(parent1: np.ndarray, parent2: np.ndarray) -> tuple[np.ndarray, np.
         tuple[np.ndarray, np.ndarray]: 两个子代
     """
     crossover_point = np.random.randint(1, len(parent1) - 1)
-    return np.concatenate([parent1[:crossover_point], parent2[crossover_point:]]), \
-        np.concatenate([parent2[:crossover_point], parent1[crossover_point:]])
+    return np.concatenate(
+        [parent1[:crossover_point], parent2[crossover_point:]]
+    ), np.concatenate([parent2[:crossover_point], parent1[crossover_point:]])
 
 
 def mutate(individual: np.ndarray) -> np.ndarray:
@@ -82,7 +86,9 @@ def mutate(individual: np.ndarray) -> np.ndarray:
     return individual
 
 
-def genetic_algorithm(population: np.ndarray, num_generations: int, mutation_rate: float) -> np.ndarray:
+def genetic_algorithm(
+    population: np.ndarray, num_generations: int, mutation_rate: float
+) -> np.ndarray:
     """遗传算法主函数
         1. 评估：使用适应度函数（fitness function）评估每个个体的适应度，适应度越高，个体被选中的概率越大。
         2. 选择（Selection）：根据适应度选择个体进行繁殖，适应度高的个体有更大的概率被选中。
@@ -118,8 +124,12 @@ def genetic_algorithm(population: np.ndarray, num_generations: int, mutation_rat
         for i, j in permutation:
             parent1, parent2 = selected[i], selected[j]
             child1, child2 = crossover(parent1, parent2)
-            children.append(mutate(child1) if np.random.uniform(0, 1) < mutation_rate else child1)
-            children.append(mutate(child2) if np.random.uniform(0, 1) < mutation_rate else child2)
+            children.append(
+                mutate(child1) if np.random.uniform(0, 1) < mutation_rate else child1
+            )
+            children.append(
+                mutate(child2) if np.random.uniform(0, 1) < mutation_rate else child2
+            )
 
         population = np.array(children)
 
@@ -128,9 +138,9 @@ def genetic_algorithm(population: np.ndarray, num_generations: int, mutation_rat
 
 if __name__ == "__main__":
     # 参数设置
-    population_size = 20    # 种群大小
-    num_generations = 100   # 迭代次数
-    mutation_rate = 0.1     # 变异率
+    population_size = 20  # 种群大小
+    num_generations = 100  # 迭代次数
+    mutation_rate = 0.1  # 变异率
 
     population = np.random.randint(-100, 100, size=(population_size, 10))
     print(population)
@@ -138,4 +148,6 @@ if __name__ == "__main__":
 
     # 执行遗传算法
     best_individual = genetic_algorithm(population, num_generations, mutation_rate)
-    print(f"最优个体是：{best_individual}, 适应度为：{fitness_function(best_individual)}")
+    print(
+        f"最优个体是：{best_individual}, 适应度为：{fitness_function(best_individual)}"
+    )

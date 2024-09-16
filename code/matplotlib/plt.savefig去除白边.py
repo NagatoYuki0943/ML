@@ -1,4 +1,3 @@
-
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,9 +9,9 @@ image = Image.fromarray(array)
 
 dpi = 100
 # 这样还是不能保存原图大小
-plt.figure(figsize=(width/dpi, height/dpi), dpi=dpi)
+plt.figure(figsize=(width / dpi, height / dpi), dpi=dpi)
 plt.imshow(image)
 plt.axis("off")
-plt.savefig("uniform.jpg", bbox_inches='tight', pad_inches = 0) # 后面2个参数去除边框
+plt.savefig("uniform.jpg", bbox_inches="tight", pad_inches=0)  # 后面2个参数去除边框
 plt.show()
 plt.close()

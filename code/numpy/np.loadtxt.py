@@ -11,23 +11,24 @@ print(data)
 
 
 d = StringIO("M 21 72\nF 35 58")
-data = np.loadtxt(d, dtype={'names': ('gender', 'age', 'weight'),
-                            'formats': ('S1', 'i4', 'f4')})
+data = np.loadtxt(
+    d, dtype={"names": ("gender", "age", "weight"), "formats": ("S1", "i4", "f4")}
+)
 print(data)
 # [(b'M', 21, 72.) (b'F', 35, 58.)]
 
 
 c = StringIO("1,0,2\n3,0,4")
-x, y = np.loadtxt(c, delimiter=',', usecols=(0, 2), unpack=True)
-print(x)    # [1. 3.]
-print(y)    # [2. 4.]
+x, y = np.loadtxt(c, delimiter=",", usecols=(0, 2), unpack=True)
+print(x)  # [1. 3.]
+print(y)  # [2. 4.]
 
 
 c = StringIO("1,0,2\n3,0,4")
-x, y, z = np.loadtxt(c, delimiter=',', usecols=(0, 1, 2), unpack=True)
-print(x)    # [1. 3.]
-print(y)    # [0. 0.]
-print(z)    # [2. 4.]
+x, y, z = np.loadtxt(c, delimiter=",", usecols=(0, 1, 2), unpack=True)
+print(x)  # [1. 3.]
+print(y)  # [0. 0.]
+print(z)  # [2. 4.]
 
 
 # The converters argument is used to specify functions to preprocess the text prior to parsing.
@@ -46,9 +47,9 @@ print(data)
 # converters can be a callable instead of a dictionary, in which case it is applied to all columns:
 s = StringIO("0xDE 0xAD\n0xC0 0xDE")
 import functools
+
 conv = functools.partial(int, base=16)
 data = np.loadtxt(s, converters=conv)
 print(data)
 # [[222. 173.]
 #  [192. 222.]]
-

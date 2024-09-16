@@ -3,16 +3,16 @@ import numpy as np
 
 # 单维数组
 x = np.arange(5)
-print(x)    # [0 1 2 3 4]
+print(x)  # [0 1 2 3 4]
 
 # 单个下标
 y = np.delete(x, 2, axis=0)
-print(x)    # [0 1 2 3 4] 不会修改原数组
-print(y)    # [0 1 3 4]
+print(x)  # [0 1 2 3 4] 不会修改原数组
+print(y)  # [0 1 3 4]
 
 # 列表下标
 y = np.delete(x, [0, 2], axis=0)
-print(y)    # [1 3 4]
+print(y)  # [1 3 4]
 
 
 # 多维数组

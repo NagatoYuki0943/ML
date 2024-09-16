@@ -14,7 +14,7 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
     return 1 / (1 + np.exp(-x))
 
 
-def softmax(x: np.ndarray, axis: int=0) -> np.ndarray:
+def softmax(x: np.ndarray, axis: int = 0) -> np.ndarray:
     """将每个值求e的指数全都变为大于0的值，然后除以求指数之后的总和
         Softmax(x)_i = \frac {e^{x_i}} {{\sum_{j=1}^{n}} e^{x_j}}
     Args:
@@ -31,23 +31,25 @@ def softmax(x: np.ndarray, axis: int=0) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    x = np.array([1., 2., 3., 4., 5.])
-    print(x)                # [1. 2. 3. 4. 5.]
+    x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    print(x)  # [1. 2. 3. 4. 5.]
 
-    print('\nsigmoid:')
-    print(sigmoid(x))       # [0.73105858 0.88079708 0.95257413 0.98201379 0.99330715]
+    print("\nsigmoid:")
+    print(sigmoid(x))  # [0.73105858 0.88079708 0.95257413 0.98201379 0.99330715]
     y = torch.sigmoid(torch.as_tensor(x))
-    print(y.numpy())        # [0.73105858 0.88079708 0.95257413 0.98201379 0.99330715]
+    print(y.numpy())  # [0.73105858 0.88079708 0.95257413 0.98201379 0.99330715]
 
-    print('\nSoftmax:')
-    print(softmax(x))       # [0.01165623 0.03168492 0.08612854 0.23412166 0.63640865]
+    print("\nSoftmax:")
+    print(softmax(x))  # [0.01165623 0.03168492 0.08612854 0.23412166 0.63640865]
     y = torch.softmax(torch.as_tensor(x), dim=0)
-    print(y.numpy())        # [0.01165623 0.03168492 0.08612854 0.23412166 0.63640865]
+    print(y.numpy())  # [0.01165623 0.03168492 0.08612854 0.23412166 0.63640865]
 
-    x = np.array([
-        [2.3, 1.5, -3.1, 5.0, 1.1],
-        [0.8, 5.4, 6.1, -3.3, 4.0],
-    ])
+    x = np.array(
+        [
+            [2.3, 1.5, -3.1, 5.0, 1.1],
+            [0.8, 5.4, 6.1, -3.3, 4.0],
+        ]
+    )
     print(softmax(x, axis=1))
     # [[6.01150428e-02 2.70114299e-02 2.71514457e-04 8.94495710e-01
     #   1.81063029e-02]

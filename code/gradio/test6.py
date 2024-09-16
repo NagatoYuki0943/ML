@@ -50,7 +50,12 @@ with block as demo:
         gr.Markdown("图像分类演示")
 
         with gr.Row():
-            image = gr.Image(sources=["upload", "webcam"], label="上传或拍照", image_mode="RGB", type="pil")
+            image = gr.Image(
+                sources=["upload", "webcam"],
+                label="上传或拍照",
+                image_mode="RGB",
+                type="pil",
+            )
             # 自动显示类别
             output_label = gr.Label(label="分类结果", num_top_classes=5)
 
@@ -63,21 +68,17 @@ with block as demo:
                 ["images/doom之森05.jpg"],
             ],
             inputs=[image],
-            label="示例图像"
+            label="示例图像",
         )
 
         submit = gr.Button("Predict", variant="primary", scale=0)
 
         # 按钮提交
-        submit.click(
-            predict,
-            inputs=[image],
-            outputs=[output_label]
-        )
+        submit.click(predict, inputs=[image], outputs=[output_label])
 
 demo.launch(
-    server_name = "0.0.0.0",
-    server_port = 7860,
-    share = True,
-    max_threads = 100,
+    server_name="0.0.0.0",
+    server_port=7860,
+    share=True,
+    max_threads=100,
 )

@@ -14,13 +14,15 @@ def hash_image(image: Image.Image | str) -> str:
 
     elif isinstance(image, str):
         url_or_path = image
-        if url_or_path.startswith('http'):
-            image = Image.open(requests.get(url_or_path, stream=True).raw).convert('RGB')
+        if url_or_path.startswith("http"):
+            image = Image.open(requests.get(url_or_path, stream=True).raw).convert(
+                "RGB"
+            )
             sha256.update(image.tobytes())
             return sha256.hexdigest()
 
         elif os.path.exists(url_or_path):
-            with open(url_or_path, 'rb') as f:
+            with open(url_or_path, "rb") as f:
                 while True:
                     data = f.read(1024)
                     if not data:
@@ -29,12 +31,10 @@ def hash_image(image: Image.Image | str) -> str:
             return sha256.hexdigest()
 
         else:
-            raise ValueError(
-                f"could not get image from {url_or_path}")
+            raise ValueError(f"could not get image from {url_or_path}")
 
     else:
-        raise ValueError(
-            'image should be a str(url/path) or PIL.Image.Image')
+        raise ValueError("image should be a str(url/path) or PIL.Image.Image")
 
 
 def test_hash_image():
@@ -46,5 +46,5 @@ def test_hash_image():
     print(hash_image(image_url))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_hash_image()

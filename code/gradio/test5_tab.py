@@ -1,5 +1,4 @@
-"""https://www.gradio.app/docs/gradio/tab_summary_
-"""
+"""https://www.gradio.app/docs/gradio/tab_summary_"""
 
 import numpy as np
 import gradio as gr
@@ -49,8 +48,8 @@ with gr.Blocks() as demo:
 
 
 demo.launch(
-    server_name = "0.0.0.0",
-    server_port = 7860,
-    share = True,
-    max_threads = 100,
+    server_name="0.0.0.0",
+    server_port=7860,
+    share=True,
+    max_threads=100,
 )

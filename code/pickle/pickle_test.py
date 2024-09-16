@@ -15,4 +15,4 @@ with open("pickle.pkl", mode="rb") as f:
     y = pickle.load(f)
 
 
-print(np.all(x == y))   # True
+print(np.all(x == y))  # True

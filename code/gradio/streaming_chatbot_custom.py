@@ -11,8 +11,8 @@ def slow_echo(message, history):
 demo = gr.ChatInterface(slow_echo).queue()
 
 demo.launch(
-    server_name = "0.0.0.0",
-    server_port = 7860,
-    share = True,
-    max_threads = 100,
+    server_name="0.0.0.0",
+    server_port=7860,
+    share=True,
+    max_threads=100,
 )

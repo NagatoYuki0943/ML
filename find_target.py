@@ -265,7 +265,7 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
     for i, boxestate in id2boxstate.items():
         ratio: float | None = boxestate["ratio"]
         score: float | None = boxestate["score"]
-        box: list | None = boxestate["box"]
+        box: list[int] | None = boxestate["box"]
 
         # box 为 None 则跳过
         if box is None:
@@ -433,7 +433,7 @@ def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
     loss_ids = []
     # 循环box，将box区域屏蔽
     for i, boxestate in id2boxstate.items():
-        box = boxestate["box"]
+        box: list[int] | None = boxestate["box"]
         if box is None:
             loss_ids.append(i)
             continue

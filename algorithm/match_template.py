@@ -340,7 +340,9 @@ def multi_scale_match_template(
     # 将模板大小调整到相对于图片合适的大小
     template_h, template_w = template.shape[:2]
     image_h, image_w = image.shape[:2]
-    ratio = min(image_h, image_w) * init_scale / min(template_h, template_w)
+    # init_ratio = min(image_h, image_w) * init_scale / min(template_h, template_w)
+    init_ratio = min(image_h / template_h, image_w / template_w) * init_scale
+    logger.info(f"{init_ratio = }")
 
     # 模糊图像
     # image = cv2.GaussianBlur(image, (3, 3), 0)
@@ -349,7 +351,7 @@ def multi_scale_match_template(
     # 根据不同尺度调整模板的大小
     for scale in np.arange(scales[0], scales[1] + 1e-8, scales[2]).tolist():
         # 得到最终比率
-        final_ratio = ratio * scale
+        final_ratio = init_ratio * scale
         # 根据最终比率得到模板的尺寸
         resized_h = int(final_ratio * template_h)
         resized_w = int(final_ratio * template_w)

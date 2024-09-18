@@ -276,13 +276,16 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
             }
             continue
 
+        # 获取 box 坐标
+        box_x1, box_y1, box_x2, box_y2 = box
+
         # ratio 为 None 代表这个 box 是强制指定的，需要计算 ratio
         if ratio is None:
-            box_x1, box_y1, box_x2, box_y2 = box
             box_h = box_y2 - box_y1
             box_w = box_x2 - box_x1
             # 求出 ratio 比例
-            ratio = min(box_h, box_w) / min(template_h, template_w)
+            # ratio = min(box_h, box_w) / min(template_h, template_w)
+            ratio = min(box_h / template_h, box_w / template_w)
             new_scales = np.arange(new_target_scales[0], new_target_scales[1] + 1e-8, new_target_scales[2])
             ratios = (ratio * new_scales).tolist()
             logger.info(f"find around target {i = } original ratio is None, use {ratios = } to search")
@@ -290,7 +293,6 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
             ratios = [ratio]
 
         # 匹配区域
-        box_x1, box_y1, box_x2, box_y2 = box
         box_target = image[box_y1:box_y2, box_x1:box_x2]
 
         # 多个 ratio 尝试匹配

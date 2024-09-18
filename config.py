@@ -130,7 +130,7 @@ class MatchTemplateConfig(BaseConfig):
     match_method: int = cv2.TM_CCOEFF_NORMED    # 匹配方法
     init_scale: float = 0.075                   # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
     scales: tuple[float] = (1.0, 4.0, 0.1)      # 缩放 scale 范围 (start, end, step)
-    new_target_scales: tuple[float] = (0.5, 1.5, 0.1)  # 新目标的缩放 scale 范围 (start, end, step)
+    new_target_scales: tuple[float] = (0.5, 1.0, 0.05)  # 新目标的缩放 scale 范围 (start, end, step)
     max_target_number: int = 10                 # 最大目标数量
     target_number: int = 0                      # 默认靶标数量,初始化时为找到的靶标数量
     got_target_number: int = 0                  # 找到的靶标数量

@@ -363,7 +363,7 @@ def main() -> None:
 
                     adjust_with_falsh_total_time += 1
                     if adjust_with_falsh_total_time >= adjust_with_falsh_total_times:
-                        logger.warning(f"adjust_exposure_full_res_for_loop failed {adjust_with_falsh_total_times} times, use last result")
+                        logger.warning(f"adjust_exposure_full_res_for_loop failed in {adjust_with_falsh_total_times} times, use last result")
                         break
 
                 #-------------------- 补光灯 --------------------#

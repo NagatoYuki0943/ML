@@ -11,7 +11,7 @@ from utils import clear_queue, drop_excessive_queue_items
 def adjust_exposure_by_mean(
     image: np.ndarray,
     exposure_time: float,
-    mean_light_suitable_range: tuple[float],
+    mean_light_suitable_range: tuple[float, float],
     adjust_exposure_time_base_step: float = 100,
     suitable_ignore_ratio: float = 0.0,
 ) -> tuple[float, int]:
@@ -232,7 +232,7 @@ def adjust_exposure_full_res_recursive(
 def adjust_exposure_full_res_for_loop(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
-) -> dict[int, dict | None]:
+) -> tuple[dict[int, dict | None], bool]:
     """使用循环实现快速调节曝光，全程使用高分辨率拍摄
 
     Args:
@@ -248,7 +248,7 @@ def adjust_exposure_full_res_for_loop(
             }
 
     Returns:
-        dict[int, dict | None]: 曝光对应不同的box状态
+        tuple[dict[int, dict | None], bool]: 曝光对应不同的box状态 和 是否需要闪光灯
             {
                 exposure_time: {
                     i: {
@@ -265,6 +265,8 @@ def adjust_exposure_full_res_for_loop(
 
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
     adjust_total_times: int = AdjustCameraConfig.getattr("adjust_total_times")
+    # low high 范围
+    exposure_time_range: tuple[int, int] = AdjustCameraConfig.getattr("exposure_time_range")
     exposure2id2boxstate: dict[int, dict | None] = {}
 
     # 备份原本配置
@@ -277,18 +279,35 @@ def adjust_exposure_full_res_for_loop(
     # 使用栈来模拟递归
     stack = [(id2boxstate, CameraConfig.getattr("exposure_time"))]
 
+    # 是否需要闪光灯
+    need_flash = False
+
     i = 0
     while stack:
+        i += 1
         logger.info(f"stack size: {len(stack)}, i: {i}")
+
         current_id2boxstate, current_exposure_time = stack.pop()
         CameraConfig.setattr("exposure_time", current_exposure_time)
 
+        # 严重过曝, 直接跳过
+        if current_exposure_time < exposure_time_range[0]:
+            logger.warning(f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us")
+            exposure2id2boxstate[current_exposure_time] = exposure_time_range[0]
+            continue
+
+        # 是否需要闪光灯
+        if current_exposure_time > exposure_time_range[1]:
+            logger.warning(f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash")
+            exposure2id2boxstate[current_exposure_time] = exposure_time_range[1]
+            need_flash = True
+            continue
+
         # 超出次数, 设置为最后一次
-        i += 1
         if i > adjust_total_times:
             logger.warning(f"adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us")
             exposure2id2boxstate[current_exposure_time] = current_id2boxstate
-            break
+            continue
 
         # 忽略多于图像
         drop_excessive_queue_items(camera_queue)
@@ -425,13 +444,13 @@ def adjust_exposure_full_res_for_loop(
 
     logger.success(f"{_exposure2id2boxstate = }")
     logger.info("adjust exposure end")
-    return _exposure2id2boxstate
+    return _exposure2id2boxstate, need_flash
 
 
 def adjust_exposure_low_res_for_loop(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
-) -> dict[int, dict | None]:
+) -> tuple[dict[int, dict | None], bool]:
     """使用循环实现快速调节曝光，全程使用低分辨率拍摄
 
     Args:
@@ -447,7 +466,7 @@ def adjust_exposure_low_res_for_loop(
             }
 
     Returns:
-        dict[int, dict | None]: 曝光对应不同的box状态
+        tuple[dict[int, dict | None], bool]: 曝光对应不同的box状态 和 是否需要闪光灯
             {
                 exposure_time: {
                     i: {
@@ -464,6 +483,8 @@ def adjust_exposure_low_res_for_loop(
 
     get_picture_timeout: int = MainConfig.getattr("get_picture_timeout")
     adjust_total_times: int = AdjustCameraConfig.getattr("adjust_total_times")
+    # low high 范围
+    exposure_time_range: tuple[int, int] = AdjustCameraConfig.getattr("exposure_time_range")
     exposure2id2boxstate: dict[int, dict | None] = {}
 
     # 备份原本配置
@@ -485,18 +506,35 @@ def adjust_exposure_low_res_for_loop(
     # 使用栈来模拟递归
     stack = [(id2boxstate, CameraConfig.getattr("exposure_time"))]
 
+    # 是否需要闪光灯
+    need_flash = False
+
     i = 0
     while stack:
+        i += 1
         logger.info(f"stack size: {len(stack)}, i: {i}")
+
         current_id2boxstate, current_exposure_time = stack.pop()
         CameraConfig.setattr("exposure_time", current_exposure_time)
 
+        # 严重过曝, 直接跳过
+        if current_exposure_time < exposure_time_range[0]:
+            logger.warning(f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us")
+            exposure2id2boxstate[current_exposure_time] = exposure_time_range[0]
+            continue
+
+        # 是否需要闪光灯
+        if current_exposure_time > exposure_time_range[1]:
+            logger.warning(f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash")
+            exposure2id2boxstate[current_exposure_time] = exposure_time_range[1]
+            need_flash = True
+            continue
+
         # 超出次数, 设置为最后一次
-        i += 1
         if i > adjust_total_times:
             logger.warning(f"adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us")
             exposure2id2boxstate[current_exposure_time] = current_id2boxstate
-            break
+            continue
 
         # 忽略多于图像
         drop_excessive_queue_items(camera_queue)
@@ -632,4 +670,4 @@ def adjust_exposure_low_res_for_loop(
 
     logger.success(f"{_exposure2id2boxstate = }")
     logger.info("adjust exposure end")
-    return _exposure2id2boxstate
+    return _exposure2id2boxstate, need_flash

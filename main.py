@@ -123,8 +123,8 @@ def main() -> None:
     serial_receive_thread = Thread(
         target = serial_receive,
         kwargs={
-            'ser':serial_objects,
-            'queue':main_queue,
+            'ser': serial_objects,
+            'queue': main_queue,
         },
     )
     serial_send_queue = serial_send_thread.queue
@@ -143,7 +143,7 @@ def main() -> None:
         MQTTConfig.getattr('username'),
         MQTTConfig.getattr('password'),
         MQTTConfig.getattr('clientId'),
-        MainConfig.getattr('apikey'),
+        MQTTConfig.getattr('apikey'),
     )
     mqtt_send_thread = ThreadWrapper(
         target_func = mqtt_send,
@@ -153,9 +153,9 @@ def main() -> None:
     mqtt_receive_thread = Thread(
         target = mqtt_receive,
         kwargs={
-            'client':mqtt_comm,
-            'main_queue':main_queue,
-            'send_queue':mqtt_send_queue,
+            'client': mqtt_comm,
+            'main_queue': main_queue,
+            'send_queue': mqtt_send_queue,
         },
     )
     mqtt_receive_thread.start()

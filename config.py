@@ -46,12 +46,12 @@ class MainConfig(BaseConfig):
     calibration_result_save_path = save_dir / "calibration_result.jsonl"
     history_save_path = save_dir / "history.jsonl"
     standard_save_path = save_dir / "standard.jsonl"
-    original_config_path = save_dir / "config_original.yaml"   # 原始 config, 用于重置
-    runtime_config_path = save_dir / "config_runtime.yaml" # 运行时 config, 用于临时修改配置
-    main_sleep_interval: int = 500  # 主循环 sleep_time ms
-    get_picture_timeout: int = 10       # 获取图片超时时间 s
-    cycle_time_interval: int = 10000    # 主循环时间 ms
-    defalut_error_distance: float = 1e6    # 错误默认距离 m
+    original_config_path = save_dir / "config_original.yaml"  # 原始 config, 用于重置
+    runtime_config_path = save_dir / "config_runtime.yaml"    # 运行时 config, 用于临时修改配置
+    main_sleep_interval: int = 500                                  # 主循环 sleep_time ms
+    get_picture_timeout: int = 10                                   # 获取图片超时时间 s
+    cycle_time_interval: int = 10000                                # 主循环时间 ms
+    defalut_error_distance: float = 1e6                             # 错误默认距离 m
 
 
 @dataclass
@@ -77,14 +77,15 @@ class AdjustCameraConfig(BaseConfig):
     """调整相机配置
     """
     lock = Lock()
-    mean_light_suitable_range: tuple[float] = (70, 160) # (100, 160)
-    suitable_ignore_ratio: float = 0.1                 # 忽略 mean_light_suitable_range 最低和最高范围的百分比 [0, 100] -> [10, 90]
-    adjust_exposure_time_base_step: int = 100
-    capture_mode: Literal['preview', 'low', 'full'] = 'low'
-    capture_time_interval: int = 100        # 拍照间隔 us
-    return_image_time_interval: int = 100   # 返回图片间隔 us
-    adjust_total_times: int = 100           # 最高调整次数
-
+    mean_light_suitable_range: tuple[float, float] = (70, 160)  # (100, 160)
+    suitable_ignore_ratio: float = 0.1                          # 忽略 mean_light_suitable_range 最低和最高范围的百分比 [0, 100] -> [10, 90]
+    exposure_time_range: tuple[int, int] = (114, 1_000_000)     # 曝光时间范围 us
+    adjust_exposure_time_base_step: int = 100                   # 曝光调整基础步长 us
+    capture_mode: Literal['preview', 'low', 'full'] = 'low'     # 相机拍照模式
+    capture_time_interval: int = 100                            # 拍照间隔 us
+    return_image_time_interval: int = 100                       # 返回图片间隔 us
+    adjust_total_times: int = 100                               # 最高调整次数(每次调用调整曝光函数的内部调整次数)
+    adjust_with_falsh_total_times: int = 10                     # 最高调整次数(主循环中调整次数，使用闪光灯)
 
 @dataclass
 class StereoCalibrationConfig(BaseConfig):
@@ -125,26 +126,22 @@ class MatchTemplateConfig(BaseConfig):
     """模板匹配配置
     """
     lock = Lock()
-    template_size: tuple[int] = (100, 100)      # 模板大小 (h, w), 单位为 mm
+    template_size: tuple[int, int] = (100, 100)                         # 模板大小 (h, w), 单位为 mm
     template_path: Path = Path("assets/template/circles2-7.5cm-390.png")
-    match_method: int = cv2.TM_CCOEFF_NORMED    # 匹配方法
-    init_scale: float = 0.075                   # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
-    scales: tuple[float] = (1.0, 4.0, 0.1)      # 缩放 scale 范围 (start, end, step)
-    new_target_scales: tuple[float] = (0.5, 1.0, 0.05)  # 新目标的缩放 scale 范围 (start, end, step)
-    max_target_number: int = 10                 # 最大目标数量
-    target_number: int = 0                      # 默认靶标数量,初始化时为找到的靶标数量
-    got_target_number: int = 0                  # 找到的靶标数量
-    iou_threshold: float = 0.5                  # iou 阈值
-    use_threshold_match: bool = True            # 是否使用阈值匹配
-    threshold_match_threshold: float = 0.6      # 阈值匹配阈值
-    threshold_iou_threshold: float = 0.5        # 阈值匹配 iou 阈值
-    # ratios: np.ndarray = None                 # 模板缩放比率 [...]
-    # scores: np.ndarray = None                 # 匹配得分 [...]
-    # boxes: np.ndarray = None                  # 匹配的 boxes [[x1, y1, x2, y2], ...]
-    # boxes_status: np.ndarray = None           # 当前 box 状态，用 True 代表找得到，False 代表丢失
-    id2boxstate: dict[int, dict] | None = None  # 靶标 id 到 boxes 的映射
-    reference_target_ids: tuple[int] = tuple()  # 参考靶标 id
-    search_range: float = 1                     # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
+    match_method: int = cv2.TM_CCOEFF_NORMED                            # 匹配方法
+    init_scale: float = 0.075                                           # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
+    scales: tuple[float, float, float] = (1.0, 4.0, 0.1)                # 缩放 scale 范围 (start, end, step)
+    new_target_scales: tuple[float, float, float] = (0.5, 1.0, 0.05)    # 新目标的缩放 scale 范围 (start, end, step)
+    max_target_number: int = 10                                         # 最大目标数量
+    target_number: int = 0                                              # 默认靶标数量,初始化时为找到的靶标数量
+    got_target_number: int = 0                                          # 找到的靶标数量
+    iou_threshold: float = 0.5                                          # iou 阈值
+    use_threshold_match: bool = True                                    # 是否使用阈值匹配
+    threshold_match_threshold: float = 0.6                              # 阈值匹配阈值
+    threshold_iou_threshold: float = 0.5                                # 阈值匹配 iou 阈值
+    id2boxstate: dict[int, dict] | None = None                          # 靶标 id 到 boxes 的映射
+    reference_target_ids: tuple[int] = tuple()                          # 参考靶标 id
+    search_range: float = 1                                             # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
 
 
 @dataclass

@@ -140,7 +140,6 @@ def main() -> None:
     # serial_send_queue = serial_send_thread.queue
     # serial_receive_thread.start()
     # serial_send_thread.start()
-    # 串口消息测试线程
     # logger.success("初始化串口完成")
     #-------------------- 初始化串口 --------------------#
 
@@ -325,24 +324,51 @@ def main() -> None:
                 logger.success(f"The cycle is started.")
                 #-------------------- 调整全图曝光 --------------------#
                 logger.info("full image ajust exposure start")
-                adjust_exposure_full_res_for_loop(camera_queue)
+
+                # 每次使用闪光灯调整曝光的总次数
+                adjust_with_falsh_total_times: int = AdjustCameraConfig.getattr("adjust_with_falsh_total_times")
+                adjust_with_falsh_total_time = 0
+                while True:
+                    _, need_flash = adjust_exposure_full_res_for_loop(camera_queue)
+
+                    #-------------------- 补光灯 --------------------#
+                    if need_flash:
+                        logger.warning("need flash, send adjustLEDlevel command")
+                        # 补光灯控制命令
+                        send_msg = {
+                            "cmd":"adjustLEDlevel",
+                            "param":{
+                                "level":10,
+                                "times":1
+                            },
+                            "msgid":1
+                        }
+                        # serial_send_queue.put(send_msg)
+
+                        # received_msg = main_queue.get(timeout=10)
+                        # cmd = received_msg.get('cmd')
+                        # if cmd == 'askadjustLEDlevel':
+                        #     {
+                        #         "cmd":" askadjustLEDlevel ",
+                        #         "times": "2024-09-11T15:45:30",
+                        #         "param": {},
+                        #         "msgid": 1
+                        #     }
+                        #     logger.info("received askadjustLEDlevel response")
+                        # else:
+                        #     ...
+                    else:
+                        logger.success("no need flash, exit adjust_exposure_full_res_for_loop")
+                        break
+
+                    adjust_with_falsh_total_time += 1
+                    if adjust_with_falsh_total_time >= adjust_with_falsh_total_times:
+                        logger.warning(f"adjust_exposure_full_res_for_loop failed {adjust_with_falsh_total_times} times, use last result")
+                        break
+
+                #-------------------- 补光灯 --------------------#
                 logger.info("full image ajust exposure end")
                 #-------------------- 调整全图曝光 --------------------#
-
-                #-------------------- 补光灯 --------------------#
-                if False:
-                    # 补光灯控制命令
-                    send_msg = {
-                        "cmd":"adjustLEDlevel",
-                        "param":{
-                            "level":10,
-                            "times":1
-                        },
-                        "msgid":1
-                    }
-                    mqtt_send_queue.put(send_msg)
-
-                #-------------------- 补光灯 --------------------#
 
                 # 忽略多余的图片
                 drop_excessive_queue_items(camera_queue)
@@ -377,7 +403,7 @@ def main() -> None:
                     #     62000: {1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}}
                     # }
                     # id2boxstate 为 None 时，理解为没有任何 box，调整曝光时设定为 {}
-                    exposure2id2boxstate = adjust_exposure_full_res_for_loop(
+                    exposure2id2boxstate, _ = adjust_exposure_full_res_for_loop(
                         camera_queue,
                         id2boxstate if id2boxstate is not None else {},
                     )
@@ -932,15 +958,15 @@ def main() -> None:
                     logger.info("received askadjusttempdata response")
                     received_temp_control_msg = True
 
-                # 回复补光灯调节指令
-                elif cmd == 'askadjustLEDlevel':
-                    {
-                        "cmd":" askadjustLEDlevel ",
-                        "times": "2024-09-11T15:45:30",
-                        "param": {},
-                        "msgid": 1
-                    }
-                    logger.info("received askadjustLEDlevel response")
+                # 回复补光灯调节指令，放到发送命令后面接收
+                # elif cmd == 'askadjustLEDlevel':
+                #     {
+                #         "cmd":" askadjustLEDlevel ",
+                #         "times": "2024-09-11T15:45:30",
+                #         "param": {},
+                #         "msgid": 1
+                #     }
+                #     logger.info("received askadjustLEDlevel response")
 
                 # 日常温度数据
                 elif cmd =='sendtempdata':
@@ -1015,7 +1041,7 @@ def main() -> None:
                 else:
                     logger.warning(f"unknown cmd: {cmd}")
                     logger.warning(f"unknown msg: {received_msg}")
-                #------------------------- 获取消息 -------------------------#
+            #------------------------- 获取消息 -------------------------#
 
             #------------------------- 发送消息 -------------------------#
             # 设备部署响应消息
@@ -1200,7 +1226,7 @@ def main() -> None:
                         }
                     }
                 }
-                mqtt_send_queue.put(send_msg)
+                serial_send_queue.put(send_msg)
 
             # 温度控制命令
             if False:
@@ -1213,7 +1239,7 @@ def main() -> None:
                     "msgid": 1
                 }
                 received_temp_control_msg = False
-                mqtt_send_queue.put(send_msg)
+                serial_send_queue.put(send_msg)
             #------------------------- 发送消息 -------------------------#
 
             # 保存运行时配置

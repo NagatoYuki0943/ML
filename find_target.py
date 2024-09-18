@@ -271,7 +271,7 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
         if box is None:
             new_id2boxstate[i] = {
                 "ratio": ratio,
-                "score": 0,
+                "score": score,
                 "box": None
             }
             continue

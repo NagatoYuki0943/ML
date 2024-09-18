@@ -773,7 +773,7 @@ def main() -> None:
                         {"ratio": None, "score": None, "box": box} for box in new_boxes
                     ]
                     # 旧的 box 也转换为列表，并合并新 box
-                    new_boxstates.extend(list(id2boxstate.values()))
+                    new_boxstates.extend(id2boxstate.values())
 
                     # 按照 box 排序
                     new_boxes = np.array([boxstate['box'] for boxstate in new_boxstates])

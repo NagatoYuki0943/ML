@@ -146,39 +146,37 @@ def main() -> None:
 
             else:
                 #-------------------- camera capture --------------------#
-                camera_qsize = camera_queue.qsize()
-                if camera_qsize > 0:
-                    logger.info(f"The {cycle_loop_count + 1} iter within the cycle.")
+                logger.info(f"The {cycle_loop_count + 1} iter within the cycle.")
 
-                    # 忽略多于图像
-                    drop_excessive_queue_items(camera_queue)
+                # 忽略多于图像
+                drop_excessive_queue_items(camera_queue)
 
-                    try:
-                        # 获取照片
-                        image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-                        logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
-                #-------------------- camera capture --------------------#
+                try:
+                    # 获取照片
+                    image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
+                    logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
+            #-------------------- camera capture --------------------#
 
-                    except queue.Empty:
-                        logger.error("get picture timeout")
+                except queue.Empty:
+                    logger.error("get picture timeout")
 
-                    else:
-                        # 没有发生错误
-                        # 周期内循环计数加1
-                        cycle_loop_count += 1
+                else:
+                    # 没有发生错误
+                    # 周期内循环计数加1
+                    cycle_loop_count += 1
 
-                        # 正常判断是否结束周期
-                        if cycle_loop_count == total_cycle_loop_count - 1:
+                    # 正常判断是否结束周期
+                    if cycle_loop_count == total_cycle_loop_count - 1:
 
-                            #------------------------- 整理检测结果 -------------------------#
-                            logger.success(f"{cycle_results = }")
-                            #------------------------- 整理检测结果 -------------------------#
+                        #------------------------- 整理检测结果 -------------------------#
+                        logger.success(f"{cycle_results = }")
+                        #------------------------- 整理检测结果 -------------------------#
 
-                            #------------------------- 结束周期 -------------------------#
-                            cycle_results = {} # 重置周期内结果
-                            cycle_loop_count = -1   # 重置周期内循环计数
-                            logger.success(f"The cycle is over.")
-                            #------------------------- 结束周期 -------------------------#
+                        #------------------------- 结束周期 -------------------------#
+                        cycle_results = {} # 重置周期内结果
+                        cycle_loop_count = -1   # 重置周期内循环计数
+                        logger.success(f"The cycle is over.")
+                        #------------------------- 结束周期 -------------------------#
 
         # 检测周期外
         if cycle_loop_count == -1:

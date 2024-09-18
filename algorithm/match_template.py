@@ -192,17 +192,14 @@ def match_template_max(
             TM_CCOEFF:        相关系数匹配方法, 越大代表越准确
             TM_CCOEFF_NORMED: 归一化的相关系数匹配方法, 越大代表越准确, 对亮度变化不敏感
         mask (np.ndarray | None, optional): 遮罩, 用于控制匹配区域, 大小必须与模板大小一致.
-            仅适用于 TM_SQDIFF 和 TM_CCORR_NORMED.
             如果 mask 数据类型为 CV_8U, 则掩码将被解释为二进制掩码, 这意味着仅使用掩码为非零的元素, 并且这些元素保持不变, 与实际掩码值无关（权重等于 1）.
             如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
+            适用于所有匹配方法, https://github.com/opencv/opencv/pull/15214
+            如果出错，请安装 `opencv-contrib-python`
 
     Returns:
         tuple[float, list[int]]: (最高得分, 框的坐标)
     """
-    if mask is not None:
-        assert match_method in (cv2.TM_SQDIFF, cv2.TM_CCORR_NORMED), \
-        f"when use mask, match_method must be cv2.TM_SQDIFF or cv2.TM_CCORR_NORMED, got: {match_method}"
-
     template_h, template_w = template.shape[:2]
 
     match_image = cv2.matchTemplate(
@@ -253,18 +250,15 @@ def match_template_filter_by_threshold(
         match_threshold (float, optional): 匹配阈值. Defaults to 0.8.
         iou_threshold (float, optional): iou threshold. Defaults to 0.5.
         mask (np.ndarray | None, optional): 遮罩, 用于控制匹配区域, 大小必须与模板大小一致.
-            仅适用于 TM_SQDIFF 和 TM_CCORR_NORMED.
             如果 mask 数据类型为 CV_8U, 则掩码将被解释为二进制掩码, 这意味着仅使用掩码为非零的元素, 并且这些元素保持不变, 与实际掩码值无关（权重等于 1）.
             如果数据类型为 CV_32F, 掩码值用作权重. Defaults to None.
+            适用于所有匹配方法, https://github.com/opencv/opencv/pull/15214
+            如果出错，请安装 `opencv-contrib-python`
 
     Returns:
         list[tuple[float, np.ndarray]]: [(得分, 框的坐标), ...]
                                        当找不到时，返回 []
     """
-    if mask is not None:
-        assert match_method in (cv2.TM_SQDIFF, cv2.TM_CCORR_NORMED), \
-        f"when use mask, match_method must be cv2.TM_SQDIFF or cv2.TM_CCORR_NORMED, got: {match_method}"
-
     template_h, template_w = template.shape[:2]
 
     match_image = cv2.matchTemplate(

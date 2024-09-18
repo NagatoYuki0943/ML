@@ -79,7 +79,7 @@ class AdjustCameraConfig(BaseConfig):
     lock = Lock()
     mean_light_suitable_range: tuple[float] = (70, 160) # (100, 160)
     suitable_ignore_ratio: float = 0.1                 # 忽略 mean_light_suitable_range 最低和最高范围的百分比 [0, 100] -> [10, 90]
-    adjust_exposure_time_step: int = 2000
+    adjust_exposure_time_base_step: int = 100
     capture_mode: Literal['preview', 'low', 'full'] = 'low'
     capture_time_interval: int = 100        # 拍照间隔 us
     return_image_time_interval: int = 100   # 返回图片间隔 us

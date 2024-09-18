@@ -145,24 +145,15 @@ def main() -> None:
         MQTTConfig.getattr('clientId'),
         MainConfig.getattr('apikey'),
     )
-    # FTP客户端
-    ftp = RaspberryFTP(
-        FTPConfig.getattr('ip'),
-        FTPConfig.getattr('port'),
-        FTPConfig.getattr('username'),
-        FTPConfig.getattr('password'),
-    )
     mqtt_send_thread = ThreadWrapper(
         target_func = mqtt_send,
         client = mqtt_comm,
-        ftp = ftp
     )
     mqtt_send_queue = mqtt_send_thread.queue
     mqtt_receive_thread = Thread(
         target = mqtt_receive,
         kwargs={
             'client':mqtt_comm,
-            'ftp':ftp,
             'main_queue':main_queue,
             'send_queue':mqtt_send_queue,
         },

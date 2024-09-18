@@ -1,5 +1,6 @@
 import ftplib
 from loguru import logger
+import threading
 
 class RaspberryFTP:
     def __init__(
@@ -22,7 +23,6 @@ class RaspberryFTP:
         self.password = password
 
         self.ftp = ftplib.FTP()
-        self.ftp_connect()
 
     def ftp_connect(self):
         try:
@@ -55,4 +55,4 @@ class RaspberryFTP:
             logger.info(f"Download file from {remote_file_path} to {local_file_path}")
 
     def ftp_close(self):
-        self.ftp.close()
+        self.ftp.quit()

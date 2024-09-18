@@ -9,39 +9,16 @@ import subprocess
 # MQTT 客户端接收线程
 def mqtt_receive(
         client: RaspberryMQTT,
-        ftp: RaspberryFTP,
         main_queue: Queue,
         send_queue: Queue,
         *args,
         **kwargs,
 ):
-    def message_handler(message):
-        """MQTT客户端消息回调"""
-        cmd = message.get('cmd', "unknown")
-        cmd_handlers = {
-            'setconfig': config_setter,
-            'getconfig': config_getter,
-        }
-        # 根据cmd判断消息是否发给主控处理
-        handler = cmd_handlers.get(cmd)
-        if handler:
-            handler(message, send_queue)
-        else:
-            # 处理配置文件下载命令
-            if cmd == "updateconfigfile":
-                msgid = message['msgid']
-                timestamp = time.strftime("%Y%m%d-%H%M%S")
-                config_file_path = MainConfig.getattr("save_dir") / f"Configuration_{timestamp}.yaml"
-                try:
-                    ftp.download_file(config_file_path, message['ftpurl'])
-                    message['configuration_path'] = config_file_path
-                    message.pop('ftpurl')
-                except Exception as e:
-                    create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)
-                    return
-            main_queue.put(message)
+    ftp = ftp_object_create()
     # 设置消息回调
-    client.set_message_callback(message_handler)
+    client.set_message_callback(
+        message_handler(lambda msg: message_handler(msg, send_queue, ftp, main_queue))
+    )
     while True:
         client.loop()
         time.sleep(0.1)
@@ -49,43 +26,96 @@ def mqtt_receive(
 # MQTT客户端发送线程
 def mqtt_send(
         client: RaspberryMQTT,
-        ftp: RaspberryFTP,
         queue: Queue,
         *args,
         **kwargs,
 ):
+    ftp = ftp_object_create()
     while True:
         message = queue.get()
         body = message.get("body")
         if body and "img" in body:
+            ftp.ftp_connect()
             ftp.upload_file(body['img'], body['ftpurl'])
+            ftp.ftp_close()
         topic, payload = client.merge_message(message)
         client.publish(topic, payload)
+
+def ftp_object_create():
+    return RaspberryFTP(
+        FTPConfig.getattr('ip'),
+        FTPConfig.getattr('port'),
+        FTPConfig.getattr('username'),
+        FTPConfig.getattr('password')
+    )
+
+def message_handler(message, send_queue, ftp, main_queue):
+    """MQTT消息处理"""
+    cmd = message.get('cmd', 'unknown')
+    cmd_handlers = {
+        'setconfig': config_setter,
+        'getconfig': config_getter,
+        'updateconfigfile': config_file_update
+    }
+    handler = cmd_handlers.get(cmd)
+    if handler:
+        if cmd == 'updateconfigfile':
+            update_message = handler(message, send_queue, ftp)
+            if update_message is not None:
+                main_queue.put(update_message)
+        else:
+            handler(message, send_queue)
+    else:
+        main_queue.put(message)
+
+def config_file_update(message, send_queue, ftp):
+    """更新配置文件"""
+    cmd = "updateconfigfile"
+    msgid = message['msgid']
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    config_file_path = MainConfig.getattr("save_dir") / f"Configuration_{timestamp}.yaml"
+    try:
+        ftp.ftp_connect()
+        ftp.download_file(config_file_path, message['ftpurl'])
+        ftp.ftp_close()
+        message['configuration_path'] = config_file_path
+        message.pop('ftpurl')
+        return message
+    except Exception as e:
+        create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)
+        return None
 
 def config_setter(message, send_queue):
     """根据命令中携带的配置参数修改配置"""
     cmd = "setconfig"
     msgid = message.get("msgid", "unknown")
+    map = config_map()
+    success = True
+    failed_keys = []
     # 根据key来选择配置的参数
     try:
         config_body = message.get("body", {})
         for key, value in config_body.items():
             # 检查配置项是否存在于设备中
-            if key not in config_map():
-                raise ValueError(f"{key} is not a valid key")
-            config = config_map()[key]
-            if isinstance(config, tuple):
-                config_class, config_attr = config
-                current_value = getattr(config_class, config_attr)
-                if isinstance(current_value, tuple):
-                    if not isinstance(value, (list, tuple)) or len(value) != len(current_value):
-                        raise ValueError(f"{key} must be a tuple with {len(current_value)} values")
-                    setattr(config_class, config_attr, tuple(value))
-                else:
-                    setattr(config_class, config_attr, value)
-            else:
-                raise ValueError(f"{key} is not avaliable")
-        create_message(cmd, {"code":200,"msg":f"{cmd} succeed"}, msgid, send_queue)
+            if key not in map:
+                failed_keys.append(f"{key} is not a valid key")
+                success = False
+                continue
+            config = map[key]
+            config_class, config_attr = config
+            current_value = getattr(config_class, config_attr)
+            if isinstance(current_value, tuple):
+                if not isinstance(value, (list, tuple)) or len(value) != len(current_value):
+                    failed_keys.append(f"{key} must be a tuple with {len(current_value)} values")
+                    success = False
+                    continue
+                setattr(config_class, config_attr, tuple(value))
+                continue
+            setattr(config_class, config_attr, value)
+        if success:
+            create_message(cmd, {"code":200,"msg":f"{cmd} succeed"}, msgid, send_queue)
+        else:
+            create_message(cmd, {"code":206,"msg":f"{cmd} partially failed, failed keys:{failed_keys}"}, msgid, send_queue)
     except Exception as e:
         create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)
 
@@ -98,15 +128,12 @@ def config_getter(message, send_queue):
         config_body = {}
         # 遍历配置映射，获取每个配置项的当前值
         for key, config in config_map().items():
-            if isinstance(config, tuple):
-                config_class, config_attr = config
-                value = getattr(config_class, config_attr)
-                if isinstance(value, tuple):
-                    config_body[key] = list(value)
-                else:
-                    config_body[key] = value
+            config_class, config_attr = config
+            value = getattr(config_class, config_attr)
+            if isinstance(value, tuple):
+                config_body[key] = list(value)
             else:
-                config_body[key] = config
+                config_body[key] = value
         config_body['code'] = 200
         config_body['msg'] = "getconfig succeed" 
         # 返回成功的消息，包含所有配置项的当前值

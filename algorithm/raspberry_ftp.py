@@ -32,39 +32,56 @@ class RaspberryFTP:
         except ftplib.Error as e:
             logger.error(f"FTP server unreachable : {e}")
 
-    def upload_file(self, img, ftpurl):
-        """上传现场图像文件
+    def upload_file(self, local_file_path, local_file_name, ftpurl):
+        """上传现场文件
         Args:
-            local_file (str): 本地文件路径.
-            remote_file (str): 上传到FTP服务器的路径
+            local_file_path (list[str] | str): 本地文件路径.
+            local_file_name (list[str] | str): 上传的文件名
+            ftpurl (str): 上传到FTP服务器的路径.
         """
-        if len(img) == len(ftpurl):
-            for local_file, remote_file in zip(img, ftpurl):
-                with open(local_file, 'rb') as f:
-                    self.ftp.storbinary(f"STOR {remote_file}", f)
-                    logger.info(f"Uploaded file from {local_file} to {remote_file}")
+        # 单个字符串转换为列表
+        try:
+            if isinstance(local_file_name, str):
+                local_file_name = [local_file_name]
+            if isinstance(local_file_path, str):
+                local_file_path = [local_file_path]
+            # 创建子目录
+            self.ftp.mkd(ftpurl)
+            # 本地路径和名字绑定，上传文件
+            for file_path, file_name in zip(local_file_path, local_file_name):
+                remote_file = f"{ftpurl}/{file_name}"
+                with open(file_path, 'rb') as f:
+                    self.ftp.storbinary(f"STOR{remote_file}", f)
+                    logger.info(f"Uploaded file from {file_path} to {remote_file}")
+        except Exception as e:
+            logger.error(f"FTP uploads error:{e}")
 
-    def download_file(self, local_file_path, remote_file_path):
+    def download_file(self, local_file_path, remote_file_name, ftpurl):
         """下载配置文件
         Args:
             local_file_path (str): 本地文件路径.
-            remote_file_path (str): FTP服务器上待下载的文件路径.
+            remote_file_name (str): FTP服务器上待下载的文件名.
+            ftpurl (str): FTP服务器上的下载路径
         """
         try:
-            self.ftp.cwd(remote_file_path)
-            files = self.ftp.nlst()
-            if len(files) == 1:
-                remote_file = files[0]
-                with open(local_file_path, 'wb') as local_file:
-                    self.ftp.retrbinary(f"RETR {remote_file}", local_file.write)
-                    logger.info(f"Download file from {remote_file_path} to {local_file_path}")
-            else:
-                if len(files) == 0:
-                    logger.error(f"No files found in {remote_file_path}")
-                else:
-                    logger.error(f"Multiple files found in {remote_file_path}:{files}")
+            # self.ftp.cwd(ftpurl)
+            # files = self.ftp.nlst()
+            # if len(files) == 1:
+            #     remote_file = files[0]
+            #     with open(local_file_path, 'wb') as local_file:
+            #         self.ftp.retrbinary(f"RETR {remote_file}", local_file.write)
+            #         logger.info(f"Download file from {remote_file_path} to {local_file_path}")
+            # else:
+            #     if len(files) == 0:
+            #         logger.error(f"No files found in {remote_file_path}")
+            #     else:
+            #         logger.error(f"Multiple files found in {remote_file_path}:{files}")
+            remote_file = f"{ftpurl}/{remote_file_name}"
+            with open(local_file_path, 'wb') as f:
+                self.ftp.retrbinary(f"RETR{remote_file}", f.write)
+                logger.info(f"Downloaded {local_file_path} from {remote_file}")
         except ftplib.error_perm as e:
-            logger.error(f"FTP error:{e}")
+            logger.error(f"FTP downloads error:{e}")
 
     def ftp_close(self):
         self.ftp.quit()

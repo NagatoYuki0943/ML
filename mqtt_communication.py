@@ -33,14 +33,25 @@ def mqtt_send(
     ftp = ftp_object_create()
     while True:
         message = queue.get()
-        body = message.get("body")
-        if body and "img" in body:
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            ftpurl = FTPConfig.getattr('upload_url') / f"{timestamp}"
-            ftp.ftp_connect()
-            ftp.upload_file(body['img'], ftpurl)
-            ftp.ftp_close()
-            body['ftpurl'] = ftpurl
+        body = message.get("body", {})
+        cmd = message.get("cmd")
+        if body:
+            if "img" in body:
+                timestamp = time.strftime("%Y%m%d%H%M%S")
+                ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
+                ftp.ftp_connect()
+                ftp.upload_file(body['path'], body['img'], ftpurl)
+                ftp.ftp_close()
+                message['body'].pop('path')
+                message['body']['ftpurl'] = ftpurl
+            elif "config" in body:
+                timestamp = time.strftime("%Y%m%d%H%M%S")
+                ftpurl = f"{FTPConfig.getattr('config_base_url')}/{cmd}/{timestamp}"
+                ftp.ftp_connect()
+                ftp.upload_file(body['path'], body['config'], ftpurl)
+                ftp.ftp_close()
+                message['body'].pop('path')
+                message['body']['ftpurl'] = ftpurl
         topic, payload = client.merge_message(message)
         client.publish(topic, payload)
 
@@ -58,7 +69,7 @@ def message_handler(message, send_queue, ftp, main_queue):
     cmd_handlers = {
         'setconfig': config_setter,
         'getconfig': config_getter,
-        'updateconfigfile': config_file_update
+        'updateconfigfile': config_file_update,
     }
     handler = cmd_handlers.get(cmd)
     if handler:
@@ -71,18 +82,19 @@ def message_handler(message, send_queue, ftp, main_queue):
     else:
         main_queue.put(message)
 
-def config_file_update(message, send_queue, ftp):
+def config_file_update(message, send_queue, ftp: RaspberryFTP):
     """更新配置文件"""
     cmd = "updateconfigfile"
     msgid = message['msgid']
+    body = message.get("body")
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     config_file_path = MainConfig.getattr("save_dir") / f"Configuration_{timestamp}.yaml"
     try:
         ftp.ftp_connect()
-        ftp.download_file(config_file_path, message['ftpurl'])
+        ftp.download_file(config_file_path, body['config'], body['ftpurl'])
         ftp.ftp_close()
-        message['configuration_path'] = config_file_path
-        message.pop('ftpurl')
+        message['body']['path'] = config_file_path
+        message['body'].pop('ftpurl')
         return message
     except Exception as e:
         create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)

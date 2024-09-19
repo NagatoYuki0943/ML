@@ -200,6 +200,8 @@ class FTPConfig(BaseConfig):
     port: int = 21
     username: str = "vision"
     password: str = "GLspepec123"
+    image_base_url: str = "/7804d2/img"
+    config_base_url: str = "/7804d2/config"
 
 
 ALL_CONFIGS = [

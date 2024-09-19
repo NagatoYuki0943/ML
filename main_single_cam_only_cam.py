@@ -144,33 +144,33 @@ def main() -> None:
     #-------------------- 初始化串口 --------------------#
 
     #-------------------- 初始化MQTT客户端 --------------------#
-    logger.info("开始初始化MQTT客户端")
-    mqtt_comm = RaspberryMQTT(
-        MQTTConfig.getattr('broker'),
-        MQTTConfig.getattr('port'),
-        MQTTConfig.getattr('timeout'),
-        MQTTConfig.getattr('topic'),
-        MQTTConfig.getattr('username'),
-        MQTTConfig.getattr('password'),
-        MQTTConfig.getattr('clientId'),
-        MQTTConfig.getattr('apikey'),
-    )
-    mqtt_send_thread = ThreadWrapper(
-        target_func = mqtt_send,
-        client = mqtt_comm,
-    )
-    mqtt_send_queue = mqtt_send_thread.queue
-    mqtt_receive_thread = Thread(
-        target = mqtt_receive,
-        kwargs={
-            'client': mqtt_comm,
-            'main_queue': main_queue,
-            'send_queue': mqtt_send_queue,
-        },
-    )
-    mqtt_receive_thread.start()
-    mqtt_send_thread.start()
-    logger.success("初始化MQTT客户端完成")
+    # logger.info("开始初始化MQTT客户端")
+    # mqtt_comm = RaspberryMQTT(
+    #     MQTTConfig.getattr('broker'),
+    #     MQTTConfig.getattr('port'),
+    #     MQTTConfig.getattr('timeout'),
+    #     MQTTConfig.getattr('topic'),
+    #     MQTTConfig.getattr('username'),
+    #     MQTTConfig.getattr('password'),
+    #     MQTTConfig.getattr('clientId'),
+    #     MQTTConfig.getattr('apikey'),
+    # )
+    # mqtt_send_thread = ThreadWrapper(
+    #     target_func = mqtt_send,
+    #     client = mqtt_comm,
+    # )
+    # mqtt_send_queue = mqtt_send_thread.queue
+    # mqtt_receive_thread = Thread(
+    #     target = mqtt_receive,
+    #     kwargs={
+    #         'client': mqtt_comm,
+    #         'main_queue': main_queue,
+    #         'send_queue': mqtt_send_queue,
+    #     },
+    # )
+    # mqtt_receive_thread.start()
+    # mqtt_send_thread.start()
+    # logger.success("初始化MQTT客户端完成")
     #-------------------- 初始化MQTT客户端 --------------------#
 
     # 设备启动消息
@@ -186,7 +186,7 @@ def main() -> None:
             "msg": "device starting"
         }
     }
-    mqtt_send_queue.put(send_msg)
+    # mqtt_send_queue.put(send_msg)
 
     logger.success("init end")
     #------------------------------ 初始化 ------------------------------#
@@ -561,7 +561,7 @@ def main() -> None:
                                     "did": MQTTConfig.getattr("did"),
                                     "data": send_msg_data
                                 }
-                                mqtt_send_queue.put(send_msg)
+                                # mqtt_send_queue.put(send_msg)
                         else:
                             logger.info("try to compare standard_cycle_results and cycle_results")
                             move_threshold = RingsLocationConfig.getattr("move_threshold")
@@ -640,7 +640,7 @@ def main() -> None:
                                         "img": [str(image_path)]# 文件名称
                                     }
                                 }
-                                mqtt_send_queue.put(send_msg)
+                                # mqtt_send_queue.put(send_msg)
                             else:
                                 # ✅️✅️✅️ 所有 box 移动距离都小于阈值 ✅️✅️✅️
                                 logger.success(f"All box move distance is under threshold {move_threshold}.")
@@ -650,7 +650,7 @@ def main() -> None:
                                     "did": MQTTConfig.getattr("did"),
                                     "data": send_msg_data
                                 }
-                                mqtt_send_queue.put(send_msg)
+                                # mqtt_send_queue.put(send_msg)
 
                         #------------------------- 整理检测结果 -------------------------#
 
@@ -706,7 +706,7 @@ def main() -> None:
                                             "img": [str(image_path)]# 文件名称
                                         }
                                     }
-                                    mqtt_send_queue.put(send_msg)
+                                    # mqtt_send_queue.put(send_msg)
                                 else:
                                     # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
                                     logger.success(f"The lost target has been found, the target number {target_number} is enough, got {got_target_number} targets.")
@@ -853,7 +853,7 @@ def main() -> None:
                         },
                         "msgid": "bb6f3eeb2"
                     }
-                    mqtt_send_queue.put(send_msg)
+                    # mqtt_send_queue.put(send_msg)
                     logger.success(f"update target success, new id2boxstate: {id2boxstate}")
 
                 # 参考靶标设定消息
@@ -883,7 +883,7 @@ def main() -> None:
                             },
                             "msgid": "bb6f3eeb2"
                         }
-                        mqtt_send_queue.put(send_msg)
+                        # mqtt_send_queue.put(send_msg)
                         logger.success(f"set reference target success, reference_target_id: {reference_target_id}")
                     else:
                         # 参考靶标设定响应消息
@@ -896,7 +896,7 @@ def main() -> None:
                             },
                             "msgid": "bb6f3eeb2"
                         }
-                        mqtt_send_queue.put(send_msg)
+                        # mqtt_send_queue.put(send_msg)
                         logger.warning(f"reference target {reference_target} not found in id2boxstate.")
 
                 # 设备状态查询消息
@@ -929,7 +929,7 @@ def main() -> None:
                             },
                             "msgid": "bb6f3eeb2"
                         }
-                        mqtt_send_queue.put(send_msg)
+                        # mqtt_send_queue.put(send_msg)
                         logger.success(f"get image success, image_path: {image_path}")
                     except queue.Empty:
                         # 现场图像查询响应消息
@@ -944,7 +944,7 @@ def main() -> None:
                             },
                             "msgid": "bb6f3eeb2"
                         }
-                        mqtt_send_queue.put(send_msg)
+                        # mqtt_send_queue.put(send_msg)
                         logger.error("get picture timeout")
 
                 # 温控板回复控温指令, 回复可能延期
@@ -1036,7 +1036,7 @@ def main() -> None:
                         },
                         "msgid": "e37e42c53"
                     }
-                    mqtt_send_queue.put(send_msg)
+                    # mqtt_send_queue.put(send_msg)
                     time.sleep(5)
                     os._exit()
                 else:
@@ -1093,7 +1093,7 @@ def main() -> None:
                     },
                     "msgid": "bb6f3eeb2"
                 }
-                mqtt_send_queue.put(send_msg)
+                # mqtt_send_queue.put(send_msg)
                 need_send_devicedeploying_msg = False
                 logger.success("send device deploying msg success")
 
@@ -1153,7 +1153,7 @@ def main() -> None:
                     },
                     "msgid": "bb6f3eeb2"
                 }
-                mqtt_send_queue.put(send_msg)
+                # mqtt_send_queue.put(send_msg)
                 need_send_getstatus_msg = False
                 logger.success("send getstatus msg success")
 
@@ -1171,7 +1171,7 @@ def main() -> None:
                         "msg": "device working"
                     }
                 }
-                mqtt_send_queue.put(send_msg)
+                # mqtt_send_queue.put(send_msg)
 
             # 温度异常告警消息
             if False:
@@ -1193,7 +1193,7 @@ def main() -> None:
                         }
                     }
                 }
-                mqtt_send_queue.put(send_msg)
+                # mqtt_send_queue.put(send_msg)
 
             # 设备异常告警消息
             if False:
@@ -1208,7 +1208,7 @@ def main() -> None:
                         "msg": "device error"
                     }
                 }
-                mqtt_send_queue.put(send_msg)
+                # mqtt_send_queue.put(send_msg)
 
             # 设备温控变化消息
             if False:

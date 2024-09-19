@@ -193,8 +193,6 @@ logger.success("init config success")
 # 初始的坐标
 standard_cycle_results = load_standard_cycle_results(standard_save_path)
 logger.info(f"standard_cycle_results: {standard_cycle_results}")
-# 一个周期内的结果
-cycle_results = {}
 # 上一个周期的结果(原因是 cycle_results 每个周期最后都会被清空)
 last_cycle_results = None
 # 是否需要发送部署信息
@@ -215,7 +213,6 @@ logger.success("init end")
 
 def main() -> None:
     global standard_cycle_results
-    global cycle_results
     global last_cycle_results
 
     #------------------------------ 调整曝光 ------------------------------#
@@ -304,7 +301,7 @@ def main() -> None:
     save_config_to_yaml(config_path=runtime_config_path)
     #------------------------------ 找到目标 ------------------------------#
 
-    #-------------------- 循环变量 --------------------#
+    #-------------------- 初始化周期内变量 --------------------#
     # 主循环
     i = 0
     # 一个周期内总循环次数
@@ -314,7 +311,15 @@ def main() -> None:
     # 每个周期的间隔时间
     cycle_time_interval: int = MainConfig.getattr("cycle_time_interval")
     cycle_before_time = time.time()
-    #-------------------- 循环变量 --------------------#
+    # 一个周期内的结果
+    cycle_results = {}
+    # 是否使用补光灯
+    use_flash = False
+    adjust_led_level_param = {
+        "level": 1, # need_darker - (达到最低就代表关闭补光灯), need_lighter +
+        "times": 10, # 亮的时间
+    },
+    #-------------------- 初始化周期内变量 --------------------#
 
     while True:
         cycle_current_time = time.time()
@@ -330,40 +335,41 @@ def main() -> None:
                 #-------------------- 调整全图曝光 --------------------#
                 logger.info("full image ajust exposure start")
 
-                # 每次使用闪光灯调整曝光的总次数
+                # 每次使用补光灯调整曝光的总次数
                 adjust_with_falsh_total_times: int = AdjustCameraConfig.getattr("adjust_with_falsh_total_times")
                 adjust_with_falsh_total_time = 0
                 while True:
-                    _, need_flash = adjust_exposure_full_res_for_loop(camera_queue)
+                    # 如果上一次使用了补光灯，那这一次也使用补光灯
+                    if use_flash:
+                        Send.send_adjust_led_level_msg(adjust_led_level_param)
+
+                    # 调整曝光
+                    _, need_darker, need_lighter = adjust_exposure_full_res_for_loop(camera_queue)
 
                     #-------------------- 补光灯 --------------------#
-                    if need_flash:
-                        logger.warning("need flash, send adjustLEDlevel command")
-                        # 补光灯控制命令
-                        send_msg = {
-                            "cmd":"adjustLEDlevel",
-                            "param":{
-                                "level":10,
-                                "times":1
-                            },
-                            "msgid":1
-                        }
-                        # serial_send_queue.put(send_msg)
-
-                        # received_msg = main_queue.get(timeout=10)
-                        # cmd = received_msg.get('cmd')
-                        # if cmd == 'askadjustLEDlevel':
-                        #     {
-                        #         "cmd":" askadjustLEDlevel ",
-                        #         "times": "2024-09-11T15:45:30",
-                        #         "param": {},
-                        #         "msgid": 1
-                        #     }
-                        #     logger.info("received askadjustLEDlevel response")
-                        # else:
-                        #     ...
+                    if need_darker or need_lighter:
+                        use_flash = True
+                        if need_darker:
+                            # 已经是最低的补光灯
+                            if adjust_led_level_param['level'] <= 1:
+                                # 关闭补光灯
+                                use_flash = False
+                                logger.warning("already is the lowest flash, close flash")
+                                # TODO: 关闭补光灯
+                                raise NotImplementedError("no need flash, close flash not implemented")
+                            else:
+                                # 降低补光灯亮度
+                                adjust_led_level_param['level'] -= 1
+                        else:
+                            # 已经是最高的补光灯
+                            if adjust_led_level_param['level'] >= 10:
+                                logger.warning("already is the highest flash, can't adjust flash")
+                                continue
+                            else:
+                                # 增加补光灯亮度
+                                adjust_led_level_param['level'] += 1
                     else:
-                        logger.success("no need flash, exit adjust_exposure_full_res_for_loop")
+                        logger.success("no need adjust flash, exit adjust_exposure_full_res_for_loop")
                         break
 
                     adjust_with_falsh_total_time += 1
@@ -408,7 +414,7 @@ def main() -> None:
                     #     62000: {1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}}
                     # }
                     # id2boxstate 为 None 时，理解为没有任何 box，调整曝光时设定为 {}
-                    exposure2id2boxstate, _ = adjust_exposure_full_res_for_loop(
+                    exposure2id2boxstate, _, _ = adjust_exposure_full_res_for_loop(
                         camera_queue,
                         id2boxstate if id2boxstate is not None else {},
                     )
@@ -577,8 +583,8 @@ def main() -> None:
                             distance_result = {}
                             for l in standard_cycle_results.keys():
                                 if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
-                                    distance_x = abs(standard_cycle_centers[l][0] - new_cycle_centers[l][0])
-                                    distance_y = abs(standard_cycle_centers[l][1] - new_cycle_centers[l][1])
+                                    distance_x: float = new_cycle_centers[l][0] - standard_cycle_centers[l][0]
+                                    distance_y: float = new_cycle_centers[l][1] - standard_cycle_centers[l][1]
                                     distance_result[l] = (distance_x, distance_y)
                                 else:
                                     # box没找到将移动距离设置为 一个很大的数
@@ -592,7 +598,7 @@ def main() -> None:
                                 if reference_target_id in distance_result.keys():
                                     # 找到参考靶标
                                     ref_distance_x, ref_distance_y = distance_result[reference_target_id]
-                                    if ref_distance_x >= defalut_error_distance or ref_distance_y >= defalut_error_distance:
+                                    if abs(ref_distance_x) >= defalut_error_distance or abs(ref_distance_y) >= defalut_error_distance:
                                         # 参考靶标出错
                                         logger.warning(f"reference box {reference_target_id} detect failed, can't calibrate other targets.")
                                     else:
@@ -609,13 +615,13 @@ def main() -> None:
                             # 超出距离的 box idx
                             over_distance_ids = set()
                             for idx, (distance_x, distance_y) in distance_result.items():
-                                if distance_x > move_threshold:
+                                if abs(distance_x) > move_threshold:
                                     over_distance_ids.add(idx)
                                     logger.warning(f"box {idx} x move distance {distance_x} is over threshold {move_threshold}.")
                                 else:
                                     logger.info(f"box {idx} x move distance {distance_x} is under threshold {move_threshold}.")
 
-                                if distance_y > move_threshold:
+                                if abs(distance_y) > move_threshold:
                                     over_distance_ids.add(idx)
                                     logger.warning(f"box {idx} y move distance {distance_y} is over threshold {move_threshold}.")
                                 else:
@@ -731,6 +737,12 @@ def main() -> None:
                         cycle_results = {}
                         # 重置周期内循环计数
                         cycle_loop_count = -1
+
+                        if use_flash:
+                            # 关闭补光灯
+                            # TODO: 关闭补光灯
+                            raise NotImplementedError("close flash")
+
                         logger.success(f"The cycle is over.")
                         #------------------------- 结束周期 -------------------------#
                     else:
@@ -769,7 +781,7 @@ class Receive:
     @staticmethod
     def main_queue_receive_msg():
         while not main_queue.empty():
-            received_msg = main_queue.get()
+            received_msg: dict = main_queue.get()
             Receive.switch(received_msg)
 
     @staticmethod
@@ -1376,6 +1388,32 @@ class Send:
         # serial_send_queue.put(send_msg)
         received_temp_control_msg = False
         is_temp_stable = False
+
+    @staticmethod
+    def send_adjust_led_level_msg(adjust_led_level_param: dict):
+        logger.info("send adjust led level msg")
+        # 补光灯控制命令
+        send_msg = {
+            "cmd": "adjustLEDlevel",
+            "param": adjust_led_level_param,
+            "msgid": 1
+        }
+        # serial_send_queue.put(send_msg)
+
+        while True:
+            received_msg: dict = main_queue.get(timeout=10)
+            cmd: str = received_msg.get('cmd')
+            if cmd == 'askadjustLEDlevel':
+                {
+                    "cmd": "askadjustLEDlevel",
+                    "times": get_now_time(),
+                    "param": {},
+                    "msgid": 1
+                }
+                logger.info("received askadjustLEDlevel response")
+                break
+            else:
+                Receive.switch(received_msg)
 
 
 if __name__ == "__main__":

@@ -232,7 +232,7 @@ def adjust_exposure_full_res_recursive(
 def adjust_exposure_full_res_for_loop(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
-) -> tuple[dict[int, dict | None], bool]:
+) -> tuple[dict[int, dict | None], bool, bool]:
     """使用循环实现快速调节曝光，全程使用高分辨率拍摄
 
     Args:
@@ -248,7 +248,7 @@ def adjust_exposure_full_res_for_loop(
             }
 
     Returns:
-        tuple[dict[int, dict | None], bool]: 曝光对应不同的box状态 和 是否需要闪光灯
+        tuple[dict[int, dict | None], bool, bool]: 曝光对应不同的box状态 和 需要更暗 和 需要更亮
             {
                 exposure_time: {
                     i: {
@@ -280,7 +280,8 @@ def adjust_exposure_full_res_for_loop(
     stack = [(id2boxstate, CameraConfig.getattr("exposure_time"))]
 
     # 是否需要闪光灯
-    need_flash = False
+    need_darker = False
+    need_lighter = False
 
     i = 0
     while stack:
@@ -290,17 +291,18 @@ def adjust_exposure_full_res_for_loop(
         current_id2boxstate, current_exposure_time = stack.pop()
         CameraConfig.setattr("exposure_time", current_exposure_time)
 
-        # 严重过曝, 直接跳过
+        # 需要更暗
         if current_exposure_time < exposure_time_range[0]:
             logger.warning(f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us")
             exposure2id2boxstate[exposure_time_range[0]] = current_id2boxstate
+            need_darker = True
             continue
 
-        # 是否需要闪光灯
+        # 需要更亮
         if current_exposure_time > exposure_time_range[1]:
             logger.warning(f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash")
             exposure2id2boxstate[exposure_time_range[1]] = current_id2boxstate
-            need_flash = True
+            need_lighter = True
             continue
 
         # 超出次数, 设置为最后一次
@@ -444,13 +446,13 @@ def adjust_exposure_full_res_for_loop(
 
     logger.success(f"{_exposure2id2boxstate = }")
     logger.info("adjust exposure end")
-    return _exposure2id2boxstate, need_flash
+    return _exposure2id2boxstate, need_darker, need_lighter
 
 
 def adjust_exposure_low_res_for_loop(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
-) -> tuple[dict[int, dict | None], bool]:
+) -> tuple[dict[int, dict | None], bool, bool]:
     """使用循环实现快速调节曝光，全程使用低分辨率拍摄
 
     Args:
@@ -466,7 +468,7 @@ def adjust_exposure_low_res_for_loop(
             }
 
     Returns:
-        tuple[dict[int, dict | None], bool]: 曝光对应不同的box状态 和 是否需要闪光灯
+        tuple[dict[int, dict | None], bool, bool]: 曝光对应不同的box状态 和 需要更暗 和 需要更亮
             {
                 exposure_time: {
                     i: {
@@ -507,7 +509,8 @@ def adjust_exposure_low_res_for_loop(
     stack = [(id2boxstate, CameraConfig.getattr("exposure_time"))]
 
     # 是否需要闪光灯
-    need_flash = False
+    need_darker = False
+    need_lighter = False
 
     i = 0
     while stack:
@@ -517,17 +520,18 @@ def adjust_exposure_low_res_for_loop(
         current_id2boxstate, current_exposure_time = stack.pop()
         CameraConfig.setattr("exposure_time", current_exposure_time)
 
-        # 严重过曝, 直接跳过
+        # 需要更暗
         if current_exposure_time < exposure_time_range[0]:
             logger.warning(f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us")
             exposure2id2boxstate[exposure_time_range[0]] = current_id2boxstate
+            need_darker = True
             continue
 
-        # 是否需要闪光灯
+        # 需要更亮
         if current_exposure_time > exposure_time_range[1]:
             logger.warning(f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash")
             exposure2id2boxstate[exposure_time_range[1]] = current_id2boxstate
-            need_flash = True
+            need_lighter = True
             continue
 
         # 超出次数, 设置为最后一次
@@ -670,4 +674,4 @@ def adjust_exposure_low_res_for_loop(
 
     logger.success(f"{_exposure2id2boxstate = }")
     logger.info("adjust exposure end")
-    return _exposure2id2boxstate, need_flash
+    return _exposure2id2boxstate, need_darker, need_lighter

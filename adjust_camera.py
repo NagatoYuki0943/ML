@@ -293,13 +293,13 @@ def adjust_exposure_full_res_for_loop(
         # 严重过曝, 直接跳过
         if current_exposure_time < exposure_time_range[0]:
             logger.warning(f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us")
-            exposure2id2boxstate[current_exposure_time] = exposure_time_range[0]
+            exposure2id2boxstate[exposure_time_range[0]] = current_id2boxstate
             continue
 
         # 是否需要闪光灯
         if current_exposure_time > exposure_time_range[1]:
             logger.warning(f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash")
-            exposure2id2boxstate[current_exposure_time] = exposure_time_range[1]
+            exposure2id2boxstate[exposure_time_range[1]] = current_id2boxstate
             need_flash = True
             continue
 
@@ -520,13 +520,13 @@ def adjust_exposure_low_res_for_loop(
         # 严重过曝, 直接跳过
         if current_exposure_time < exposure_time_range[0]:
             logger.warning(f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us")
-            exposure2id2boxstate[current_exposure_time] = exposure_time_range[0]
+            exposure2id2boxstate[exposure_time_range[0]] = current_id2boxstate
             continue
 
         # 是否需要闪光灯
         if current_exposure_time > exposure_time_range[1]:
             logger.warning(f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash")
-            exposure2id2boxstate[current_exposure_time] = exposure_time_range[1]
+            exposure2id2boxstate[exposure_time_range[1]] = current_id2boxstate
             need_flash = True
             continue
 

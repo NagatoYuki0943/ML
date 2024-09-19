@@ -54,11 +54,10 @@ class RaspberryMQTT:
     def on_message(self, client, userdata, msg):
         """收到的消息传入回调函数"""
         message = msg.payload.decode('utf-8')
-        logger.info(f"Received message from server: {message}")
+        logger.info(f"Received mqtt message from server: {message}")
         data = self.extract_message(message)
         if data is not None:
             if self.message_callback:
-                logger.info(f"Sent message to Master Control:{data}")
                 self.message_callback(data)
 
     def set_message_callback(self, callback):
@@ -67,7 +66,7 @@ class RaspberryMQTT:
 
     def publish(self, topic, payload):
         """发送消息"""
-        logger.info(f"Sent message to server: {payload} in topic {topic}")
+        logger.info(f"Sent mqtt message to server: {payload} in topic {topic}")
         self.client.publish(topic, payload)
 
     def loop(self):
@@ -111,7 +110,6 @@ class RaspberryMQTT:
         Args:
             data (dict): 要发送的数据.
         """
-        logger.info(f"Received message from Master Control:{data}")
         cmd = data.get("cmd")
         if cmd == "update":
             topic = "$dp"

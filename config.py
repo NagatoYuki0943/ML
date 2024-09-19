@@ -196,10 +196,10 @@ class MQTTConfig(BaseConfig):
 class FTPConfig(BaseConfig):
     """FTP配置
     """
-    ip: str = "localhost"
+    ip: str = "120.79.11.147"
     port: int = 21
-    username: str = "admin"
-    password: str = "123456"
+    username: str = "vision"
+    password: str = "GLspepec123"
 
 
 ALL_CONFIGS = [

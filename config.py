@@ -237,7 +237,7 @@ def save_config_to_yaml(
         class2data[config.__name__] = data
 
     with open(config_path, 'w') as file:
-        yaml.dump(class2data, file, default_flow_style=False)
+        yaml.dump(class2data, file, default_flow_style=False, sort_keys=False)
 
 
 def load_config_from_yaml(
@@ -251,7 +251,7 @@ def load_config_from_yaml(
     :param config_path: The path to the YAML file to load. default: "config.yaml"
     """
     with open(config_path, 'r') as file:
-        class2data = yaml.load(file, Loader=yaml.FullLoader)
+        class2data = yaml.full_load(file)
 
     for config in configs:
         data = class2data[config.__name__]
@@ -270,8 +270,10 @@ def init_config_from_yaml(
     初始化配置
     """
     if not Path(config_path).exists():
+        logger.info(f"Config file {config_path} not found, creating a new one.")
         save_config_to_yaml(configs, config_path)
     else:
+        logger.info(f"Loading config from {config_path}.")
         load_config_from_yaml(configs, config_path)
 
 

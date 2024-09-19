@@ -118,12 +118,12 @@ def main() -> None:
 
     serial_send_thread = ThreadWrapper(
         target_func = serial_send,
-        ser = serial_objects,
+        serial_ports = serial_objects,
     )
     serial_receive_thread = Thread(
         target = serial_receive,
         kwargs={
-            'ser': serial_objects,
+            'serial_ports': serial_objects,
             'queue': main_queue,
         },
     )

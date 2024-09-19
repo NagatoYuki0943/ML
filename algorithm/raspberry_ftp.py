@@ -50,9 +50,21 @@ class RaspberryFTP:
             local_file_path (str): 本地文件路径.
             remote_file_path (str): FTP服务器上待下载的文件路径.
         """
-        with open(local_file_path, 'wb') as local_file:
-            self.ftp.retrbinary(f"RETR {remote_file_path}", local_file.write)
-            logger.info(f"Download file from {remote_file_path} to {local_file_path}")
+        try:
+            self.ftp.cwd(remote_file_path)
+            files = self.ftp.nlst()
+            if len(files) == 1:
+                remote_file = files[0]
+                with open(local_file_path, 'wb') as local_file:
+                    self.ftp.retrbinary(f"RETR {remote_file}", local_file.write)
+                    logger.info(f"Download file from {remote_file_path} to {local_file_path}")
+            else:
+                if len(files) == 0:
+                    logger.error(f"No files found in {remote_file_path}")
+                else:
+                    logger.error(f"Multiple files found in {remote_file_path}:{files}")
+        except ftplib.error_perm as e:
+            logger.error(f"FTP error:{e}")
 
     def ftp_close(self):
         self.ftp.quit()

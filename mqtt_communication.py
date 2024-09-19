@@ -17,7 +17,7 @@ def mqtt_receive(
     ftp = ftp_object_create()
     # 设置消息回调
     client.set_message_callback(
-        message_handler(lambda msg: message_handler(msg, send_queue, ftp, main_queue))
+        lambda msg: message_handler(msg, send_queue, ftp, main_queue)
     )
     while True:
         client.loop()
@@ -35,9 +35,12 @@ def mqtt_send(
         message = queue.get()
         body = message.get("body")
         if body and "img" in body:
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            ftpurl = FTPConfig.getattr('upload_url') / f"{timestamp}"
             ftp.ftp_connect()
-            ftp.upload_file(body['img'], body['ftpurl'])
+            ftp.upload_file(body['img'], ftpurl)
             ftp.ftp_close()
+            body['ftpurl'] = ftpurl
         topic, payload = client.merge_message(message)
         client.publish(topic, payload)
 

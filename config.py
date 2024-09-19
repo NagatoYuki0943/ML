@@ -167,7 +167,7 @@ class SerialCommConfig(BaseConfig):
     """串口通讯模块配置
     """
     # 串口配置
-    port: str ="/dev/ttyAMA2"
+    ports: list[str] = "/dev/ttyAMA2", "/dev/ttyAMA4"
     baudrate: int = 115200
     BUFFER_SIZE: int = 2048
     timeout: float = 0

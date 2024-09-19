@@ -51,7 +51,7 @@ class RaspberryFTP:
             for file_path, file_name in zip(local_file_path, local_file_name):
                 remote_file = f"{ftpurl}/{file_name}"
                 with open(file_path, 'rb') as f:
-                    self.ftp.storbinary(f"STOR{remote_file}", f)
+                    self.ftp.storbinary(f"STOR {remote_file}", f)
                     logger.info(f"Uploaded file from {file_path} to {remote_file}")
         except Exception as e:
             logger.error(f"FTP uploads error:{e}")
@@ -78,7 +78,7 @@ class RaspberryFTP:
             #         logger.error(f"Multiple files found in {remote_file_path}:{files}")
             remote_file = f"{ftpurl}/{remote_file_name}"
             with open(local_file_path, 'wb') as f:
-                self.ftp.retrbinary(f"RETR{remote_file}", f.write)
+                self.ftp.retrbinary(f"RETR {remote_file}", f.write)
                 logger.info(f"Downloaded {local_file_path} from {remote_file}")
         except ftplib.error_perm as e:
             logger.error(f"FTP downloads error:{e}")

@@ -86,5 +86,13 @@ def save_image(image: np.ndarray, file_path: str | Path):
     cv2.imwrite(str(object=file_path), image)
 
 
+def get_picture_timeout_process():
+    logger.error("get picture timeout")
+    MainConfig.setattr(
+        "get_picture_timeout_count",
+        MainConfig.getattr("get_picture_timeout_count") + 1
+    )
+
+
 if __name__ == '__main__':
     test_load_standard_cycle_results()

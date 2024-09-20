@@ -5,7 +5,11 @@ from config import MainConfig, CameraConfig, AdjustCameraConfig
 import queue
 from loguru import logger
 
-from utils import clear_queue, drop_excessive_queue_items
+from utils import (
+    clear_queue,
+    drop_excessive_queue_items,
+    get_picture_timeout_process
+)
 
 
 def adjust_exposure_by_mean(
@@ -203,7 +207,7 @@ def adjust_exposure_full_res_recursive(
                     exposure2id2boxstate.update(exposure2boxes_high)
 
     except queue.Empty:
-        logger.error("get picture timeout")
+        get_picture_timeout_process()
 
     # 还原相机配置
     CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
@@ -424,7 +428,7 @@ def adjust_exposure_full_res_for_loop(
                         logger.success(f"id2boxstate: {id2boxstate_high}, exposure time need heighter, adjust to {exposure_time_high} us")
 
         except queue.Empty:
-            logger.error("get picture timeout")
+            get_picture_timeout_process()
 
     # 还原相机配置
     CameraConfig.setattr("capture_time_interval", default_capture_time_interval)
@@ -651,7 +655,7 @@ def adjust_exposure_low_res_for_loop(
                         logger.success(f"id2boxstate: {id2boxstate_high}, exposure time need heighter, adjust to {exposure_time_high} us")
 
         except queue.Empty:
-            logger.error("get picture timeout")
+            get_picture_timeout_process()
 
     # 还原相机配置
     CameraConfig.setattr("capture_mode", default_capture_mode)

@@ -39,7 +39,13 @@ from adjust_camera import (
 )
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
-from utils import clear_queue, save_to_jsonl, load_standard_cycle_results, drop_excessive_queue_items
+from utils import (
+    clear_queue,
+    save_to_jsonl,
+    load_standard_cycle_results,
+    drop_excessive_queue_items,
+    get_picture_timeout_process
+)
 
 
 # 将日志输出到文件
@@ -130,7 +136,7 @@ def main() -> None:
             #-------------------- camera capture --------------------#
 
                 except queue.Empty:
-                    logger.error("get picture timeout")
+                    get_picture_timeout_process()
 
                 #-------------------- 设定循环 --------------------##
                 # 总的循环轮数为 1 + 曝光次数
@@ -157,7 +163,7 @@ def main() -> None:
             #-------------------- camera capture --------------------#
 
                 except queue.Empty:
-                    logger.error("get picture timeout")
+                    get_picture_timeout_process()
 
                 else:
                     # 没有发生错误

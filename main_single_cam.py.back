@@ -42,7 +42,15 @@ from adjust_camera import (
 )
 from serial_communication import serial_receive, serial_send, serial_for_test
 from mqtt_communication import mqtt_receive, mqtt_send
-from utils import clear_queue, drop_excessive_queue_items, save_to_jsonl, load_standard_cycle_results, get_now_time, save_image
+from utils import (
+    clear_queue,
+    drop_excessive_queue_items,
+    save_to_jsonl,
+    load_standard_cycle_results,
+    get_now_time,
+    save_image,
+    get_picture_timeout_process,
+)
 
 
 # 将日志输出到文件
@@ -196,7 +204,7 @@ def main() -> None:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
         save_image(image, save_dir / "image_default.jpg")
     except queue.Empty:
-        logger.error("get picture timeout")
+        get_picture_timeout_process()
 
     logger.info("ajust exposure 1 start")
     adjust_exposure_full_res_for_loop(camera_queue)
@@ -205,7 +213,7 @@ def main() -> None:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
         save_image(image, save_dir / "image_adjust_exposure.jpg")
     except queue.Empty:
-        logger.error("get picture timeout")
+        get_picture_timeout_process()
     #------------------------------ 调整曝光 ------------------------------#
 
     #------------------------------ 找到目标 ------------------------------#
@@ -271,7 +279,7 @@ def main() -> None:
 
         logger.success("find target end")
     except queue.Empty:
-        logger.error("get picture timeout")
+        get_picture_timeout_process()
 
     # 保存运行时配置
     save_config_to_yaml(config_path=runtime_config_path)
@@ -430,7 +438,7 @@ def main() -> None:
                     cycle_before_time = cycle_current_time
 
                 except queue.Empty:
-                    logger.error("get picture timeout")
+                    get_picture_timeout_process()
 
             # 每个周期的其余循环
             else:
@@ -517,7 +525,7 @@ def main() -> None:
                     #------------------------- 检测目标 -------------------------#
 
                 except queue.Empty:
-                    logger.error("get picture timeout")
+                    get_picture_timeout_process()
 
                 else:
                     # 没有发生错误
@@ -712,7 +720,7 @@ def main() -> None:
                                     logger.success(f"The lost target has been found, the target number {target_number} is enough, got {got_target_number} targets.")
 
                             except queue.Empty:
-                                logger.error("get picture timeout")
+                                get_picture_timeout_process()
 
                         # 目标数量正常
                         else:
@@ -945,7 +953,7 @@ def main() -> None:
                             "msgid": "bb6f3eeb2"
                         }
                         mqtt_send_queue.put(send_msg)
-                        logger.error("get picture timeout")
+                        get_picture_timeout_process()
 
                 # 温控板回复控温指令, 回复可能延期
                 elif cmd == 'askadjusttempdata':
@@ -1069,7 +1077,7 @@ def main() -> None:
                     save_image(image, image_path)
                 except queue.Empty:
                     image_path = None
-                    logger.error("get picture timeout")
+                    get_picture_timeout_process()
 
                 send_msg = {
                     "cmd":"devicedeploying",

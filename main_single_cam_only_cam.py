@@ -42,7 +42,15 @@ from adjust_camera import (
 )
 from serial_communication import serial_receive, serial_send, serial_for_test
 from mqtt_communication import mqtt_receive, mqtt_send
-from utils import clear_queue, drop_excessive_queue_items, save_to_jsonl, load_standard_cycle_results, get_now_time, save_image
+from utils import (
+    clear_queue,
+    drop_excessive_queue_items,
+    save_to_jsonl,
+    load_standard_cycle_results,
+    get_now_time,
+    save_image,
+    get_picture_timeout_process,
+)
 
 
 # 将日志输出到文件
@@ -224,7 +232,7 @@ def main() -> None:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
         save_image(image, save_dir / "image_default.jpg")
     except queue.Empty:
-        logger.error("get picture timeout")
+        get_picture_timeout_process()
 
     logger.info("ajust exposure 1 start")
     adjust_exposure_full_res_for_loop(camera_queue)
@@ -233,7 +241,7 @@ def main() -> None:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
         save_image(image, save_dir / "image_adjust_exposure.jpg")
     except queue.Empty:
-        logger.error("get picture timeout")
+        get_picture_timeout_process()
     #------------------------------ 调整曝光 ------------------------------#
 
     #------------------------------ 找到目标 ------------------------------#
@@ -299,7 +307,7 @@ def main() -> None:
 
         logger.success("find target end")
     except queue.Empty:
-        logger.error("get picture timeout")
+        get_picture_timeout_process()
 
     # 保存运行时配置
     save_config_to_yaml(config_path=runtime_config_path)
@@ -445,7 +453,7 @@ def main() -> None:
                     cycle_before_time = cycle_current_time
 
                 except queue.Empty:
-                    logger.error("get picture timeout")
+                    get_picture_timeout_process()
 
             # 每个周期的其余循环
             else:
@@ -532,7 +540,7 @@ def main() -> None:
                     #------------------------- 检测目标 -------------------------#
 
                 except queue.Empty:
-                    logger.error("get picture timeout")
+                    get_picture_timeout_process()
 
                 else:
                     # 没有发生错误
@@ -728,7 +736,7 @@ def main() -> None:
                                     logger.success(f"The lost target has been found, the target number {target_number} is enough, got {got_target_number} targets.")
 
                             except queue.Empty:
-                                logger.error("get picture timeout")
+                                get_picture_timeout_process()
 
                         # 目标数量正常
                         else:
@@ -1068,7 +1076,7 @@ class Receive:
                 "msgid": "bb6f3eeb2"
             }
             # mqtt_send_queue.put(send_msg)
-            logger.error("get picture timeout")
+            get_picture_timeout_process()
 
     @staticmethod
     def receive_temp_control_msg(received_msg: dict | None = None):
@@ -1263,6 +1271,14 @@ class Send:
         if False:
             Send.send_temperature_control_msg()
 
+        # 相机超时错误
+        get_picture_timeout_threshold: int = MainConfig.getattr("get_picture_timeout_threshold")
+        get_picture_timeout_count: int = MainConfig.getattr("get_picture_timeout_count")
+        if get_picture_timeout_count >= get_picture_timeout_threshold:
+            logger.warning(f"get picture timeout count: {get_picture_timeout_count} >= threshold: {get_picture_timeout_threshold}, send device error msg")
+            Send.send_device_error_msg("camera timeout")
+            MainConfig.setattr("get_picture_timeout_count", 0)
+
     @staticmethod
     def send_device_deploying_msg():
         """设备部署响应消息"""
@@ -1291,7 +1307,7 @@ class Send:
             save_image(image, image_path)
         except queue.Empty:
             image_path = None
-            logger.error("get picture timeout")
+            get_picture_timeout_process()
 
         send_msg = {
             "cmd": "devicedeploying",
@@ -1423,7 +1439,7 @@ class Send:
         logger.warning("send temperature alarm msg")
 
     @staticmethod
-    def send_device_error_msg():
+    def send_device_error_msg(msg: str = "device error"):
         """设备异常告警消息"""
         send_msg = {
             "cmd": "alarm",
@@ -1432,7 +1448,7 @@ class Send:
                 "type": "device",
                 "at": get_now_time(),
                 "code": 400,
-                "msg": "device error"
+                "msg": msg
             }
         }
         # mqtt_send_queue.put(send_msg)

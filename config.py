@@ -256,12 +256,18 @@ def load_config_from_yaml(
         class2data = yaml.full_load(file)
 
     for config in configs:
-        data = class2data[config.__name__]
-        for key, value in data.items():
-            if hasattr(config, key):
-                if isinstance(getattr(config, key), Path):
-                    value = Path(value)
-                config.setattr(key, value)
+        # 判断配置类是否存在于配置文件中
+        if config.__name__ in class2data:
+            logger.info(f"Loading {config.__name__} config from {config_path}.")
+            data = class2data[config.__name__]
+            for key, value in data.items():
+                if hasattr(config, key):
+                    if isinstance(getattr(config, key), Path):
+                        value = Path(value)
+                    logger.info(f"Setting {config.__name__}.{key}: from `{getattr(config, key)}` to `{value}`.")
+                    config.setattr(key, value)
+                else:
+                    logger.warning(f"Config {config.__name__} has no attribute {key}.")
 
 
 def init_config_from_yaml(

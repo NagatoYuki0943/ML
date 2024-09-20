@@ -32,6 +32,7 @@ class RaspberryFTP:
             logger.info(f"FTP server connected")
         except ftplib.Error as e:
             logger.error(f"FTP server unreachable : {e}")
+            raise
 
     def upload_file(self, local_file_path, local_file_name, ftpurl):
         """上传现场文件
@@ -81,6 +82,13 @@ class RaspberryFTP:
         except ftplib.error_perm as e:
             logger.error(f"FTP downloads error:{e}")
             raise
+
+    def check_and_connect(self):
+        """检查连接状态，断开时重连"""
+        try:
+            self.ftp.voidcmd('NOOP')
+        except ftplib.Error as e:
+            self.ftp_connect()
 
     def ftp_close(self):
         self.ftp.quit()

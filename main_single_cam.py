@@ -47,7 +47,11 @@ from utils import clear_queue, drop_excessive_queue_items, save_to_jsonl, load_s
 
 # 将日志输出到文件
 # 每天 0 点新创建一个 log 文件
-handler_id = logger.add('log/runtime_{time}.log', level=MainConfig.getattr("log_level"), rotation='00:00')
+handler_id = logger.add(
+    str(MainConfig.getattr("loguru_log_path")),
+    level=MainConfig.getattr("log_level"),
+    rotation='00:00'
+)
 
 
 #------------------------------ 初始化 ------------------------------#

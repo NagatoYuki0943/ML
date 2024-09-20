@@ -54,7 +54,9 @@ class RaspberryFTP:
                     self.ftp.storbinary(f"STOR {remote_file}", f)
                     logger.info(f"Uploaded file from {file_path} to {remote_file}")
         except Exception as e:
+            self.ftp.rmd(ftpurl)
             logger.error(f"FTP uploads error:{e}")
+            raise
 
     def download_file(self, local_file_path, remote_file_name, ftpurl):
         """下载配置文件
@@ -82,6 +84,7 @@ class RaspberryFTP:
                 logger.info(f"Downloaded {local_file_path} from {remote_file}")
         except ftplib.error_perm as e:
             logger.error(f"FTP downloads error:{e}")
+            raise
 
     def ftp_close(self):
         self.ftp.quit()

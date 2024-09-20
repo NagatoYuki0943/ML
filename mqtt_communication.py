@@ -36,22 +36,26 @@ def mqtt_send(
         body = message.get("body", {})
         cmd = message.get("cmd")
         if body:
-            if "img" in body:
-                timestamp = time.strftime("%Y%m%d%H%M%S")
-                ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
-                ftp.ftp_connect()
-                ftp.upload_file(body['path'], body['img'], ftpurl)
-                ftp.ftp_close()
-                message['body'].pop('path')
-                message['body']['ftpurl'] = ftpurl
-            elif "config" in body:
-                timestamp = time.strftime("%Y%m%d%H%M%S")
-                ftpurl = f"{FTPConfig.getattr('config_base_url')}/{cmd}/{timestamp}"
-                ftp.ftp_connect()
-                ftp.upload_file(body['path'], body['config'], ftpurl)
-                ftp.ftp_close()
-                message['body'].pop('path')
-                message['body']['ftpurl'] = ftpurl
+            try:
+                if "img" in body:
+                    timestamp = time.strftime("%Y%m%d%H%M%S")
+                    ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
+                    ftp.ftp_connect()
+                    ftp.upload_file(body['path'], body['img'], ftpurl)
+                    ftp.ftp_close()
+                    message['body'].pop('path')
+                    message['body']['ftpurl'] = ftpurl
+                elif "config" in body:
+                    timestamp = time.strftime("%Y%m%d%H%M%S")
+                    ftpurl = f"{FTPConfig.getattr('config_base_url')}/{cmd}/{timestamp}"
+                    ftp.ftp_connect()
+                    ftp.upload_file(body['path'], body['config'], ftpurl)
+                    ftp.ftp_close()
+                    message['body'].pop('path')
+                    message['body']['ftpurl'] = ftpurl
+            except Exception as e:
+                message['body']['code'] = 400
+                message['body']['msg'] = f"{cmd} uploads faild: {e}"
         topic, payload = client.merge_message(message)
         client.publish(topic, payload)
 

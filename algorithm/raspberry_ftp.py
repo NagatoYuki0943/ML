@@ -1,6 +1,7 @@
 import ftplib
 from loguru import logger
 import threading
+import os
 
 class RaspberryFTP:
     def __init__(
@@ -45,6 +46,10 @@ class RaspberryFTP:
                 local_file_name = [local_file_name]
             if isinstance(local_file_path, str):
                 local_file_path = [local_file_path]
+            # 检查每个本地文件是否存在
+            for file_path in local_file_path:
+                if not os.path.exists(file_path):
+                    raise FileNotFoundError(f"Local file does not exist: {file_path}")
             # 创建子目录
             self.ftp.mkd(ftpurl)
             # 本地路径和名字绑定，上传文件
@@ -53,6 +58,9 @@ class RaspberryFTP:
                 with open(file_path, 'rb') as f:
                     self.ftp.storbinary(f"STOR {remote_file}", f)
                     logger.info(f"Uploaded file from {file_path} to {remote_file}")
+        except FileNotFoundError as e:
+            logger.error(e)
+            raise
         except Exception as e:
             self.ftp.rmd(ftpurl)
             logger.error(f"FTP uploads error:{e}")

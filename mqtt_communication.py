@@ -92,7 +92,7 @@ def config_file_update(message, send_queue, ftp: RaspberryFTP):
     msgid = message['msgid']
     body = message.get("body")
     timestamp = time.strftime("%Y%m%d-%H%M%S")
-    config_file_path = MainConfig.getattr("save_dir") / f"Configuration_{timestamp}.yaml"
+    config_file_path = MainConfig.getattr("save_dir") / f"config_{timestamp}.yaml"
     try:
         ftp.ftp_connect()
         ftp.download_file(config_file_path, body['config'], body['ftpurl'])

@@ -51,6 +51,13 @@ handler_id = logger.add(
 )
 
 
+# 调整主循环的周期时间
+MainConfig.cycle_time_interval = 2000
+# 调整相机拍照速度
+CameraConfig.capture_time_interval = 500
+CameraConfig.return_image_time_interval = 500
+
+
 def main() -> None:
     #------------------------------ 初始化 ------------------------------#
     logger.info("init start")

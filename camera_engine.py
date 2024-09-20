@@ -41,8 +41,14 @@ def camera_engine(
                 raspberry_cameras.switch_mode(camera_index, capture_mode)
 
             # 2.拍照
-            exposure_time: int = CameraConfig.getattr("exposure_time")
-            analogue_gain: float = CameraConfig.getattr("analogue_gain")
+            # 曝光时间
+            exposure_time: int | None = CameraConfig.getattr("exposure_time")
+            # 曝光时间宽容度
+            exposure_time_tolerance_percent: float = CameraConfig.getattr("exposure_time_tolerance_percent")
+            if exposure_time is not None:
+                exposure_time_tolerance = exposure_time * exposure_time_tolerance_percent
+            # 增益
+            analogue_gain: float | None = CameraConfig.getattr("analogue_gain")
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S.%f")
             image, metadata = raspberry_cameras.capture(
                 camera_index,
@@ -64,8 +70,9 @@ def camera_engine(
                 # 默认 exposure_time 为 None,要手动设定
                 if exposure_time is None:
                     exposure_time = _ExposureTime
+                    exposure_time_tolerance = exposure_time * exposure_time_tolerance_percent
                     CameraConfig.setattr("exposure_time", exposure_time)
-                if _ExposureTime >= exposure_time - 100 and _ExposureTime <= exposure_time + 100:
+                if _ExposureTime >= exposure_time - exposure_time_tolerance and _ExposureTime <= exposure_time + exposure_time_tolerance:
                     # 如果队列满了，就删除队列的第一张图片
                     if queue.full():
                         queue.get()

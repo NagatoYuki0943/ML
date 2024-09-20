@@ -63,8 +63,9 @@ class CameraConfig(BaseConfig):
     """
     lock = Lock()
     low_res_ratio: float = 0.5                              # 相机拍摄低分辨率比率
-    exposure_time: int = 40000                              # 曝光时间 us
-    analogue_gain: float = None                             # 模拟增益
+    exposure_time: int | None = 40000                       # 曝光时间 us
+    exposure_time_tolerance_percent: float = 0.01           # 曝光时间容差百分比 +/-0.01
+    analogue_gain: float | None = None                      # 模拟增益
     capture_time_interval: int = 1000                       # 相机拍照间隔 ms
     return_image_time_interval: int = 3000                  # 返回图片的检测 ms
     capture_mode: Literal['preview', 'low', 'full'] = 'full'# 相机拍照模式
@@ -174,7 +175,7 @@ class SerialCommConfig(BaseConfig):
     baudrate: int = 115200
     BUFFER_SIZE: int = 2048
     timeout: float = 0
-    log_dir: Path = Path("log")
+    log_dir: Path = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
     temperature_data_save_path = log_dir / "temperature_data.json"
     LOG_SIZE: int = 10_000_000 # 温度数据记录文件大小为10MB

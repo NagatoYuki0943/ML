@@ -2,6 +2,7 @@ from paho.mqtt import client as mqtt
 from loguru import logger
 import json
 import re
+import time
 
 class RaspberryMQTT:
     def __init__(
@@ -39,17 +40,21 @@ class RaspberryMQTT:
         self.client.on_message = self.on_message
         self.connect_mqtt()
         self.pattern = re.compile(r'(\w+)=([^&]*)')
+        self.client.on_disconnect = self.on_disconnect()
 
     def connect_mqtt(self):
         """与服务器建立连接并订阅主题"""
-        def on_connect(client, userdata, flags, rc):
-            if rc == 0:
-                logger.info(f"MQTT server connected")
-            else:
-                logger.error(f"MQTT server connection error")
-        self.client.on_connect = on_connect
-        self.client.connect(host = self.broker, port = self.port, keepalive = self.timeout )
-        self.client.subscribe(self.topic, qos = 1)
+        # 尝试连接服务器，无法连接则等待十秒后尝试重连
+        while True:
+            try:
+                self.client.connect(host = self.broker, port = self.port, keepalive = self.timeout )
+                self.client.subscribe(self.topic, qos = 1)
+                logger.success(f"MQTT server connected")
+                break
+            except Exception as e:
+                logger.warning(f"Connection failed: {e}, Retrying in 10 seconds...")
+                time.sleep(10)
+            
 
     def on_message(self, client, userdata, msg):
         """收到的消息传入回调函数"""
@@ -76,6 +81,22 @@ class RaspberryMQTT:
     def stop(self):
         """断开服务器连接"""
         self.client.disconnect()
+
+    def on_disconnect(self, client, userdata, rc):
+        """设备意外掉线处理"""
+        if rc == 0:
+            logger.info("MQTT server manually disconnected")
+        else:
+            logger.warning(f"Unexpected disconnection {rc}. Trying to reconnect...")
+            # 尝试重连服务器
+            while True:
+                try:
+                    self.client.reconnect()
+                    logger.success("MQTT server reconnected")
+                    break
+                except Exception as e:
+                    print(f"Reconnect failed: {e}. Retrying in 10 seconds...")
+                    time.sleep(10)
 
     def extract_message(self, message):
         """解析mqtt消息

@@ -74,18 +74,6 @@ class RaspberryFTP:
             ftpurl (str): FTP服务器上的下载路径
         """
         try:
-            # self.ftp.cwd(ftpurl)
-            # files = self.ftp.nlst()
-            # if len(files) == 1:
-            #     remote_file = files[0]
-            #     with open(local_file_path, 'wb') as local_file:
-            #         self.ftp.retrbinary(f"RETR {remote_file}", local_file.write)
-            #         logger.info(f"Download file from {remote_file_path} to {local_file_path}")
-            # else:
-            #     if len(files) == 0:
-            #         logger.error(f"No files found in {remote_file_path}")
-            #     else:
-            #         logger.error(f"Multiple files found in {remote_file_path}:{files}")
             remote_file = f"{ftpurl}/{remote_file_name}"
             with open(local_file_path, 'wb') as f:
                 self.ftp.retrbinary(f"RETR {remote_file}", f.write)

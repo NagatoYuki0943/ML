@@ -1,5 +1,6 @@
 import numpy as np
 import time
+from pathlib import Path
 from datetime import datetime
 from typing import Literal
 from loguru import logger
@@ -11,7 +12,8 @@ class RaspberryCameras:
     def __init__(
         self,
         camera_indexes: int | list[int] | tuple[int] = 0,
-        log_level: int = Picamera2.WARNING,
+        log_level: int = 'INFO',
+        log_file_path: str | Path = Path("logs/camera.log"),
         low_res_ratio: float = 0.5,
         *args,
         **kwargs,
@@ -19,11 +21,25 @@ class RaspberryCameras:
         """
         Args:
             camera_indexes (int | list[int] | tuple[int], optional): 相机 index. Defaults to 0.
-            log_level (int, optional): log 级别. Defaults to Picamera2.WARNING.
+            log_level (str, optional): log 级别. Defaults to 'INFO'.
+            log_file_path (str | Path, optional): 日志文件路径. Defaults to "logs/camera.log".
             low_res_ratio (float, optional): 低分辨率比率. Defaults to 0.5.
         """
+        # 日志
+        log_file_path = Path(log_file_path)
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        self.log_file = open(log_file_path, "a", encoding="utf-8")
+        _log_level = {
+            'TRACE': Picamera2.DEBUG,
+            'DEBUG': Picamera2.DEBUG,
+            'INFO': Picamera2.INFO,
+            'SUCCESS': Picamera2.INFO,
+            'WARNING': Picamera2.WARNING,
+            'ERROR': Picamera2.ERROR,
+            'CRITICAL': Picamera2.CRITICAL,
+        }[log_level]
+        Picamera2.set_logging(_log_level, self.log_file)
 
-        Picamera2.set_logging(log_level)
         camera_indexes = [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
         self.camera_indexes = camera_indexes
 
@@ -57,6 +73,11 @@ class RaspberryCameras:
             self.full_res_configs[camera_index] = full_res_config
             # 默认设置为高分辨率 config
             picam2.configure(full_res_config)
+
+
+    def close_log_file(self) -> None:
+        """关闭日志文件"""
+        self.log_file.close()
 
 
     def start_preview(
@@ -300,6 +321,9 @@ def test_raspberry_cameras_single() -> None:
     # 关闭相机
     raspberry_cameras.close(camera_index)
 
+    # 关闭日志文件
+    raspberry_cameras.close_log_file()
+
 
 def test_raspberry_cameras_double() -> None:
     import cv2
@@ -322,6 +346,9 @@ def test_raspberry_cameras_double() -> None:
 
     # 关闭相机
     raspberry_cameras.close_all()
+
+    # 关闭日志文件
+    raspberry_cameras.close_log_file()
 
 
 def test_raspberry_cameras_speed() -> None:
@@ -355,6 +382,9 @@ def test_raspberry_cameras_speed() -> None:
 
     # 关闭相机
     raspberry_cameras.close(camera_index)
+
+    # 关闭日志文件
+    raspberry_cameras.close_log_file()
 
 
 if __name__ == "__main__":

@@ -44,7 +44,11 @@ from utils import clear_queue, save_to_jsonl, load_standard_cycle_results, drop_
 
 # 将日志输出到文件
 # 每天 0 点新创建一个 log 文件
-handler_id = logger.add('log/runtime_{time}.log', rotation='00:00')
+handler_id = logger.add(
+    str(MainConfig.getattr("loguru_log_path")),
+    level=MainConfig.getattr("log_level"),
+    rotation='00:00'
+)
 
 
 def main() -> None:
@@ -82,20 +86,6 @@ def main() -> None:
     #------------------------------ 初始化 ------------------------------#
 
     #------------------------------ 调整曝光 ------------------------------#
-    try:
-        _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_default.jpg", image)
-    except queue.Empty:
-        logger.error("get picture timeout")
-
-    logger.info("ajust exposure 1 start")
-    adjust_exposure_full_res_for_loop(camera_queue)
-    logger.success("ajust exposure 1 end")
-    try:
-        _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        cv2.imwrite(save_dir / "image_adjust_exposure.jpg", image)
-    except queue.Empty:
-        logger.error("get picture timeout")
     #------------------------------ 调整曝光 ------------------------------#
 
     #-------------------- 循环变量 --------------------#
@@ -125,12 +115,15 @@ def main() -> None:
         if _cycle_current_time_period > _cycle_before_time_period or cycle_loop_count > -1:
             if cycle_loop_count == -1:  # 每个周期的第一次循环
                 logger.success(f"The cycle is started.")
-                #-------------------- 调整全图曝光 --------------------#
-                logger.info("full image ajust exposure start")
-                adjust_exposure_full_res_for_loop(camera_queue)
-                logger.info("full image ajust exposure end")
-                #-------------------- 调整全图曝光 --------------------#
 
+                try:
+                    # 获取照片
+                    image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
+                    logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
+            #-------------------- camera capture --------------------#
+
+                except queue.Empty:
+                    logger.error("get picture timeout")
 
                 #-------------------- 设定循环 --------------------##
                 # 总的循环轮数为 1 + 曝光次数
@@ -140,7 +133,6 @@ def main() -> None:
                 cycle_loop_count = 0
                 logger.info(f"The {cycle_loop_count} iter within the cycle.")
                 #-------------------- 设定循环 --------------------##
-
                 # 周期设置
                 cycle_before_time = cycle_current_time
 

@@ -36,6 +36,9 @@ class MainConfig(BaseConfig):
     """
     lock = Lock()   # 锁, 在读取或者修改配置文件时要加锁
     log_level: Literal['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO'
+    log_dir: Path = Path("logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    loguru_log_path: str = log_dir / "runtime_{time}.log"
     save_dir: Path = Path("results")
     save_dir.mkdir(parents=True, exist_ok=True)
     location_save_dir = save_dir / "rings_location"

@@ -5,7 +5,7 @@ from loguru import logger
 import cv2
 
 from algorithm import RaspberryCameras
-from config import CameraConfig
+from config import MainConfig, CameraConfig
 from utils import enhance_contrast_clahe
 
 
@@ -16,9 +16,12 @@ def camera_engine(
     *args,
     **kwargs,
 ):
+    log_file_path = MainConfig.getattr("log_dir") / f"camera_{camera_index}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
     raspberry_cameras = RaspberryCameras(
         camera_index,
-        low_res_ratio=CameraConfig.getattr("low_res_ratio"),
+        MainConfig.getattr("log_level"),
+        log_file_path,
+        CameraConfig.getattr("low_res_ratio"),
     )
     raspberry_cameras.start(camera_index)
 

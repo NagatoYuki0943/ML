@@ -3,7 +3,7 @@ __pycache__/
 .idea/
 
 results/
-log/
+logs/
 
 rings_location_draw1.ipynb
 test.ipynb

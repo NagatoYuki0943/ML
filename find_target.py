@@ -161,7 +161,7 @@ from config import MatchTemplateConfig
 #     return sorted_ratios, sorted_scores, sorted_boxes, got_target_number
 
 
-def find_target(image: np.ndarray) -> tuple[dict, int]:
+def find_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
     logger.info("find target start")
     # 匹配参数
     template_path: Path = MatchTemplateConfig.getattr("template_path")
@@ -231,7 +231,7 @@ def find_target(image: np.ndarray) -> tuple[dict, int]:
 
 
 # 在原来box周围扩大范围搜寻
-def find_around_target(image: np.ndarray) -> tuple[dict, int]:
+def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
     logger.info("find around target start")
     # 匹配参数
     template_path: Path = MatchTemplateConfig.getattr("template_path")
@@ -403,7 +403,7 @@ def find_around_target(image: np.ndarray) -> tuple[dict, int]:
 
 
 # 全局查找丢失的box，屏蔽已知的box
-def find_lost_target(image: np.ndarray) -> tuple[dict, int]:
+def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
     logger.info("find lost target start")
     # 匹配参数
     template_path: Path = MatchTemplateConfig.getattr("template_path")

@@ -387,7 +387,34 @@ def test_raspberry_cameras_speed() -> None:
     raspberry_cameras.close_log_file()
 
 
+def test_restart_raspberry_cameras() -> None:
+
+    camera_index = 0
+
+    print("start 1")
+    raspberry_cameras = RaspberryCameras(camera_index)
+    raspberry_cameras.start(camera_index)
+    raspberry_cameras.capture(camera_index)
+    raspberry_cameras.close(camera_index)
+    raspberry_cameras.close_log_file()
+    id1 = id(raspberry_cameras)
+    print("end 1")
+
+    print("start 2")
+    raspberry_cameras = RaspberryCameras(camera_index)
+    raspberry_cameras.start(camera_index)
+    raspberry_cameras.capture(camera_index)
+    raspberry_cameras.close(camera_index)
+    raspberry_cameras.close_log_file()
+    id2 = id(raspberry_cameras)
+    print("end 2")
+    print(id1)
+    print(id2)
+    print(id1 == id2)
+
+
 if __name__ == "__main__":
     test_raspberry_cameras_single()
     # test_raspberry_cameras_double()
     test_raspberry_cameras_speed()
+    test_restart_raspberry_cameras()

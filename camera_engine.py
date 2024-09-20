@@ -16,15 +16,19 @@ def camera_engine(
     *args,
     **kwargs,
 ):
-    log_file_path = MainConfig.getattr("log_dir") / f"camera_{camera_index}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
-    raspberry_cameras = RaspberryCameras(
-        camera_index,
-        MainConfig.getattr("log_level"),
-        log_file_path,
-        CameraConfig.getattr("low_res_ratio"),
-    )
-    raspberry_cameras.start(camera_index)
+    # 启动相机函数
+    def start_camera_engine():
+        log_file_path = MainConfig.getattr("log_dir") / f"camera_{camera_index}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+        raspberry_cameras = RaspberryCameras(
+            camera_index,
+            MainConfig.getattr("log_level"),
+            log_file_path,
+            CameraConfig.getattr("low_res_ratio"),
+        )
+        raspberry_cameras.start(camera_index)
+        return raspberry_cameras
 
+    raspberry_cameras = start_camera_engine()
     # 存放当前的 mode
     capture_mode: str = CameraConfig.getattr("capture_mode")
     raspberry_cameras.switch_mode(camera_index, capture_mode)
@@ -103,3 +107,16 @@ def camera_engine(
 
         except Exception as e:
             logger.error(f"camera {camera_index} error: {e}")
+
+        else:
+            # 相机超时重启
+            get_picture_timeout_threshold: int = MainConfig.getattr("get_picture_timeout_threshold")
+            get_picture_timeout_count: int = MainConfig.getattr("get_picture_timeout_count")
+            if get_picture_timeout_count >= get_picture_timeout_threshold:
+                logger.warning(f"get picture timeout count: {get_picture_timeout_count} >= threshold: {get_picture_timeout_threshold}, restart camera")
+                # 关闭相机
+                raspberry_cameras.close(camera_index)
+                raspberry_cameras.close_log_file()
+                # 重启相机
+                raspberry_cameras = start_camera_engine()
+                raspberry_cameras.switch_mode(camera_index, capture_mode)

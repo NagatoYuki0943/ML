@@ -47,10 +47,10 @@ class MainConfig(BaseConfig):
     history_save_path = save_dir / "history.jsonl"
     standard_save_path = save_dir / "standard.jsonl"
     original_config_path = save_dir / "config_original.yaml"  # 原始 config, 用于重置
-    runtime_config_path = save_dir / "config_runtime.yaml"    # 运行时 config, 用于临时修改配置
+    runtime_config_path = save_dir / "config_runtime.yaml"    # 运行时 config, 用于保存当前配置
     main_sleep_interval: int = 500                                  # 主循环 sleep_time ms
+    cycle_time_interval: int = 15000                                # 主循环时间 ms
     get_picture_timeout: int = 10                                   # 获取图片超时时间 s
-    cycle_time_interval: int = 10000                                # 主循环时间 ms
     defalut_error_distance: float = 1e6                             # 错误默认距离 m
 
 

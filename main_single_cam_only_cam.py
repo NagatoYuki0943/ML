@@ -636,7 +636,7 @@ def main() -> None:
                                 logger.warning(f"box {over_distance_ids} move distance is over threshold {move_threshold}.")
 
                                 # 保存丢失的图片
-                                image_path = save_dir / f"target_displacement.jpg"
+                                image_path = save_dir / "target_displacement.jpg"
                                 save_image(image, image_path)
                                 # 位移告警消息
                                 send_msg = {
@@ -647,8 +647,8 @@ def main() -> None:
                                         "at": get_now_time(),
                                         "number": [i + 1 for i in over_distance_ids], # 表示异常的靶标编号
                                         "data": send_msg_data,
-                                        "ftpurl": "/5654/20240810160846",# ftp上传路径
-                                        "img": [str(image_path)]# 文件名称
+                                        "path": [str(image_path)], # 图片本地路径
+                                        "img": ["target_displacement.jpg"] # 文件名称
                                     }
                                 }
                                 # mqtt_send_queue.put(send_msg)
@@ -703,8 +703,9 @@ def main() -> None:
                                     logger.critical(f"The target number {target_number} is not enough, got {got_target_number} targets, loss box ids: {loss_ids}.")
 
                                     # 保存丢失的图片
-                                    image_path = save_dir / f"target_loss.jpg"
+                                    image_path = save_dir / "target_loss.jpg"
                                     save_image(image, image_path)
+                                    # 目标丢失告警消息
                                     send_msg = {
                                         "cmd":"alarm",
                                         "body":{
@@ -713,8 +714,8 @@ def main() -> None:
                                             "at": get_now_time(),
                                             "number": [i + 1 for i in loss_ids],# 异常的靶标编号
                                             "data": send_msg_data,
-                                            "ftpurl": "/5654/20240810160846",# ftp上传路径
-                                            "img": [str(image_path)]# 文件名称
+                                            "path": [str(image_path)], # 图片本地路径
+                                            "img": ["target_loss.jpg"] # 文件名称
                                         }
                                     }
                                     # mqtt_send_queue.put(send_msg)
@@ -829,6 +830,14 @@ class Receive:
         elif cmd =='reboot':
             Receive.receive_reboot_msg(received_msg)
 
+        # 更新配置文件消息
+        elif cmd == 'updateconfigfile':
+            Receive.receive_update_config_file_msg(received_msg)
+
+        # 查询配置文件消息
+        elif cmd == 'getconfigfile':
+            Receive.receive_get_config_file_msg(received_msg)
+
         else:
             logger.warning(f"unknown cmd: {cmd}")
             logger.warning(f"unknown msg: {received_msg}")
@@ -942,6 +951,7 @@ class Receive:
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),
+                "at": get_now_time(),
                 "msg": "correction succeed",
                 "data": _data,
                 # "data": {
@@ -968,6 +978,7 @@ class Receive:
         #     }
         # }
         reference_target: str = received_msg['body']['reference_target']
+        logger.success(f" try set reference reference_target: {reference_target}")
         reference_target_id = int(reference_target.split('_')[-1]) - 1 # -1 因为 id 从 0 开始
 
         id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
@@ -979,6 +990,7 @@ class Receive:
                 "body": {
                     "code": 200,
                     "did": MQTTConfig.getattr("did"),
+                    "at": get_now_time(),
                     "msg": "set succeed"
                 },
                 "msgid": "bb6f3eeb2"
@@ -992,6 +1004,7 @@ class Receive:
                 "body": {
                     "code": 200,
                     "did": MQTTConfig.getattr("did"),
+                    "at": get_now_time(),
                     "msg": "set fail, reference_target not exist"
                 },
                 "msgid": "bb6f3eeb2"
@@ -1018,7 +1031,7 @@ class Receive:
         try:
             image_timestamp, image, _ = camera_queue.get(timeout=get_picture_timeout)
             # 保存图片
-            image_path = save_dir / f"upload_image.jpg"
+            image_path = save_dir / "upload_image.jpg"
             save_image(image, image_path)
 
             # 现场图像查询响应消息
@@ -1027,9 +1040,10 @@ class Receive:
                 "body": {
                     "code": 200,
                     "did": MQTTConfig.getattr("did"),
+                    "at": get_now_time(),
                     "msg": "upload succeed",
-                    "ftpurl": "/5654/20240810160846",# ftp上传路径
-                    "img": [str(image_path)]# 文件名称
+                    "path": [str(image_path)], # 图片本地路径
+                    "img": ["upload_image.jpg"] # 文件名称
                 },
                 "msgid": "bb6f3eeb2"
             }
@@ -1042,9 +1056,10 @@ class Receive:
                 "body": {
                     "code": 200,
                     "did": MQTTConfig.getattr("did"),
+                    "at": get_now_time(),
                     "msg": "upload succeed",
-                    "ftpurl": "/5654/20240810160846",# ftp上传路径
-                    "img": []# 文件名称
+                    "path": [], # 图片本地路径
+                    "img": [] # 文件名称
                 },
                 "msgid": "bb6f3eeb2"
             }
@@ -1059,10 +1074,12 @@ class Receive:
         #     "cmd": "askadjusttempdata",
         #     "times": "2024-09-11T15:45:30",
         #     "camera": "2",
-        #     "param": {},
+        #     "param": {
+        #         "result": "OK/NOT"
+        #     },
         #     "msgid": 1
         # }
-        logger.info("received askadjusttempdata response")
+        logger.success("received askadjusttempdata response")
         received_temp_control_msg = True
 
     @staticmethod
@@ -1084,7 +1101,7 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.info("received temp data")
+        logger.success("received temp data")
 
     @staticmethod
     def receive_adjust_temp_data_msg(received_msg: dict | None = None):
@@ -1101,7 +1118,7 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.info("received adjust temp data")
+        logger.success("received adjust temp data")
 
     @staticmethod
     def receive_stop_adjust_temp_data(received_msg: dict | None = None):
@@ -1117,7 +1134,6 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.info("received stop adjust temp data")
         logger.success("received stop adjust temp data")
         is_temp_stable = True
 
@@ -1133,13 +1149,82 @@ class Receive:
             "cmd": "reboot",
             "body": {
                 "did":MQTTConfig.getattr("did"),
+                "at": get_now_time(),
                 "msg": "reboot succeed",
             },
             "msgid": "e37e42c53"
         }
         # mqtt_send_queue.put(send_msg)
+        logger.success("reboot device")
         time.sleep(5)
         os._exit()
+
+    @staticmethod
+    def receive_update_config_file_msg(received_msg: dict | None = None):
+        """更新配置文件消息"""
+        # {
+        #     "cmd":"updateconfigfile",
+        #     "body":{
+        #         "path":"results/config_20240919-170300.yaml"
+        #     },
+        #     "msgid": "bb6f3eeb2"
+        # }
+        try:
+            new_config_path = Path(received_msg['body']['path'])
+            # 载入配置文件
+            load_config_from_yaml(config_path=new_config_path)
+
+            # 更新配置文件响应消息
+            send_msg = {
+                "cmd":"updateconfigfile",
+                "body":{
+                    "code": 200,
+                    "did": MQTTConfig.getattr("did"),
+                    "at": get_now_time(),
+                    "msg": "update succeed",
+                },
+                "msgid": "bb6f3eeb2"
+            }
+            # mqtt_send_queue.put(send_msg)
+            logger.success(f"update config file: {new_config_path} success")
+
+        except Exception as e:
+            # 更新配置文件响应消息
+            send_msg = {
+                "cmd":"updateconfigfile",
+                "body":{
+                    "code": 200,
+                    "did": MQTTConfig.getattr("did"),
+                    "at": get_now_time(),
+                    "msg": "update error",
+                },
+                "msgid": "bb6f3eeb2"
+            }
+            # mqtt_send_queue.put(send_msg)
+            logger.error(f"update config file: {new_config_path} error: {e}")
+
+    @staticmethod
+    def receive_get_config_file_msg(received_msg: dict | None = None):
+        """查询配置文件消息"""
+        # {
+        #     "cmd":"getconfigfile",
+        #     "msgid": "bb6f3eeb2"
+        # }
+        # 查询配置文件响应消息
+        send_msg = {
+            "cmd":"getconfigfile",
+            "body":{
+                "code": 200,
+                "did": MQTTConfig.getattr("did"),
+                "at": get_now_time(),
+                "msg": "get succeed",
+                "path": str(save_dir / "config_runtime.yaml"), # 配置文件本地路径
+                "config": "config_runtime.yaml"# 文件名称
+            },
+            "msgid": "bb6f3eeb2"
+        }
+        # mqtt_send_queue.put(send_msg)
+        logger.success(f"get config file success, config_path: {save_dir / 'config_runtime.yaml'}")
 
 
 class Send:
@@ -1179,8 +1264,8 @@ class Send:
         """设备部署响应消息"""
         global need_send_device_deploying_msg
 
-        # 设备部署响应消息
         logger.info("send device deploying msg")
+
         if last_cycle_results is None:
             logger.warning("last_cycle_results is None, can't send device deploying msg, wait for next cycle.")
             return
@@ -1198,15 +1283,15 @@ class Send:
         try:
             # 获取照片
             _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-            image_path = save_dir / f"deploy.jpg"
+            image_path = save_dir / "deploy.jpg"
             save_image(image, image_path)
         except queue.Empty:
             image_path = None
             logger.error("get picture timeout")
 
         send_msg = {
-            "cmd":"devicedeploying",
-            "body":{
+            "cmd": "devicedeploying",
+            "body": {
                 "code": 200,
                 "msg": "deployed succeed",
                 "did": MQTTConfig.getattr("did"),
@@ -1221,8 +1306,8 @@ class Send:
                 #     "L1_SJ_2": {"X": 4.09, "Y": 8.92, "Z":6.7},
                 #     "L1_SJ_3": {"X": 2.02, "Y": 5.09, "Z":14.6}
                 # },
-                "ftpurl": "/5654/20240810160846",
-                "img": [str(image_path)]
+                "path": [str(image_path) if image_path is not None else ""], # 图片本地路径
+                "img": ["deploy.jpg" if image_path is not None else ""] # 文件名称
             },
             "msgid": "bb6f3eeb2"
         }
@@ -1297,7 +1382,6 @@ class Send:
     @staticmethod
     def send_in_working_state_msg():
         """设备进入工作状态响应消息"""
-        logger.info("send working state msg")
         send_msg = {
             "cmd": "devicestate",
             "body": {
@@ -1309,11 +1393,11 @@ class Send:
             }
         }
         # mqtt_send_queue.put(send_msg)
+        logger.success("send working state msg")
 
     @staticmethod
     def send_temperature_alarm_msg():
         """温度异常告警消息"""
-        logger.info("send temperature alarm msg")
         send_msg = {
             "cmd": "alarm",
             "body": {
@@ -1332,11 +1416,11 @@ class Send:
             }
         }
         # mqtt_send_queue.put(send_msg)
+        logger.warning("send temperature alarm msg")
 
     @staticmethod
     def send_device_error_msg():
         """设备异常告警消息"""
-        logger.info("send device error msg")
         send_msg = {
             "cmd": "alarm",
             "body": {
@@ -1348,12 +1432,12 @@ class Send:
             }
         }
         # mqtt_send_queue.put(send_msg)
+        logger.warning("send device error msg")
 
     @staticmethod
     def send_temperature_change_msg():
         """设备温控变化消息"""
         global is_temp_stable
-        logger.info("send temperature change msg")
         send_msg = {
             "cmd": "devicestate",
             "body":{
@@ -1368,7 +1452,8 @@ class Send:
                 }
             }
         }
-        # serial_send_queue.put(send_msg)
+        # mqtt_send_queue.put(send_msg)
+        logger.success("send temperature change msg")
         is_temp_stable = False
 
     @staticmethod
@@ -1386,6 +1471,7 @@ class Send:
             "msgid": 1
         }
         # serial_send_queue.put(send_msg)
+        logger.success("send temperature control msg success")
         received_temp_control_msg = False
         is_temp_stable = False
 
@@ -1399,18 +1485,22 @@ class Send:
             "msgid": 1
         }
         # serial_send_queue.put(send_msg)
+        logger.success("send adjust led level msg success")
 
         while True:
             received_msg: dict = main_queue.get(timeout=10)
             cmd: str = received_msg.get('cmd')
+            # 温控板回复补光灯调节指令
             if cmd == 'askadjustLEDlevel':
-                {
-                    "cmd": "askadjustLEDlevel",
-                    "times": get_now_time(),
-                    "param": {},
-                    "msgid": 1
-                }
-                logger.info("received askadjustLEDlevel response")
+                # {
+                #     "cmd": "askadjustLEDlevel",
+                #     "times": "2024-09-11T15:45:30",
+                #     "param":{
+                #         "result": "OK/NOT"
+                #     },
+                #     "msgid": 1
+                # }
+                logger.success("received askadjustLEDlevel response")
                 break
             else:
                 Receive.switch(received_msg)

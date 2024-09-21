@@ -1,7 +1,7 @@
 # 导入必要的库
 import gradio as gr
 import numpy as np
-from typing import Generator, Sequence
+from typing import Sequence
 import threading
 import time
 from loguru import logger
@@ -46,7 +46,7 @@ def multimodal_chat(
     if query_text is None or (
         len(query_text.strip()) == 0 and len(query["files"]) == 0
     ):
-        logger.warning(f"query is None, return history")
+        logger.warning("query is None, return history")
         return history
     query_text = query_text.strip()
     logger.info(f"query_text: {query_text}")
@@ -95,7 +95,7 @@ def regenerate(
             state_session_id=state_session_id,
         )
     else:
-        logger.warning(f"no history, can't regenerate")
+        logger.warning("no history, can't regenerate")
         return history
 
 

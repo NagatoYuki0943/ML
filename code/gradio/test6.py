@@ -1,7 +1,6 @@
 # 导入必要的库
 import gradio as gr
 import numpy as np
-import time
 from PIL import Image
 
 

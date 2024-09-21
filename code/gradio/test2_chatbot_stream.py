@@ -87,7 +87,7 @@ def regenerate(
             state_session_id=state_session_id,
         )
     else:
-        logger.warning(f"no history, can't regenerate")
+        logger.warning("no history, can't regenerate")
         yield history
 
 

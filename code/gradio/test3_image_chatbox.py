@@ -1,6 +1,6 @@
 import gradio as gr
 import numpy as np
-from typing import Generator, Sequence
+from typing import Sequence
 import threading
 import time
 from PIL import Image
@@ -109,7 +109,7 @@ def regenerate(
             state_session_id=state_session_id,
         )
     else:
-        logger.warning(f"no history, can't regenerate")
+        logger.warning("no history, can't regenerate")
         return history, image
 
 
@@ -128,7 +128,7 @@ def combine_chatbot_and_query(
 ) -> Sequence:
     history = [] if history is None else list(history)
     query = query.strip()
-    if query == None or len(query) < 1:
+    if query is None or len(query) < 1:
         return history
     return history + [[query, None]]
 

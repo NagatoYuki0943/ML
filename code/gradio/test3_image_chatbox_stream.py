@@ -1,6 +1,6 @@
 import gradio as gr
 import numpy as np
-from typing import Generator, Sequence
+from typing import Generator, Sequence, Any
 import threading
 import time
 from PIL import Image
@@ -20,6 +20,12 @@ class InterFace:
     lock = threading.Lock()
 
 
+# regenerate 使用图片有 bug
+enable_btn = gr.update(interactive=True)
+disable_btn = gr.update(interactive=False)
+btn = dict[str, Any]
+
+
 def chat_stream_with_image(
     query: str,
     history: Sequence
@@ -30,7 +36,7 @@ def chat_stream_with_image(
     top_k: int = 40,
     image: Image.Image | None = None,
     state_session_id: int = 0,
-) -> Generator[tuple[Sequence, Image.Image | None], None, None]:
+) -> Generator[tuple[Sequence, Image.Image | None, btn, btn, btn, btn], None, None]:
     history = [] if history is None else list(history)
 
     logger.info(f"{state_session_id = }")
@@ -44,12 +50,22 @@ def chat_stream_with_image(
     )
 
     if query is None or len(query.strip()) < 1:
-        yield history, image
+        yield history, image, enable_btn, enable_btn, enable_btn, enable_btn
         return
     query = query.strip()
     logger.info(f"query: {query}")
 
     logger.info(f"{image = }")
+
+    yield (
+        history + [[query, None]],
+        None,
+        disable_btn,
+        disable_btn,
+        disable_btn,
+        disable_btn,
+    )
+
     use_image: bool = False
     if isinstance(image, Image.Image):
         use_image = True
@@ -71,30 +87,77 @@ def chat_stream_with_image(
         image.save(image_path)
 
     if use_image:
-        yield history + [[(image_path, "alt_text"), None], [query, None]], image
+        yield (
+            history + [[(image_path, "alt_text"), None], [query, None]],
+            image,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+        )
     else:
-        yield history + [[query, None]], image
+        yield (
+            history + [[query, None]],
+            image,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+        )
 
     time.sleep(1)
     number: np.ndarray = np.random.randint(1, 100, 20)
+    logger.info(f"response: {number}")
+    if not use_image:
+        logger.info(f"history: {history + [[query, str(number)]]}")
+    else:
+        logger.info(
+            f"history: {history + [[(image_path, "alt_text"), None], [query, str(number)]]}"
+        )
+
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])
         if not use_image:
-            yield history + [[query, str(number[: i + 1])]], image
+            yield (
+                history + [[query, str(number[: i + 1])]],
+                image,
+                disable_btn,
+                disable_btn,
+                disable_btn,
+                disable_btn,
+            )
         else:
             # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
             yield (
                 history
                 + [[(image_path, "alt_text"), None], [query, str(number[: i + 1])]],
                 image,
+                disable_btn,
+                disable_btn,
+                disable_btn,
+                disable_btn,
             )
-    logger.info(f"response: {number}")
+
     if not use_image:
-        logger.info(f"history: {history + [[query, str(number[:i+1])]]}")
+        yield (
+            history + [[query, str(number)]],
+            image,
+            enable_btn,
+            enable_btn,
+            enable_btn,
+            enable_btn,
+        )
     else:
-        logger.info(
-            f"history: {history + [[(image_path, "alt_text"), None], [query, str(number[:i+1])]]}"
+        # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
+        yield (
+            history
+            + [[(image_path, "alt_text"), None], [query, str(number)]],
+            image,
+            enable_btn,
+            enable_btn,
+            enable_btn,
+            enable_btn,
         )
 
 
@@ -107,7 +170,7 @@ def regenerate(
     top_k: int = 40,
     image: Image.Image | None = None,
     state_session_id: int = 0,
-) -> Generator[tuple[Sequence, Image.Image | None], None, None]:
+) -> Generator[tuple[Sequence, Image.Image | None, btn, btn, btn, btn], None, None]:
     history = [] if history is None else list(history)
 
     # 重新生成时要把最后的query和response弹出,重用query
@@ -125,7 +188,7 @@ def regenerate(
         )
     else:
         logger.warning("no history, can't regenerate")
-        yield history, image
+        yield history, image, enable_btn, enable_btn, enable_btn, enable_btn
 
 
 def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
@@ -225,7 +288,7 @@ def main():
                     label="示例问题 / Example questions",
                 )
 
-            # 回车提交
+            # 回车提交(无法禁止按钮)
             query.submit(
                 chat_stream_with_image,
                 inputs=[
@@ -238,7 +301,7 @@ def main():
                     image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image],
+                outputs=[chatbot, image, submit, regen, undo, clear],
             )
 
             # 清空query
@@ -261,7 +324,7 @@ def main():
                     image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image],
+                outputs=[chatbot, image, submit, regen, undo, clear],
             )
 
             # 清空query
@@ -283,7 +346,7 @@ def main():
                     image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image],
+                outputs=[chatbot, image, submit, regen, undo, clear],
             )
 
             # 撤销

@@ -1,7 +1,7 @@
 # 导入必要的库
 import gradio as gr
 import numpy as np
-from typing import Generator, Sequence
+from typing import Generator, Sequence, Any
 import threading
 import time
 from loguru import logger
@@ -18,6 +18,11 @@ class InterFace:
     lock = threading.Lock()
 
 
+enable_btn = gr.update(interactive=True)
+disable_btn = gr.update(interactive=False)
+btn = dict[str, Any]
+
+
 def multimodal_chat(
     query: dict,
     history: Sequence
@@ -27,7 +32,7 @@ def multimodal_chat(
     top_p: float = 0.8,
     top_k: int = 40,
     state_session_id: int = 0,
-) -> Generator[Sequence, None, None]:
+) -> Generator[tuple[Sequence, btn, btn, btn], None, None]:
     history = [] if history is None else list(history)
 
     logger.info(f"{state_session_id = }")
@@ -40,24 +45,23 @@ def multimodal_chat(
         }
     )
 
-    logger.info(f"query : {query }")
+    logger.info(f"query: {query}")
     query_text = query["text"]
     # if query_text is None or len(query_text.strip()) == 0:
     if query_text is None or (
         len(query_text.strip()) == 0 and len(query["files"]) == 0
     ):
         logger.warning("query is None, return history")
-        yield history
+        yield history, enable_btn, enable_btn, enable_btn
         return
     query_text = query_text.strip()
     logger.info(f"query_text: {query_text}")
 
     # 将图片放入历史记录中
     for file in query["files"]:
-        logger.info(f"{file = }")
         history.append([(file,), None])
 
-    yield history + [[query_text, None]]
+    yield history + [[query_text, None]], disable_btn, disable_btn, disable_btn
 
     time.sleep(1)
     number: np.ndarray = np.random.randint(1, 100, 20)
@@ -67,7 +71,14 @@ def multimodal_chat(
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(f"number[{i}] = {number[i]}")
-        yield history + [[query_text, str(number[: i + 1])]]
+        yield (
+            history + [[query_text, str(number[: i + 1])]],
+            disable_btn,
+            disable_btn,
+            disable_btn,
+        )
+
+    yield history + [[query_text, str(number)]], enable_btn, enable_btn, enable_btn
 
 
 def regenerate(
@@ -78,7 +89,7 @@ def regenerate(
     top_p: float = 0.8,
     top_k: int = 40,
     state_session_id: int = 0,
-) -> Generator[Sequence, None, None]:
+) -> Generator[tuple[Sequence, btn, btn, btn], None, None]:
     history = [] if history is None else list(history)
 
     query = {"text": "", "files": []}
@@ -101,7 +112,7 @@ def regenerate(
         )
     else:
         logger.warning("no history, can't regenerate")
-        yield history
+        yield history, enable_btn, enable_btn, enable_btn
 
 
 def revocery(query: dict, history: Sequence | None = None) -> tuple[str, Sequence]:
@@ -200,7 +211,7 @@ def main():
                     label="示例问题 / Example questions",
                 )
 
-            # 回车提交
+            # 回车提交(无法禁止按钮)
             query.submit(
                 multimodal_chat,
                 inputs=[
@@ -212,7 +223,7 @@ def main():
                     top_k,
                     state_session_id,
                 ],
-                outputs=[chatbot],
+                outputs=[chatbot, regen, undo, clear],
             )
 
             # 清空query
@@ -233,7 +244,7 @@ def main():
                     top_k,
                     state_session_id,
                 ],
-                outputs=[chatbot],
+                outputs=[chatbot, regen, undo, clear],
             )
 
             # 撤销

@@ -3,7 +3,7 @@
 
 import gradio as gr
 import numpy as np
-from typing import Generator, Sequence
+from typing import Generator, Sequence, Any
 import threading
 import time
 from loguru import logger
@@ -17,6 +17,11 @@ class InterFace:
     lock = threading.Lock()
 
 
+enable_btn = gr.update(interactive=True)
+disable_btn = gr.update(interactive=False)
+btn = dict[str, Any]
+
+
 def chat_stream(
     query: str,
     history: Sequence
@@ -28,7 +33,7 @@ def chat_stream(
     language1: str = "ZH",
     language2: str = "ZH",
     state_session_id: int = 0,
-) -> Generator[Sequence, None, None]:
+) -> Generator[tuple[Sequence, btn, btn, btn, btn], None, None]:
     history = [] if history is None else list(history)
 
     logger.info(f"{language1 = }, {language2 = }")
@@ -43,20 +48,36 @@ def chat_stream(
     )
 
     if query is None or len(query.strip()) < 1:
-        yield history
+        yield history, enable_btn, enable_btn, enable_btn, enable_btn
         return
     query = query.strip()
     logger.info(f"query: {query}")
 
-    yield history + [[query, None]]
+    yield history + [[query, None]], disable_btn, disable_btn, disable_btn, disable_btn
+
     time.sleep(1)
     number = np.random.randint(1, 100, 20)
+    logger.info(f"response: {number}")
+    logger.info(f"history: {history + [[query, str(number)]]}")
+
     for i in range(len(number)):
         time.sleep(0.1)
         logger.info(number[i])
-        yield history + [[query, str(number[: i + 1])]]
-    logger.info(f"response: {number}")
-    logger.info(f"history: {history + [[query, str(number)]]}")
+        yield (
+            history + [[query, str(number[: i + 1])]],
+            disable_btn,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+        )
+
+    yield (
+        history + [[query, str(number)]],
+        enable_btn,
+        enable_btn,
+        enable_btn,
+        enable_btn,
+    )
 
 
 def regenerate(
@@ -69,7 +90,7 @@ def regenerate(
     language1: str = "ZH",
     language2: str = "ZH",
     state_session_id: int = 0,
-) -> Generator[Sequence, None, None]:
+) -> Generator[tuple[Sequence, btn, btn, btn, btn], None, None]:
     history = [] if history is None else list(history)
 
     # 重新生成时要把最后的query和response弹出,重用query
@@ -88,7 +109,7 @@ def regenerate(
         )
     else:
         logger.warning("no history, can't regenerate")
-        yield history
+        yield history, enable_btn, enable_btn, enable_btn, enable_btn
 
 
 def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
@@ -193,7 +214,7 @@ def main():
                     label="示例问题 / Example questions",
                 )
 
-            # 回车提交
+            # 回车提交(无法禁止按钮)
             query.submit(
                 chat_stream,
                 inputs=[
@@ -207,7 +228,7 @@ def main():
                     language2,
                     state_session_id,
                 ],
-                outputs=[chatbot],
+                outputs=[chatbot, submit, regen, undo, clear],
             )
 
             # 清空query
@@ -231,7 +252,7 @@ def main():
                     language2,
                     state_session_id,
                 ],
-                outputs=[chatbot],
+                outputs=[chatbot, submit, regen, undo, clear],
             )
 
             # 清空query
@@ -254,7 +275,7 @@ def main():
                     language2,
                     state_session_id,
                 ],
-                outputs=[chatbot],
+                outputs=[chatbot, submit, regen, undo, clear],
             )
 
             # 撤销

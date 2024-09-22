@@ -1,7 +1,7 @@
 # 导入必要的库
 import gradio as gr
 import numpy as np
-from typing import Sequence
+from typing import Sequence, Any
 import threading
 import time
 from loguru import logger
@@ -18,6 +18,11 @@ class InterFace:
     lock = threading.Lock()
 
 
+enable_btn = gr.update(interactive=True)
+disable_btn = gr.update(interactive=False)
+btn = dict[str, Any]
+
+
 def multimodal_chat(
     query: dict,
     history: Sequence
@@ -27,7 +32,7 @@ def multimodal_chat(
     top_p: float = 0.8,
     top_k: int = 40,
     state_session_id: int = 0,
-) -> Sequence:
+) -> tuple[Sequence, btn, btn, btn]:
     history = [] if history is None else list(history)
 
     logger.info(f"{state_session_id = }")
@@ -40,20 +45,19 @@ def multimodal_chat(
         }
     )
 
-    logger.info(f"query : {query }")
+    logger.info(f"query: {query}")
     query_text = query["text"]
     # if query_text is None or len(query_text.strip()) == 0:
     if query_text is None or (
         len(query_text.strip()) == 0 and len(query["files"]) == 0
     ):
         logger.warning("query is None, return history")
-        return history
+        return history, enable_btn, enable_btn, enable_btn
     query_text = query_text.strip()
     logger.info(f"query_text: {query_text}")
 
     # 将图片放入历史记录中
     for file in query["files"]:
-        logger.info(f"{file = }")
         history.append([(file,), None])
 
     time.sleep(3)
@@ -62,7 +66,7 @@ def multimodal_chat(
     history.append([query_text, response])
     logger.info(f"history: {history}")
 
-    return history
+    return history, enable_btn, enable_btn, enable_btn
 
 
 def regenerate(
@@ -73,7 +77,7 @@ def regenerate(
     top_p: float = 0.8,
     top_k: int = 40,
     state_session_id: int = 0,
-) -> Sequence:
+) -> tuple[Sequence, btn, btn, btn]:
     history = [] if history is None else list(history)
 
     query = {"text": "", "files": []}
@@ -96,7 +100,7 @@ def regenerate(
         )
     else:
         logger.warning("no history, can't regenerate")
-        return history
+        return history, enable_btn, enable_btn, enable_btn
 
 
 def revocery(query: dict, history: Sequence | None = None) -> tuple[str, Sequence]:
@@ -115,19 +119,19 @@ def revocery(query: dict, history: Sequence | None = None) -> tuple[str, Sequenc
 def combine_chatbot_and_query(
     query: dict,
     history: Sequence | None = None,
-) -> Sequence:
+) -> tuple[Sequence, btn, btn, btn]:
     history = [] if history is None else list(history)
     query_text = query["text"]
     if query_text is None or (
         len(query_text.strip()) == 0 and len(query["files"]) == 0
     ):
-        return history
+        return history, disable_btn, disable_btn, disable_btn
 
     # 将图片放入历史记录中
     for x in query["files"]:
         print(f"file: {x}")
         history.append([(x,), None])
-    return history + [[query_text, None]]
+    return history + [[query_text, None]], disable_btn, disable_btn, disable_btn
 
 
 def main():
@@ -213,6 +217,13 @@ def main():
                     label="示例问题 / Example questions",
                 )
 
+            # 拼接历史记录和问题(同时禁用按钮)
+            query.submit(
+                combine_chatbot_and_query,
+                inputs=[query, chatbot],
+                outputs=[chatbot, regen, undo, clear],
+            )
+
             # 回车提交
             query.submit(
                 multimodal_chat,
@@ -225,7 +236,7 @@ def main():
                     top_k,
                     state_session_id,
                 ],
-                outputs=[chatbot],
+                outputs=[chatbot, regen, undo, clear],
             )
 
             # 清空query
@@ -235,11 +246,11 @@ def main():
                 outputs=[query],
             )
 
-            # 拼接历史记录和问题
-            query.submit(
+            # 拼接历史记录和问题(同时禁用按钮)
+            regen.click(
                 combine_chatbot_and_query,
                 inputs=[query, chatbot],
-                outputs=[chatbot],
+                outputs=[chatbot, regen, undo, clear],
             )
 
             # 重新生成
@@ -253,7 +264,7 @@ def main():
                     top_k,
                     state_session_id,
                 ],
-                outputs=[chatbot],
+                outputs=[chatbot, regen, undo, clear],
             )
 
             # 撤销

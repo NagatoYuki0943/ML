@@ -1,6 +1,6 @@
 import gradio as gr
 import numpy as np
-from typing import Sequence
+from typing import Sequence, Any
 import threading
 import time
 from PIL import Image
@@ -20,6 +20,12 @@ class InterFace:
     lock = threading.Lock()
 
 
+# regenerate 使用图片有 bug
+enable_btn = gr.update(interactive=True)
+disable_btn = gr.update(interactive=False)
+btn = dict[str, Any]
+
+
 def chat_with_image(
     query: str,
     history: Sequence
@@ -30,7 +36,7 @@ def chat_with_image(
     top_k: int = 40,
     image: Image.Image | None = None,
     state_session_id: int = 0,
-) -> tuple[Sequence, Image.Image | None]:
+) -> tuple[Sequence, Image.Image | None, btn, btn, btn, btn]:
     history = [] if history is None else list(history)
 
     logger.info(f"{state_session_id = }")
@@ -44,7 +50,7 @@ def chat_with_image(
     )
 
     if query is None or len(query.strip()) < 1:
-        return history, image
+        return history, image, enable_btn, enable_btn, enable_btn, enable_btn
     query = query.strip()
     logger.info(f"query: {query}")
 
@@ -74,13 +80,13 @@ def chat_with_image(
     logger.info(f"response: {response}")
     if not use_image:
         logger.info(f"history: {history + [[query, response]]}")
-        return history + [[query, response]], image
+        return history + [[query, response]], image, enable_btn, enable_btn, enable_btn, enable_btn
     else:
         # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
         logger.info(
             f"history: {history + [[(image_path, "alt_text"), None], [query, response]]}"
         )
-        return history + [[(image_path, "alt_text"), None], [query, response]], image
+        return history + [[(image_path, "alt_text"), None], [query, response]], image, enable_btn, enable_btn, enable_btn, enable_btn
 
 
 def regenerate(
@@ -92,7 +98,7 @@ def regenerate(
     top_k: int = 40,
     image: Image.Image | None = None,
     state_session_id: int = 0,
-) -> tuple[Sequence, Image.Image | None]:
+) -> tuple[Sequence, Image.Image | None, btn, btn, btn, btn]:
     history = [] if history is None else list(history)
 
     # 重新生成时要把最后的query和response弹出,重用query
@@ -110,7 +116,7 @@ def regenerate(
         )
     else:
         logger.warning("no history, can't regenerate")
-        return history, image
+        return history, image, enable_btn, enable_btn, enable_btn, enable_btn
 
 
 def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
@@ -125,12 +131,12 @@ def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
 def combine_chatbot_and_query(
     query: str,
     history: Sequence | None = None,
-) -> Sequence:
+) -> tuple[Sequence, btn, btn, btn, btn]:
     history = [] if history is None else list(history)
     query = query.strip()
     if query is None or len(query) < 1:
-        return history
-    return history + [[query, None]]
+        return history, disable_btn, disable_btn, disable_btn, disable_btn
+    return history + [[query, None]], disable_btn, disable_btn, disable_btn, disable_btn
 
 
 def main():
@@ -221,6 +227,13 @@ def main():
                     label="示例问题 / Example questions",
                 )
 
+            # 拼接历史记录和问题
+            query.submit(
+                combine_chatbot_and_query,
+                inputs=[query, chatbot],
+                outputs=[chatbot, submit, regen, undo, clear],
+            )
+
             # 回车提交
             query.submit(
                 chat_with_image,
@@ -234,7 +247,7 @@ def main():
                     image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image],
+                outputs=[chatbot, image, submit, regen, undo, clear],
             )
 
             # 清空query
@@ -244,11 +257,11 @@ def main():
                 outputs=[query],
             )
 
-            # 拼接历史记录和问题
-            query.submit(
+            # 拼接历史记录和问题(同时禁用按钮)
+            submit.click(
                 combine_chatbot_and_query,
                 inputs=[query, chatbot],
-                outputs=[chatbot],
+                outputs=[chatbot, submit, regen, undo, clear],
             )
 
             # 按钮提交
@@ -264,7 +277,7 @@ def main():
                     image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image],
+                outputs=[chatbot, image, submit, regen, undo, clear],
             )
 
             # 清空query
@@ -274,11 +287,11 @@ def main():
                 outputs=[query],
             )
 
-            # 拼接历史记录和问题
-            submit.click(
+            # 拼接历史记录和问题(同时禁用按钮)
+            regen.click(
                 combine_chatbot_and_query,
                 inputs=[query, chatbot],
-                outputs=[chatbot],
+                outputs=[chatbot, submit, regen, undo, clear],
             )
 
             # 重新生成
@@ -293,7 +306,7 @@ def main():
                     image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image],
+                outputs=[chatbot, image, submit, regen, undo, clear],
             )
 
             # 撤销

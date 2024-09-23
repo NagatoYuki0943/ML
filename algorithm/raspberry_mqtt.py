@@ -39,7 +39,7 @@ class RaspberryMQTT:
         self.message_callback = None
         self.client.on_message = self.on_message
         self.pattern = re.compile(r'(\w+)=([^&]*)')
-        self.client.on_disconnect = self.on_disconnect()
+        self.client.on_disconnect = self.on_disconnect
         self.connection_flag = False
 
     def connect_mqtt(self):

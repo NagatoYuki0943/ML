@@ -38,9 +38,9 @@ class RaspberryMQTT:
         self.client.username_pw_set(username=username, password=password)
         self.message_callback = None
         self.client.on_message = self.on_message
-        self.connect_mqtt()
         self.pattern = re.compile(r'(\w+)=([^&]*)')
         self.client.on_disconnect = self.on_disconnect()
+        self.connection_flag = False
 
     def connect_mqtt(self):
         """与服务器建立连接并订阅主题"""
@@ -49,11 +49,12 @@ class RaspberryMQTT:
             try:
                 self.client.connect(host = self.broker, port = self.port, keepalive = self.timeout )
                 self.client.subscribe(self.topic, qos = 1)
+                self.connection_flag = True
                 logger.success(f"MQTT server connected")
                 break
             except Exception as e:
-                logger.warning(f"Connection failed: {e}, Retrying in 10 seconds...")
-                time.sleep(10)
+                logger.warning(f"Connection failed: {e}, Retrying in 5 seconds...")
+                time.sleep(5)
             
 
     def on_message(self, client, userdata, msg):
@@ -80,10 +81,12 @@ class RaspberryMQTT:
 
     def stop(self):
         """断开服务器连接"""
+        self.connection_flag = False
         self.client.disconnect()
 
     def on_disconnect(self, client, userdata, rc):
         """设备意外掉线处理"""
+        self.connection_flag = False
         if rc == 0:
             logger.info("MQTT server manually disconnected")
         else:
@@ -92,11 +95,12 @@ class RaspberryMQTT:
             while True:
                 try:
                     self.client.reconnect()
+                    self.connection_flag = True
                     logger.success("MQTT server reconnected")
                     break
                 except Exception as e:
-                    print(f"Reconnect failed: {e}. Retrying in 10 seconds...")
-                    time.sleep(10)
+                    print(f"Reconnect failed: {e}. Retrying in 5 seconds...")
+                    time.sleep(5)
 
     def extract_message(self, message):
         """解析mqtt消息

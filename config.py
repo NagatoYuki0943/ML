@@ -196,6 +196,7 @@ class MQTTConfig(BaseConfig):
     clientId: str = "7804d2"
     apikey: str = "123456"
     did: str = "7804d2"
+    send_queue_maxsize: int = 50
 
 
 @dataclass

@@ -14,6 +14,7 @@ def mqtt_receive(
         *args,
         **kwargs,
 ):
+    client.connect_mqtt()
     ftp = ftp_object_create()
     # 设置消息回调
     client.set_message_callback(
@@ -33,6 +34,11 @@ def mqtt_send(
     ftp = ftp_object_create()
     while True:
         message = queue.get()
+        while not client.connection_flag:
+            if queue.full():
+                logger.warning(f"MQTT send queue is full, delete message {message}")
+                message = queue.get()
+            time.sleep(1)
         body = message.get("body", {})
         cmd = message.get("cmd")
         if body:

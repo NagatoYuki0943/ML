@@ -57,7 +57,7 @@ class RaspberrySerialPort:
             with self.lock:
                 temperature_message = self.comm.read(self.comm.in_waiting).decode().strip()
                 self.buffer += temperature_message
-            logger.info(f"Received serial message from serial port: {temperature_message}")
+            logger.info(f"Received serial message from serial port: {self.port}, message: {temperature_message}")
 
     def subcontracting(self):
         """处理串口数据包"""
@@ -137,7 +137,7 @@ class RaspberrySerialPort:
         """
         with self.lock:
             self.comm.write(command_message.encode().strip())
-        logger.info(f"Sending message to serial port: {command_message}")
+        logger.info(f"Sending message to serial port: {self.port}, message: {command_message}")
 
     def process_command(self, command_data):
         """合并控制指令与数据

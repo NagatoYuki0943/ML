@@ -85,9 +85,7 @@ class RaspberryFTP:
 
     def check_and_connect(self):
         """检查连接状态，断开时重连"""
-        try:
-            self.ftp.voidcmd('NOOP')
-        except ftplib.Error as e:
+        if self.ftp.sock is None:
             self.ftp_connect()
 
     def ftp_close(self):

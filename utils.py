@@ -52,6 +52,11 @@ def save_to_jsonl(data, file_path: str | Path, mode: str = 'a'):
     """
     Save data to a JSON lines file.
     """
+    if data is None:
+        # write an empty file if data is None
+        with open(file_path, mode='w', encoding='utf-8') as f:
+            f.write('')
+        return
     string = json.dumps(data, ensure_ascii=False)
     with open(file_path, mode=mode, encoding='utf-8') as f:
         f.write(string + "\n")
@@ -65,8 +70,9 @@ def load_standard_cycle_results(file_path: str | Path) -> dict | None:
             line = f.readline()
             if line:
                 data = json.loads(line)
-                data = {eval(k): v for k, v in data.items()}
-                return data
+                if data is not None:
+                    data = {eval(k): v for k, v in data.items()}
+                    return data
 
 
 def test_load_standard_cycle_results():

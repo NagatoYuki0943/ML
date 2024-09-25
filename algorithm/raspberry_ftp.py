@@ -21,13 +21,14 @@ class RaspberryFTP:
         self.port = port
         self.username = username
         self.password = password
-
         self.ftp = ftplib.FTP()
 
     def ftp_connect(self):
         try:
             self.ftp.connect(self.ip, self.port)
             self.ftp.login(self.username, self.password)
+            # 设置为主动模式
+            self.ftp.set_pasv(False)
             logger.info("FTP server connected")
         except ftplib.Error as e:
             logger.error(f"FTP server unreachable : {e}")
@@ -50,16 +51,18 @@ class RaspberryFTP:
             for file_path in local_file_path:
                 if not os.path.exists(file_path):
                     raise FileNotFoundError(f"Local file does not exist: {file_path}")
-            # 检查连接状态
-            self.check_and_connect()
+            self.ftp_connect()
             # 创建子目录
-            self.ftp.mkd(ftpurl)
-            # 本地路径和名字绑定，上传文件
+            try:
+                self.ftp.cwd(ftpurl)
+            except ftplib.error_perm:
+                self.ftp.mkd(ftpurl)
+            self.ftp.cwd(ftpurl)
             for file_path, file_name in zip(local_file_path, local_file_name):
-                remote_file = f"{ftpurl}/{file_name}"
                 with open(file_path, 'rb') as f:
-                    self.ftp.storbinary(f"STOR {remote_file}", f)
-                    logger.info(f"Uploaded file from {file_path} to {remote_file}")
+                    self.ftp.storbinary(f"STOR {file_name}", f)
+                    logger.info(f"Uploaded file from {file_path} to FTP server")
+            self.ftp_close()
         except FileNotFoundError as e:
             logger.error(e)
             raise
@@ -76,28 +79,16 @@ class RaspberryFTP:
             ftpurl (str): FTP服务器上的下载路径
         """
         try:
+            self.ftp.connect()
             remote_file = f"{ftpurl}/{remote_file_name}"
-            # 检查连接状态
-            self.check_and_connect()
             with open(local_file_path, 'wb') as f:
                 self.ftp.retrbinary(f"RETR {remote_file}", f.write)
                 logger.info(f"Downloaded {local_file_path} from {remote_file}")
+            self.ftp_close()
         except ftplib.error_perm as e:
             logger.error(f"FTP downloads error:{e}")
             raise
 
-    def check_and_connect(self):
-        """检查连接状态，断开时重连"""
-        if self.ftp.sock:
-            try:
-                self.ftp.voidcmd("NOOP")
-                logger.info("FTP connection is still active")
-            except (BrokenPipeError, ftplib.Error):
-                logger.info("FTP connection lost during NOOP, reconnecting")
-                self.ftp_connect()
-        else:
-            logger.info("FTP connection socket is None, connecting")
-            self.ftp_connect()
-
     def ftp_close(self):
         self.ftp.quit()
+        logger.info("FTP disconnected")

@@ -231,7 +231,9 @@ def main() -> None:
     #------------------------------ 调整曝光 ------------------------------#
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        save_image(image, save_dir / "image_default.jpg")
+        image_path = save_dir / "image_default.jpg"
+        save_image(image, image_path)
+        logger.info(f"save `image default` image to {image_path}")
     except queue.Empty:
         get_picture_timeout_process()
 
@@ -240,7 +242,9 @@ def main() -> None:
     logger.success("ajust exposure 1 end")
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
-        save_image(image, save_dir / "image_adjust_exposure.jpg")
+        image_path = save_dir / "image_adjust_exposure.jpg"
+        save_image(image, image_path)
+        logger.info(f"save `image adjust exposure` image to {image_path}")
     except queue.Empty:
         get_picture_timeout_process()
     #------------------------------ 调整曝光 ------------------------------#
@@ -344,7 +348,7 @@ def main() -> None:
         if _cycle_current_time_period > _cycle_before_time_period or cycle_loop_count > -1:
             # 每个周期的第一次循环
             if cycle_loop_count == -1:
-                logger.success(f"The cycle is started.")
+                logger.success("The cycle is started.")
                 #-------------------- 调整全图曝光 --------------------#
                 logger.info("full image ajust exposure start")
 
@@ -526,6 +530,7 @@ def main() -> None:
                                     'box': _box,
                                     'center': None if np.isnan(center[0]) or np.isnan(center[1]) else center,
                                     'exposure_time': exposure_time,
+                                    'offset' : [0, 0],
                                 }
                             except Exception as e:
                                 logger.error(e)
@@ -535,6 +540,7 @@ def main() -> None:
                                     'box': _box,
                                     'center': None, # 丢失目标, 置为 None
                                     'exposure_time': exposure_time,
+                                    'offset' : [0, 0],
                                 }
                     #-------------------- single box location --------------------#
 
@@ -556,29 +562,32 @@ def main() -> None:
                         # 保存到文件
                         save_to_jsonl(cycle_results, history_save_path)
 
-                        # [n, 2] n个目标中心坐标
-                        # standard_cycle_centers: {0: [1830.03952661, 1097.25685946]), 1: [2090.1380529 , 2148.12593385]}
-                        # new_cycle_centers: {0: [1830.05961465, 1097.2564746 ]), 1: [2090.13342415, 2148.12260239]}
-
                         # 防止值不存在
                         send_msg_data = {}
 
-                        # 初始化 standard_cycle_centers
                         target_number = MatchTemplateConfig.getattr("target_number")
                         if standard_cycle_results is None or len(standard_cycle_results) != target_number:
+                            # 初始化 standard_cycle_results
                             logger.info("try to init standard_cycle_results")
                             new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
                             if len(new_cycle_centers) == 0:
-                                logger.warning("No box found in new_cycle_centers, can't init standard_cycle_centers.")
+                                logger.warning("No box found in new_cycle_centers, can't init standard_cycle_results.")
                             elif any(v is None for v in new_cycle_centers.values()):
-                                logger.warning("Some box not found in new_cycle_centers, can't init standard_cycle_centers.")
+                                logger.warning("Some box not found in new_cycle_centers, can't init standard_cycle_results.")
                             else:
-                                standard_cycle_results = cycle_results
-                                save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
-                                logger.info(f"init standard_cycle_results: {standard_cycle_results}")
+                                if standard_cycle_results is None:
+                                    # 标准靶标为 None, 则初始化为 cycle_results
+                                    standard_cycle_results = cycle_results
+                                    logger.info(f"init standard_cycle_results: {standard_cycle_results}")
+                                else:
+                                    # 标准靶标已经初始化，则更新
+                                    for n_k in cycle_results.keys():
+                                        if n_k not in standard_cycle_results.keys():
+                                            standard_cycle_results[n_k] = cycle_results[n_k]
+                                    logger.info(f"update standard_cycle_results: {standard_cycle_results}")
 
                                 # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
-                                logger.success(f"send init data message.")
+                                logger.success("send init data message.")
                                 send_msg_data = {f"L1_SJ_{k+1}": {'X': 0, 'Y': 0} for k in standard_cycle_results.keys()}
                                 send_msg = {
                                     "cmd": "update",
@@ -587,6 +596,7 @@ def main() -> None:
                                 }
                                 # mqtt_send_queue.put(send_msg)
                         else:
+                            # 比较标准靶标和新的靶标
                             logger.info("try to compare standard_cycle_results and cycle_results")
                             move_threshold = RingsLocationConfig.getattr("move_threshold")
                             standard_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
@@ -594,15 +604,15 @@ def main() -> None:
 
                             # 计算移动距离
                             distance_result = {}
-                            for l in standard_cycle_results.keys():
-                                if l in new_cycle_centers.keys() and new_cycle_centers[l] is not None:
-                                    distance_x: float = new_cycle_centers[l][0] - standard_cycle_centers[l][0]
-                                    distance_y: float = new_cycle_centers[l][1] - standard_cycle_centers[l][1]
-                                    distance_result[l] = (distance_x, distance_y)
+                            for res_k in standard_cycle_results.keys():
+                                if res_k in new_cycle_centers.keys() and new_cycle_centers[res_k] is not None:
+                                    distance_x: float = new_cycle_centers[res_k][0] - standard_cycle_centers[res_k][0]
+                                    distance_y: float = new_cycle_centers[res_k][1] - standard_cycle_centers[res_k][1]
+                                    distance_result[res_k] = (distance_x, distance_y)
                                 else:
                                     # box没找到将移动距离设置为 一个很大的数
-                                    distance_result[l] = (defalut_error_distance, defalut_error_distance)
-                                    logger.error(f"box {l} not found in cycle_centers.")
+                                    distance_result[res_k] = (defalut_error_distance, defalut_error_distance)
+                                    logger.error(f"box {res_k} not found in cycle_centers.")
 
                             # 使用参考靶标校准其他靶标
                             reference_target_ids: tuple[int] = MatchTemplateConfig.reference_target_ids
@@ -623,7 +633,7 @@ def main() -> None:
                                 else:
                                     logger.warning(f"reference box {reference_target_id} not found in distance_result, don't calibrate other targets.")
                             else:
-                                logger.warning(f"no reference box set, can't calibrate other targets.")
+                                logger.warning("no reference box set, can't calibrate other targets.")
 
                             # 超出距离的 box idx
                             over_distance_ids = set()
@@ -651,6 +661,7 @@ def main() -> None:
                                 # 保存丢失的图片
                                 image_path = save_dir / "target_displacement.jpg"
                                 save_image(image, image_path)
+                                logger.info(f"save `target displacement` image to {image_path}")
                                 # 位移告警消息
                                 send_msg = {
                                     "cmd": "alarm",
@@ -718,6 +729,7 @@ def main() -> None:
                                     # 保存丢失的图片
                                     image_path = save_dir / "target_loss.jpg"
                                     save_image(image, image_path)
+                                    logger.info(f"save `target loss` image to {image_path}")
                                     # 目标丢失告警消息
                                     send_msg = {
                                         "cmd":"alarm",
@@ -757,7 +769,7 @@ def main() -> None:
                             # TODO: 关闭补光灯
                             raise NotImplementedError("close flash")
 
-                        logger.success(f"The cycle is over.")
+                        logger.success("The cycle is over.")
                         #------------------------- 结束周期 -------------------------#
                     else:
                         # 不是结束周期，设置下一轮的曝光值
@@ -777,6 +789,8 @@ def main() -> None:
 
             # 保存运行时配置
             save_config_to_yaml(config_path=runtime_config_path)
+            # 保存标准靶标
+            save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
             # 重新获取周期时间
             cycle_time_interval: int = MainConfig.getattr("cycle_time_interval")
 
@@ -890,7 +904,6 @@ class Receive:
         #     }
         # }
         logger.info("target correction, update target")
-        # 靶标丢失，传递来新靶标
         # id2boxstate: {
         #     i: {
         #         "ratio": ratio,
@@ -909,7 +922,7 @@ class Receive:
         for remove_box_id in _remove_box_ids:
             if remove_box_id in id2boxstate.keys():
                 logger.info(f"remove box {remove_box_id}, boxstate: {id2boxstate[remove_box_id]}")
-                id2boxstate.pop(remove_box_id)
+                id2boxstate.pop(remove_box_id, None)
             else:
                 logger.warning(f"box {remove_box_id} not found in id2boxstate.")
 
@@ -917,7 +930,7 @@ class Receive:
         logger.info(f"new_boxes: {new_boxes}")
         # 将新的 box 转换为列表
         new_boxstates = [
-            {"ratio": None, "score": None, "box": box} for box in new_boxes
+            {"ratio": None, "score": None, "box": new_box} for new_box in new_boxes
         ]
         # 旧的 box 也转换为列表，并合并新 box
         new_boxstates.extend(id2boxstate.values())
@@ -932,31 +945,29 @@ class Receive:
         sorted_boxes = new_boxes[sorted_index]
 
         # 合并后的 box 生成新的 id2boxstate
-        new_boxstates = {}
+        new_id2boxstate = {}
         for i, (ratio, score, box) in enumerate(zip(sorted_ratios, sorted_scores, sorted_boxes)):
-            new_boxstates[i] = {
+            new_id2boxstate[i] = {
                 "ratio": float(ratio) if ratio is not None else None,
                 "score": float(score) if score is not None else None,
                 "box": box.tolist()
             }
-        target_number = len(new_boxstates)
-        logger.info(f"new_boxstates: {new_boxstates}")
+        target_number = len(new_id2boxstate)
+        logger.info(f"new_id2boxstate: {new_id2boxstate}")
         logger.info(f"target_number: {target_number}")
 
         # 设置新目标数量和靶标信息
         MatchTemplateConfig.setattr("target_number", target_number)
-        MatchTemplateConfig.setattr("id2boxstate", new_boxstates)
+        MatchTemplateConfig.setattr("id2boxstate", new_id2boxstate)
         # 删除参考靶标
         MatchTemplateConfig.setattr("reference_target_ids", tuple())
         # 因为重设了靶标，所以需要重新初始化标准靶标
         standard_cycle_results = None
 
-        box_center_xs: np.ndarray = (sorted_boxes[:, 0] + sorted_boxes[:, 2]) / 2
-        box_center_ys: np.ndarray = (sorted_boxes[:, 1] + sorted_boxes[:, 3]) / 2
-        _data = {
-            f"L1_SJ_{i+1}": {"X": float(x), "Y": float(y), "Z": 0} \
-            for i, (x, y) in enumerate(zip(box_center_xs, box_center_ys))
-        }
+        _data = {}
+        for i, boxstate in new_id2boxstate.items():
+            box = boxstate['box']
+            _data[f"L1_SJ_{i+1}"] = {"X": (box[0] + box[2]) / 2, "Y": (box[1] + box[3]) / 2, "Z": 0}
 
         # 靶标校正响应消息
         send_msg = {
@@ -976,7 +987,156 @@ class Receive:
             "msgid": "bb6f3eeb2"
         }
         # mqtt_send_queue.put(send_msg)
-        logger.success(f"update target success, new id2boxstate: {id2boxstate}")
+        logger.success("update target success")
+
+    @staticmethod
+    def receive_delete_target_msg(received_msg: dict | None = None):
+        """删除靶标消息"""
+        global standard_cycle_results
+        # {
+        #     "cmd":"",
+        #     "msgid":"bb6f3eeb2",
+        #     "body":{
+        #         "remove_box_ids": ["L1_SJ_3", "L1_SJ_4"]
+        #     }
+        # }
+        logger.info("delete target")
+        # id2boxstate: {
+        #     i: {
+        #         "ratio": ratio,
+        #         "score": score,
+        #         "box": box
+        #     }
+        # }
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+        remove_box_ids: list[str] = received_msg['body'].get('remove_box_ids', [])
+        logger.info(f"remove_box_ids: {remove_box_ids}")
+        # -1 因为 id 从 0 开始
+        _remove_box_ids: list[int] = [int(remove_box_id.split('_')[-1]) - 1 for remove_box_id in remove_box_ids]
+        logger.info(f"int(remove_box_ids): {_remove_box_ids}")
+
+        # 去除多余的 box
+        for remove_box_id in _remove_box_ids:
+            if remove_box_id in id2boxstate.keys():
+                logger.info(f"remove box {remove_box_id}, boxstate: {id2boxstate[remove_box_id]}")
+                id2boxstate.pop(remove_box_id, None)
+                # 因为重设了靶标，所以需要删除部分初始化标准靶标
+                standard_cycle_results.pop(remove_box_id, None)
+            else:
+                logger.warning(f"box {remove_box_id} not found in id2boxstate.")
+
+        target_number = len(id2boxstate)
+        logger.info(f"new_id2boxstate: {id2boxstate}")
+        logger.info(f"target_number: {target_number}")
+
+        # 设置新目标数量和靶标信息
+        MatchTemplateConfig.setattr("target_number", target_number)
+        MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
+
+        # 可能删除参考靶标
+        reference_target_ids: tuple[int] = MatchTemplateConfig.getattr("reference_target_ids")
+        if len(reference_target_ids) > 0:
+            reference_target_id = reference_target_ids[0]
+            if reference_target_id in _remove_box_ids:
+                MatchTemplateConfig.setattr("reference_target_ids", tuple())
+                logger.warning(f"reference target {reference_target_id} is removed, reset reference_target_ids.")
+
+        _data = {}
+        for i, boxstate in id2boxstate.items():
+            box = boxstate['box']
+            _data[f"L1_SJ_{i+1}"] = {"X": (box[0] + box[2]) / 2, "Y": (box[1] + box[3]) / 2, "Z": 0}
+
+        # 删除靶标响应消息
+        send_msg = {
+            "cmd": "",
+            "body": {
+                "code": 200,
+                "did": MQTTConfig.getattr("did"),
+                "at": get_now_time(),
+                "msg": "",
+                "data": _data,
+                # "data": {
+                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
+                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
+                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
+                # },
+            },
+            "msgid": "bb6f3eeb2"
+        }
+        # mqtt_send_queue.put(send_msg)
+        logger.success("delete target success")
+
+    @staticmethod
+    def receive_add_target_msg(received_msg: dict | None = None):
+        """添加靶标消息"""
+        # {
+        #     "cmd":"",
+        #     "msgid":"bb6f3eeb2",
+        #     "body":{
+        #         "add_boxes":{
+        #               "L1_SJ_3": [x1, y1, x2, y2],
+        #               "L1_SJ_4": [x1, y1, x2, y2]
+        #         },
+        #     }
+        # }
+        logger.info("add targe")
+        # id2boxstate: {
+        #     i: {
+        #         "ratio": ratio,
+        #         "score": score,
+        #         "box": box
+        #     }
+        # }
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+
+        new_boxes: dict[str, list[int]] = received_msg['body'].get('add_boxes', {})
+        logger.info(f"new_boxes: {new_boxes}")
+
+        for new_key, new_box in new_boxes.items():
+            _new_key = int(new_key.split('_')[-1]) - 1 # -1 因为 id 从 0 开始
+            if _new_key in id2boxstate.keys():
+                logger.warning(f"box {_new_key} already exist in id2boxstate.")
+            else:
+                new_boxstate = {
+                    "ratio": None,
+                    "score": None,
+                    "box": new_box
+                }
+                id2boxstate[_new_key] = new_boxstate
+                logger.info(f"add box {_new_key}, new_box: {new_box}")
+
+        target_number = len(id2boxstate)
+        logger.info(f"new_id2boxstate: {id2boxstate}")
+        logger.info(f"target_number: {target_number}")
+
+        # 设置新目标数量和靶标信息
+        MatchTemplateConfig.setattr("target_number", target_number)
+        MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
+
+        _data = {}
+        for i, boxstate in id2boxstate.items():
+            box = boxstate['box']
+            _data[f"L1_SJ_{i+1}"] = {"X": (box[0] + box[2]) / 2, "Y": (box[1] + box[3]) / 2, "Z": 0}
+
+        # 添加靶标响应消息
+        send_msg = {
+            "cmd": "",
+            "body": {
+                "code": 200,
+                "did": MQTTConfig.getattr("did"),
+                "at": get_now_time(),
+                "msg": "",
+                "data": _data,
+                # "data": {
+                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
+                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
+                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
+                # },
+            },
+            "msgid": "bb6f3eeb2"
+        }
+        # mqtt_send_queue.put(send_msg)
+        logger.success("add target success")
 
     @staticmethod
     def receive_set_reference_target_msg(received_msg: dict | None = None):
@@ -1029,23 +1189,25 @@ class Receive:
     def receive_getstatus_msg(received_msg: dict | None = None):
         """设备状态查询消息"""
         global need_send_get_status_msg
-        logger.success(f"received getstatus msg")
+        logger.success("received getstatus msg")
         # 需要发送设备状态查询消息
         need_send_get_status_msg = True
 
     @staticmethod
     def receive_get_image_msg(received_msg: dict | None = None):
         """现场图像查询消息"""
-        logger.info(f"get image")
+        logger.info("received upload image msg")
         # {
         #     "cmd":"getimage",
         #     "msgid":"bb6f3eeb2"
         # }
         try:
             image_timestamp, image, _ = camera_queue.get(timeout=get_picture_timeout)
+            logger.info(f"`upload image` get image success, image_timestamp: {image_timestamp}")
             # 保存图片
             image_path = save_dir / "upload_image.jpg"
             save_image(image, image_path)
+            logger.info(f"save `upload image` success, save image to {image_path}")
 
             # 现场图像查询响应消息
             send_msg = {
@@ -1061,8 +1223,9 @@ class Receive:
                 "msgid": "bb6f3eeb2"
             }
             # mqtt_send_queue.put(send_msg)
-            logger.success(f"get image success, image_path: {image_path}")
+            logger.success(f"upload image send msg success, image_path: {image_path}")
         except queue.Empty:
+            logger.warning("upload image send msg failed")
             # 现场图像查询响应消息
             send_msg = {
                 "cmd": "setconfig",
@@ -1070,7 +1233,7 @@ class Receive:
                     "code": 200,
                     "did": MQTTConfig.getattr("did"),
                     "at": get_now_time(),
-                    "msg": "upload succeed",
+                    "msg": "upload failed, get image timeout",
                     "path": [], # 图片本地路径
                     "img": [] # 文件名称
                 },
@@ -1175,6 +1338,7 @@ class Receive:
     @staticmethod
     def receive_update_config_file_msg(received_msg: dict | None = None):
         """更新配置文件消息"""
+        logger.info("received update config file msg")
         # {
         #     "cmd":"updateconfigfile",
         #     "body":{
@@ -1219,6 +1383,7 @@ class Receive:
     @staticmethod
     def receive_get_config_file_msg(received_msg: dict | None = None):
         """查询配置文件消息"""
+        logger.info("received send config file msg")
         # {
         #     "cmd":"getconfigfile",
         #     "msgid": "bb6f3eeb2"
@@ -1306,6 +1471,7 @@ class Send:
             _, image, _ = camera_queue.get(timeout=get_picture_timeout)
             image_path = save_dir / "deploy.jpg"
             save_image(image, image_path)
+            logger.info(f"save `deploying image` success, save image to {image_path}")
         except queue.Empty:
             image_path = None
             get_picture_timeout_process()
@@ -1319,8 +1485,6 @@ class Send:
                 "type": "deploying",
                 "at": get_now_time(),
                 "sw_version": "230704180", # 版本号
-                "code": 200,
-                "msg": "device starting",
                 "data": _data,
                 # "data": { # 靶标初始位置
                 #     "L1_SJ_1": {"X": 19.01, "Y": 18.31, "Z":10.8},

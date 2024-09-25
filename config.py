@@ -173,7 +173,7 @@ class SerialCommConfig(BaseConfig):
     """串口通讯模块配置
     """
     # 串口配置
-    ports: list[str] = "/dev/ttyAMA2", "/dev/ttyAMA4"
+    ports: list[str] = "/dev/ttyAMA1", "/dev/ttyAMA4"
     baudrate: int = 115200
     BUFFER_SIZE: int = 2048
     timeout: float = 0
@@ -189,7 +189,7 @@ class MQTTConfig(BaseConfig):
     """
     broker: str = "47.116.118.93"
     port: int = 1883
-    timeout: int = 60
+    timeout: int = 30
     topic: str = "$creq/7804d2/+"
     username: str = "admin"
     password: str = "123456"

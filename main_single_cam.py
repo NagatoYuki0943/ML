@@ -40,7 +40,7 @@ from adjust_camera import (
     adjust_exposure_full_res_for_loop,
     adjust_exposure_low_res_for_loop, # 调整分辨率需要一段时间才能获取调整后的图片分辨率
 )
-from serial_communication import serial_receive, serial_send, serial_for_test
+from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import (
     clear_queue,

@@ -585,7 +585,8 @@ def main() -> None:
                                             standard_cycle_results[ref_id] = cycle_results[ref_id]
 
                                     logger.info(f"update standard_cycle_results: {standard_cycle_results}")
-                                    RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
+
+                                RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
 
                                 # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                                 logger.success("send init data message.")

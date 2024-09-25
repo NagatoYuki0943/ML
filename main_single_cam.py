@@ -576,8 +576,16 @@ def main() -> None:
                                     for n_k in cycle_results.keys():
                                         if n_k not in standard_cycle_results.keys():
                                             standard_cycle_results[n_k] = cycle_results[n_k]
+
+                                    # 更新参考靶标的标准位置
+                                    reference_target_id2offset: dict[int, tuple[float, float]] | None = RingsLocationConfig.getattr("reference_target_id2offset")
+                                    if reference_target_id2offset is not None:
+                                        ref_id: int = list(reference_target_id2offset.keys())[0]
+                                        if ref_id in standard_cycle_results.keys() and ref_id in cycle_results.keys():
+                                            standard_cycle_results[ref_id] = cycle_results[ref_id]
+
                                     logger.info(f"update standard_cycle_results: {standard_cycle_results}")
-                                RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
+                                    RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
 
                                 # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                                 logger.success("send init data message.")
@@ -593,14 +601,19 @@ def main() -> None:
                             logger.info("try to compare standard_cycle_results and cycle_results")
                             move_threshold = RingsLocationConfig.getattr("move_threshold")
                             standard_cycle_centers = {k: result['center'] for k, result in standard_cycle_results.items()}
+                            standard_cycle_offsets = {k: result['offset'] for k, result in standard_cycle_results.items()}
                             new_cycle_centers = {k: result['center'] for k, result in cycle_results.items()}
+                            logger.info(f"standard_cycle_centers: {standard_cycle_centers}")
+                            logger.info(f"standard_cycle_offsets: {standard_cycle_offsets}")
+                            logger.info(f"new_cycle_centers: {new_cycle_centers}")
 
                             # 计算移动距离
                             distance_result = {}
                             for res_k in standard_cycle_results.keys():
                                 if res_k in new_cycle_centers.keys() and new_cycle_centers[res_k] is not None:
-                                    distance_x: float = new_cycle_centers[res_k][0] - standard_cycle_centers[res_k][0]
-                                    distance_y: float = new_cycle_centers[res_k][1] - standard_cycle_centers[res_k][1]
+                                    # 移动距离 = 当前位置 - 标准位置 - 补偿值
+                                    distance_x: float = new_cycle_centers[res_k][0] - standard_cycle_centers[res_k][0] - standard_cycle_offsets[res_k][0]
+                                    distance_y: float = new_cycle_centers[res_k][1] - standard_cycle_centers[res_k][1] - standard_cycle_offsets[res_k][1]
                                     distance_result[res_k] = (distance_x, distance_y)
                                 else:
                                     # box没找到将移动距离设置为 一个很大的数
@@ -608,23 +621,24 @@ def main() -> None:
                                     logger.error(f"box {res_k} not found in cycle_centers.")
 
                             # 使用参考靶标校准其他靶标
-                            reference_target_ids: tuple[int] = RingsLocationConfig.getattr("reference_target_ids")
-                            if len(reference_target_ids) > 0:
-                                reference_target_id = reference_target_ids[0]
-                                if reference_target_id in distance_result.keys():
+                            reference_target_id2offset: dict[int, tuple[float, float]] | None = RingsLocationConfig.getattr("reference_target_id2offset")
+                            if reference_target_id2offset is not None:
+                                ref_id: int = list(reference_target_id2offset.keys())[0]
+                                if ref_id in distance_result.keys():
                                     # 找到参考靶标
-                                    ref_distance_x, ref_distance_y = distance_result[reference_target_id]
+                                    ref_distance_x, ref_distance_y = distance_result[ref_id]
                                     if abs(ref_distance_x) >= defalut_error_distance or abs(ref_distance_y) >= defalut_error_distance:
                                         # 参考靶标出错
-                                        logger.warning(f"reference box {reference_target_id} detect failed, can't calibrate other targets.")
+                                        logger.warning(f"reference box {ref_id} detect failed, can't calibrate other targets.")
                                     else:
                                         # 参考靶标正常
-                                        logger.info(f"use reference box {reference_target_id} to calibrate other targets.")
+                                        RingsLocationConfig.setattr("reference_target_id2offset", {ref_id: [ref_distance_x, ref_distance_y]})
+                                        logger.info(f"use reference box {ref_id} to calibrate other targets.")
                                         for idx, (distance_x, distance_y) in distance_result.items():
-                                            if idx != reference_target_id:
+                                            if idx != ref_id:
                                                 distance_result[idx] = (distance_x - ref_distance_x, distance_y - ref_distance_y)
                                 else:
-                                    logger.warning(f"reference box {reference_target_id} not found in distance_result, don't calibrate other targets.")
+                                    logger.warning(f"reference box {ref_id} not found in distance_result, don't calibrate other targets.")
                             else:
                                 logger.warning("no reference box set, can't calibrate other targets.")
 
@@ -816,6 +830,12 @@ class Receive:
         elif cmd == 'targetcorrection':
             Receive.receive_target_correction_msg(received_msg)
 
+        elif cmd == 'removetarget':
+            Receive.receive_remove_target_msg(received_msg)
+
+        elif cmd == 'addtarget':
+            Receive.receive_add_target_msg(received_msg)
+
         # 参考靶标设定消息
         elif cmd == 'setreferencetarget':
             Receive.receive_set_reference_target_msg(received_msg)
@@ -949,7 +969,7 @@ class Receive:
         MatchTemplateConfig.setattr("target_number", target_number)
         MatchTemplateConfig.setattr("id2boxstate", new_id2boxstate)
         # 删除参考靶标
-        RingsLocationConfig.setattr("reference_target_ids", tuple())
+        RingsLocationConfig.setattr("reference_target_id2offset", None)
         # 因为重设了靶标，所以需要重新初始化标准靶标
         RingsLocationConfig.setattr("standard_cycle_results", None)
 
@@ -979,16 +999,16 @@ class Receive:
         logger.success("update target success")
 
     @staticmethod
-    def receive_delete_target_msg(received_msg: dict | None = None):
+    def receive_remove_target_msg(received_msg: dict | None = None):
         """删除靶标消息"""
         # {
-        #     "cmd":"",
-        #     "msgid":"bb6f3eeb2",
-        #     "body":{
+        #     "cmd": "removetarget",
+        #     "msgid": "bb6f3eeb2",
+        #     "body": {
         #         "remove_box_ids": ["L1_SJ_3", "L1_SJ_4"]
         #     }
         # }
-        logger.info("delete target")
+        logger.info("remove target")
         # id2boxstate: {
         #     i: {
         #         "ratio": ratio,
@@ -1027,32 +1047,44 @@ class Receive:
         MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
 
         # 可能删除参考靶标
-        reference_target_ids: tuple[int] = RingsLocationConfig.getattr("reference_target_ids")
-        if len(reference_target_ids) > 0:
-            reference_target_id = reference_target_ids[0]
+        reference_target_id2offset: dict[int, tuple[float, float]] | None = RingsLocationConfig.getattr("reference_target_id2offset")
+        if reference_target_id2offset is not None:
+            reference_target_id: int = list(reference_target_id2offset.keys())[0]
             if reference_target_id in _remove_box_ids:
-                RingsLocationConfig.setattr("reference_target_ids", tuple())
-                logger.warning(f"reference target {reference_target_id} is removed, reset reference_target_ids.")
+                RingsLocationConfig.setattr("reference_target_id2offset", None)
+                logger.warning(f"reference target {reference_target_id} is removed, reset reference_target_id2offset.")
 
         _data = {}
         for i, boxstate in id2boxstate.items():
             box = boxstate['box']
             _data[f"L1_SJ_{i+1}"] = {"X": (box[0] + box[2]) / 2, "Y": (box[1] + box[3]) / 2, "Z": 0}
 
+        try:
+            # 获取照片
+            _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+            image_path = save_dir / "remove_target.jpg"
+            save_image(image, image_path)
+            logger.info(f"save `remove target` success, save image to {image_path}")
+        except queue.Empty:
+            image_path = None
+            get_picture_timeout_process()
+
         # 删除靶标响应消息
         send_msg = {
-            "cmd": "",
+            "cmd": "removetarget",
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),
                 "at": get_now_time(),
-                "msg": "",
+                "msg": "remove target succeed",
                 "data": _data,
                 # "data": {
                 #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
                 #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
                 #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
                 # },
+                "path": str(image_path) if image_path is not None else "", # 图片本地路径
+                "img": "remove_target.jpg" if image_path is not None else "" # 文件名称
             },
             "msgid": "bb6f3eeb2"
         }
@@ -1063,13 +1095,13 @@ class Receive:
     def receive_add_target_msg(received_msg: dict | None = None):
         """添加靶标消息"""
         # {
-        #     "cmd":"",
-        #     "msgid":"bb6f3eeb2",
-        #     "body":{
+        #     "cmd": "addtarget",
+        #     "msgid": "bb6f3eeb2",
+        #     "body": {
         #         "add_boxes":{
-        #               "L1_SJ_3": [x1, y1, x2, y2],
-        #               "L1_SJ_4": [x1, y1, x2, y2]
-        #         },
+        #             "L1_SJ_3": [x1, y1, x2, y2],
+        #             "L1_SJ_4": [x1, y1, x2, y2]
+        #         }
         #     }
         # }
         logger.info("add targe")
@@ -1106,10 +1138,15 @@ class Receive:
         MatchTemplateConfig.setattr("target_number", target_number)
         MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
 
+        # 由于添加了新的box, 因此参考靶标也会更新为最新的, 因此除了参考靶标之外的其他靶标的偏移量需要重新计算, 计算方式为原本的偏移量加上参考靶标的偏移量
         standard_cycle_results: dict | None = RingsLocationConfig.getattr("standard_cycle_results")
-        if standard_cycle_results is not None:
-            # TODO: 这里应该是更新标准靶标,给标准靶标添加 offset
-            ...
+        reference_target_id2offset: dict[int, tuple[float, float]] | None = RingsLocationConfig.getattr("reference_target_id2offset")
+        if standard_cycle_results is not None and reference_target_id2offset is not None:
+            ref_id: int = list(reference_target_id2offset.keys())[0]
+            ref_value = reference_target_id2offset[ref_id]
+            for key, value in standard_cycle_results.items():
+                if key != ref_id:
+                    standard_cycle_results[key]['offset'] = [value['offset'][0] + ref_value[0], value['offset'][1] + ref_value[1]]
         else:
             logger.warning("standard_cycle_results is None, can not add box.")
         RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
@@ -1119,20 +1156,32 @@ class Receive:
             box = boxstate['box']
             _data[f"L1_SJ_{i+1}"] = {"X": (box[0] + box[2]) / 2, "Y": (box[1] + box[3]) / 2, "Z": 0}
 
+        try:
+            # 获取照片
+            _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+            image_path = save_dir / "add_target.jpg"
+            save_image(image, image_path)
+            logger.info(f"save `add target` success, save image to {image_path}")
+        except queue.Empty:
+            image_path = None
+            get_picture_timeout_process()
+
         # 添加靶标响应消息
         send_msg = {
-            "cmd": "",
+            "cmd": "addtarget",
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),
                 "at": get_now_time(),
-                "msg": "",
+                "msg": "add target succeed",
                 "data": _data,
                 # "data": {
                 #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
                 #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
                 #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
                 # },
+                "path": str(image_path) if image_path is not None else "", # 图片本地路径
+                "img": "add_target.jpg" if image_path is not None else "" # 文件名称
             },
             "msgid": "bb6f3eeb2"
         }
@@ -1157,7 +1206,7 @@ class Receive:
 
         id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
         if reference_target_id in id2boxstate.keys():
-            RingsLocationConfig.setattr("reference_target_ids", (reference_target_id,))
+            RingsLocationConfig.setattr("reference_target_id2offset", {reference_target_id: [0, 0]})
             # 参考靶标设定响应消息
             send_msg = {
                 "cmd": "setreferencetarget",

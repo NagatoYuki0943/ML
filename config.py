@@ -165,7 +165,7 @@ class RingsLocationConfig(BaseConfig):
     save_detect_images: bool = False
     save_detect_results: bool = False
     move_threshold: float = 0.3 # 定位误差阈值, pixel
-    reference_target_ids: tuple[int] = tuple() # 参考靶标 id
+    reference_target_id2offset: dict[int, list[float, float]] | None = None # 参考靶标 id 和 x y 的偏移(每次检测到都会偏移)
     standard_cycle_results: dict | None = None # 标准循环结果
 
 

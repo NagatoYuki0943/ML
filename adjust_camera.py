@@ -1,5 +1,4 @@
 import numpy as np
-import cv2
 from algorithm import mean_brightness
 from config import MainConfig, CameraConfig, AdjustCameraConfig
 import queue

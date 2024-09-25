@@ -192,7 +192,7 @@ def find_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
     )
     # 没有找到任何目标
     if len(ratios) == 0:
-        logger.warning(f"can not find any target")
+        logger.warning("can not find any target")
         MatchTemplateConfig.setattr("id2boxstate", None)
         MatchTemplateConfig.setattr("got_target_number", 0)
         return None, 0
@@ -253,7 +253,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
     id2boxstate: dict | None = MatchTemplateConfig.getattr("id2boxstate")
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
-        logger.warning(f"id2boxstate is None, use find_target")
+        logger.warning("id2boxstate is None, use find_target")
         return find_target(image)
 
     image_h, image_w = image.shape[:2]
@@ -428,7 +428,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
     id2boxstate: dict | None = MatchTemplateConfig.getattr("id2boxstate")
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
-        logger.warning(f"id2boxstate is None, use find_target")
+        logger.warning("id2boxstate is None, use find_target")
         return find_target(image)
 
     image = image.copy()

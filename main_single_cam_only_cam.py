@@ -151,6 +151,7 @@ logger.success("初始化畸变矫正完成")
 # )
 # mqtt_send_thread = ThreadWrapper(
 #     target_func = mqtt_send,
+#     queue_maxsize = MQTTConfig.getattr('send_queue_maxsize'),
 #     client = mqtt_comm,
 # )
 # mqtt_send_queue = mqtt_send_thread.queue

@@ -1,13 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-from datetime import datetime
 import cv2
-import json
-from threading import Lock, Thread
+from threading import Thread
 import queue
 from loguru import logger
-from typing import Literal
 from pathlib import Path
 import os
 
@@ -43,10 +40,8 @@ from adjust_camera import (
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import (
-    clear_queue,
     drop_excessive_queue_items,
     save_to_jsonl,
-    load_standard_cycle_results,
     get_now_time,
     save_image,
     get_picture_timeout_process,
@@ -203,9 +198,6 @@ save_config_to_yaml(config_path=original_config_path)
 init_config_from_yaml(config_path=runtime_config_path)
 logger.success("init config success")
 
-# 初始的坐标
-standard_cycle_results = load_standard_cycle_results(standard_save_path)
-logger.info(f"standard_cycle_results: {standard_cycle_results}")
 # 上一个周期的结果(原因是 cycle_results 每个周期最后都会被清空)
 last_cycle_results = None
 # 是否需要发送部署信息
@@ -225,7 +217,6 @@ logger.success("init end")
 
 
 def main() -> None:
-    global standard_cycle_results
     global last_cycle_results
 
     #------------------------------ 调整曝光 ------------------------------#
@@ -566,6 +557,7 @@ def main() -> None:
                         send_msg_data = {}
 
                         target_number = MatchTemplateConfig.getattr("target_number")
+                        standard_cycle_results: dict | None = RingsLocationConfig.getattr("standard_cycle_results")
                         if standard_cycle_results is None or len(standard_cycle_results) != target_number:
                             # 初始化 standard_cycle_results
                             logger.info("try to init standard_cycle_results")
@@ -585,6 +577,7 @@ def main() -> None:
                                         if n_k not in standard_cycle_results.keys():
                                             standard_cycle_results[n_k] = cycle_results[n_k]
                                     logger.info(f"update standard_cycle_results: {standard_cycle_results}")
+                                RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
 
                                 # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                                 logger.success("send init data message.")
@@ -615,7 +608,7 @@ def main() -> None:
                                     logger.error(f"box {res_k} not found in cycle_centers.")
 
                             # 使用参考靶标校准其他靶标
-                            reference_target_ids: tuple[int] = MatchTemplateConfig.reference_target_ids
+                            reference_target_ids: tuple[int] = RingsLocationConfig.getattr("reference_target_ids")
                             if len(reference_target_ids) > 0:
                                 reference_target_id = reference_target_ids[0]
                                 if reference_target_id in distance_result.keys():
@@ -789,8 +782,6 @@ def main() -> None:
 
             # 保存运行时配置
             save_config_to_yaml(config_path=runtime_config_path)
-            # 保存标准靶标
-            save_to_jsonl(standard_cycle_results, standard_save_path, mode='w')
             # 重新获取周期时间
             cycle_time_interval: int = MainConfig.getattr("cycle_time_interval")
 
@@ -876,13 +867,12 @@ class Receive:
         #     "cmd":"devicedeploying",
         #     "msgid":"bb6f3eeb2",
         # }
-        global standard_cycle_results
         global need_send_device_deploying_msg
 
         logger.info("device deploying, reset config and init target")
         # 设备部署，重置配置和初始靶标
         load_config_from_yaml(config_path=original_config_path)
-        standard_cycle_results = None
+        RingsLocationConfig.setattr("standard_cycle_results", None)
         logger.success("reset config and init target success")
         # 需要发送部署消息
         need_send_device_deploying_msg = True
@@ -890,7 +880,6 @@ class Receive:
     @staticmethod
     def receive_target_correction_msg(received_msg: dict | None = None):
         """靶标校正消息"""
-        global standard_cycle_results
 
         # {
         #     "cmd":"targetcorrection",
@@ -960,9 +949,9 @@ class Receive:
         MatchTemplateConfig.setattr("target_number", target_number)
         MatchTemplateConfig.setattr("id2boxstate", new_id2boxstate)
         # 删除参考靶标
-        MatchTemplateConfig.setattr("reference_target_ids", tuple())
+        RingsLocationConfig.setattr("reference_target_ids", tuple())
         # 因为重设了靶标，所以需要重新初始化标准靶标
-        standard_cycle_results = None
+        RingsLocationConfig.setattr("standard_cycle_results", None)
 
         _data = {}
         for i, boxstate in new_id2boxstate.items():
@@ -992,7 +981,6 @@ class Receive:
     @staticmethod
     def receive_delete_target_msg(received_msg: dict | None = None):
         """删除靶标消息"""
-        global standard_cycle_results
         # {
         #     "cmd":"",
         #     "msgid":"bb6f3eeb2",
@@ -1015,15 +1003,20 @@ class Receive:
         _remove_box_ids: list[int] = [int(remove_box_id.split('_')[-1]) - 1 for remove_box_id in remove_box_ids]
         logger.info(f"int(remove_box_ids): {_remove_box_ids}")
 
-        # 去除多余的 box
-        for remove_box_id in _remove_box_ids:
-            if remove_box_id in id2boxstate.keys():
-                logger.info(f"remove box {remove_box_id}, boxstate: {id2boxstate[remove_box_id]}")
-                id2boxstate.pop(remove_box_id, None)
-                # 因为重设了靶标，所以需要删除部分初始化标准靶标
-                standard_cycle_results.pop(remove_box_id, None)
-            else:
-                logger.warning(f"box {remove_box_id} not found in id2boxstate.")
+        standard_cycle_results: dict | None = RingsLocationConfig.getattr("standard_cycle_results")
+        if standard_cycle_results is not None:
+            # 去除多余的 box
+            for remove_box_id in _remove_box_ids:
+                if remove_box_id in id2boxstate.keys():
+                    logger.info(f"remove box {remove_box_id}, boxstate: {id2boxstate[remove_box_id]}")
+                    id2boxstate.pop(remove_box_id, None)
+                    # 因为重设了靶标，所以需要删除部分初始化标准靶标
+                    standard_cycle_results.pop(remove_box_id, None)
+                else:
+                    logger.warning(f"box {remove_box_id} not found in id2boxstate.")
+        else:
+            logger.warning("standard_cycle_results is None, can not remove box.")
+        RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
 
         target_number = len(id2boxstate)
         logger.info(f"new_id2boxstate: {id2boxstate}")
@@ -1034,11 +1027,11 @@ class Receive:
         MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
 
         # 可能删除参考靶标
-        reference_target_ids: tuple[int] = MatchTemplateConfig.getattr("reference_target_ids")
+        reference_target_ids: tuple[int] = RingsLocationConfig.getattr("reference_target_ids")
         if len(reference_target_ids) > 0:
             reference_target_id = reference_target_ids[0]
             if reference_target_id in _remove_box_ids:
-                MatchTemplateConfig.setattr("reference_target_ids", tuple())
+                RingsLocationConfig.setattr("reference_target_ids", tuple())
                 logger.warning(f"reference target {reference_target_id} is removed, reset reference_target_ids.")
 
         _data = {}
@@ -1113,6 +1106,14 @@ class Receive:
         MatchTemplateConfig.setattr("target_number", target_number)
         MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
 
+        standard_cycle_results: dict | None = RingsLocationConfig.getattr("standard_cycle_results")
+        if standard_cycle_results is not None:
+            # TODO: 这里应该是更新标准靶标,给标准靶标添加 offset
+            ...
+        else:
+            logger.warning("standard_cycle_results is None, can not add box.")
+        RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
+
         _data = {}
         for i, boxstate in id2boxstate.items():
             box = boxstate['box']
@@ -1156,7 +1157,7 @@ class Receive:
 
         id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
         if reference_target_id in id2boxstate.keys():
-            MatchTemplateConfig.setattr("reference_target_ids", (reference_target_id,))
+            RingsLocationConfig.setattr("reference_target_ids", (reference_target_id,))
             # 参考靶标设定响应消息
             send_msg = {
                 "cmd": "setreferencetarget",
@@ -1521,6 +1522,8 @@ class Send:
         }
 
         box_sensor_state = {}
+
+        standard_cycle_results: dict | None = RingsLocationConfig.getattr("standard_cycle_results")
         if standard_cycle_results is not None and last_cycle_results is not None:
             for k in standard_cycle_results.keys():
                 if k in last_cycle_results.keys():

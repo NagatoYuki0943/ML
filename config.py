@@ -146,7 +146,6 @@ class MatchTemplateConfig(BaseConfig):
     threshold_match_threshold: float = 0.6                              # 阈值匹配阈值
     threshold_iou_threshold: float = 0.5                                # 阈值匹配 iou 阈值
     id2boxstate: dict[int, dict] | None = None                          # 靶标 id 到 boxes 的映射
-    reference_target_ids: tuple[int] = tuple()                          # 参考靶标 id
     search_range: float = 1                                             # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
 
 
@@ -165,7 +164,9 @@ class RingsLocationConfig(BaseConfig):
     save_grads: bool = False
     save_detect_images: bool = False
     save_detect_results: bool = False
-    move_threshold: float = 0.3     # 定位误差阈值, pixel
+    move_threshold: float = 0.3 # 定位误差阈值, pixel
+    reference_target_ids: tuple[int] = tuple() # 参考靶标 id
+    standard_cycle_results: dict | None = None # 标准循环结果
 
 
 @dataclass

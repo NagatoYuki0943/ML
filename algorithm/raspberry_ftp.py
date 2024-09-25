@@ -1,6 +1,5 @@
 import ftplib
 from loguru import logger
-import threading
 import os
 
 class RaspberryFTP:
@@ -29,7 +28,7 @@ class RaspberryFTP:
         try:
             self.ftp.connect(self.ip, self.port)
             self.ftp.login(self.username, self.password)
-            logger.info(f"FTP server connected")
+            logger.info("FTP server connected")
         except ftplib.Error as e:
             logger.error(f"FTP server unreachable : {e}")
             raise
@@ -51,6 +50,8 @@ class RaspberryFTP:
             for file_path in local_file_path:
                 if not os.path.exists(file_path):
                     raise FileNotFoundError(f"Local file does not exist: {file_path}")
+            # 检查连接状态
+            self.check_and_connect()
             # 创建子目录
             self.ftp.mkd(ftpurl)
             # 本地路径和名字绑定，上传文件
@@ -76,6 +77,8 @@ class RaspberryFTP:
         """
         try:
             remote_file = f"{ftpurl}/{remote_file_name}"
+            # 检查连接状态
+            self.check_and_connect()
             with open(local_file_path, 'wb') as f:
                 self.ftp.retrbinary(f"RETR {remote_file}", f.write)
                 logger.info(f"Downloaded {local_file_path} from {remote_file}")
@@ -85,7 +88,15 @@ class RaspberryFTP:
 
     def check_and_connect(self):
         """检查连接状态，断开时重连"""
-        if self.ftp.sock is None:
+        if self.ftp.sock:
+            try:
+                self.ftp.voidcmd("NOOP")
+                logger.info("FTP connection is still active")
+            except (BrokenPipeError, ftplib.Error):
+                logger.info("FTP connection lost during NOOP, reconnecting")
+                self.ftp_connect()
+        else:
+            logger.info("FTP connection socket is None, connecting")
             self.ftp_connect()
 
     def ftp_close(self):

@@ -46,14 +46,12 @@ def mqtt_send(
                 if "img" in body:
                     timestamp = time.strftime("%Y%m%d%H%M%S")
                     ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
-                    ftp.check_and_connect()
                     ftp.upload_file(body['path'], body['img'], ftpurl)
                     message['body'].pop('path')
                     message['body']['ftpurl'] = ftpurl
                 elif "config" in body:
                     timestamp = time.strftime("%Y%m%d%H%M%S")
                     ftpurl = f"{FTPConfig.getattr('config_base_url')}/{cmd}/{timestamp}"
-                    ftp.check_and_connect()
                     ftp.upload_file(body['path'], body['config'], ftpurl)
                     message['body'].pop('path')
                     message['body']['ftpurl'] = ftpurl
@@ -98,7 +96,6 @@ def config_file_update(message, send_queue, ftp: RaspberryFTP):
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     config_file_path = MainConfig.getattr("save_dir") / f"config_{timestamp}.yaml"
     try:
-        ftp.check_and_connect()
         ftp.download_file(config_file_path, body['config'], body['ftpurl'])
         message['body']['path'] = config_file_path
         message['body'].pop('ftpurl')

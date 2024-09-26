@@ -39,14 +39,14 @@ from utils import clear_queue
 
 # 将日志输出到文件
 # 每天 0 点新创建一个 log 文件
-handler_id = logger.add('log/runtime_{time}.log', rotation='00:00')
+handler_id = logger.add("log/runtime_{time}.log", rotation="00:00")
 
 
 def main() -> None:
-    #------------------------------ 初始化 ------------------------------#
+    # ------------------------------ 初始化 ------------------------------#
     logger.info("init start")
 
-    #-------------------- 基础 --------------------#
+    # -------------------- 基础 --------------------#
     # 主线程消息队列
     main_queue = Queue()
 
@@ -56,19 +56,19 @@ def main() -> None:
     right_camera_result_save_path = MainConfig.getattr("right_camera_result_save_path")
     calibration_result_save_path = MainConfig.getattr("calibration_result_save_path")
     get_picture_timeout = MainConfig.getattr("get_picture_timeout")
-    #-------------------- 基础 --------------------#
+    # -------------------- 基础 --------------------#
 
-    #-------------------- 初始化相机 --------------------#
+    # -------------------- 初始化相机 --------------------#
     logger.info("开始初始化相机")
     camera0_thread = ThreadWrapper(
-        target_func = camera_engine,
-        queue_maxsize = CameraConfig.getattr("queue_maxsize"),
-        camera_index = 0,
+        target_func=camera_engine,
+        queue_maxsize=CameraConfig.getattr("queue_maxsize"),
+        camera_index=0,
     )
     camera1_thread = ThreadWrapper(
-        target_func = camera_engine,
-        queue_maxsize = CameraConfig.getattr("queue_maxsize"),
-        camera_index = 1,
+        target_func=camera_engine,
+        queue_maxsize=CameraConfig.getattr("queue_maxsize"),
+        camera_index=1,
     )
     camera0_thread.start()
     camera1_thread.start()
@@ -85,87 +85,87 @@ def main() -> None:
 
     time.sleep(1)
     logger.success("初始化相机完成")
-    #-------------------- 初始化相机 --------------------#
+    # -------------------- 初始化相机 --------------------#
 
-    #-------------------- 畸变矫正 --------------------#
+    # -------------------- 畸变矫正 --------------------#
     logger.info("开始初始化畸变矫正")
     stereo_calibration = StereoCalibration(
-        StereoCalibrationConfig.getattr('camera_matrix_left'),
-        StereoCalibrationConfig.getattr('camera_matrix_right'),
-        StereoCalibrationConfig.getattr('distortion_coefficients_left'),
-        StereoCalibrationConfig.getattr('distortion_coefficients_right'),
-        StereoCalibrationConfig.getattr('R'),
-        StereoCalibrationConfig.getattr('T'),
-        StereoCalibrationConfig.getattr('pixel_width_mm'),
+        StereoCalibrationConfig.getattr("camera_matrix_left"),
+        StereoCalibrationConfig.getattr("camera_matrix_right"),
+        StereoCalibrationConfig.getattr("distortion_coefficients_left"),
+        StereoCalibrationConfig.getattr("distortion_coefficients_right"),
+        StereoCalibrationConfig.getattr("R"),
+        StereoCalibrationConfig.getattr("T"),
+        StereoCalibrationConfig.getattr("pixel_width_mm"),
     )
     logger.success("初始化畸变矫正完成")
-    #-------------------- 畸变矫正 --------------------#
+    # -------------------- 畸变矫正 --------------------#
 
-    #-------------------- 初始化串口 --------------------#
+    # -------------------- 初始化串口 --------------------#
     logger.info("开始初始化串口")
     serial_objects = []
 
-    for port in SerialCommConfig.getattr('ports'):
+    for port in SerialCommConfig.getattr("ports"):
         object = RaspberrySerialPort(
-            SerialCommConfig.getattr('temperature_data_save_path'),
+            SerialCommConfig.getattr("temperature_data_save_path"),
             port,
-            SerialCommConfig.getattr('baudrate'),
-            SerialCommConfig.getattr('timeout'),
-            SerialCommConfig.getattr('BUFFER_SIZE'),
-            SerialCommConfig.getattr('LOG_SIZE'),
+            SerialCommConfig.getattr("baudrate"),
+            SerialCommConfig.getattr("timeout"),
+            SerialCommConfig.getattr("BUFFER_SIZE"),
+            SerialCommConfig.getattr("LOG_SIZE"),
         )
         serial_objects.append(object)
 
     serial_send_thread = ThreadWrapper(
-        target_func = serial_send,
-        serial_ports = serial_objects,
+        target_func=serial_send,
+        serial_ports=serial_objects,
     )
     serial_receive_thread = Thread(
-        target = serial_receive,
+        target=serial_receive,
         kwargs={
-            'serial_ports': serial_objects,
-            'queue': main_queue,
+            "serial_ports": serial_objects,
+            "queue": main_queue,
         },
     )
     serial_send_queue = serial_send_thread.queue
     serial_receive_thread.start()
     serial_send_thread.start()
     logger.success("初始化串口完成")
-    #-------------------- 初始化串口 --------------------#
+    # -------------------- 初始化串口 --------------------#
 
-    #-------------------- 初始化MQTT客户端 --------------------#
+    # -------------------- 初始化MQTT客户端 --------------------#
     logger.info("开始初始化MQTT客户端")
     mqtt_comm = RaspberryMQTT(
-        MQTTConfig.getattr('broker'),
-        MQTTConfig.getattr('port'),
-        MQTTConfig.getattr('timeout'),
-        MQTTConfig.getattr('topic'),
-        MQTTConfig.getattr('username'),
-        MQTTConfig.getattr('password'),
-        MQTTConfig.getattr('clientId'),
-        MQTTConfig.getattr('apikey'),
+        MQTTConfig.getattr("broker"),
+        MQTTConfig.getattr("port"),
+        MQTTConfig.getattr("timeout"),
+        MQTTConfig.getattr("topic"),
+        MQTTConfig.getattr("username"),
+        MQTTConfig.getattr("password"),
+        MQTTConfig.getattr("clientId"),
+        MQTTConfig.getattr("apikey"),
     )
     mqtt_send_thread = ThreadWrapper(
-        target_func = mqtt_send,
-        queue_maxsize = MQTTConfig.getattr('send_queue_maxsize'),
-        client = mqtt_comm,
+        target_func=mqtt_send,
+        queue_maxsize=MQTTConfig.getattr("send_queue_maxsize"),
+        client=mqtt_comm,
     )
     mqtt_send_queue = mqtt_send_thread.queue
     mqtt_receive_thread = Thread(
-        target = mqtt_receive,
+        target=mqtt_receive,
         kwargs={
-            'client': mqtt_comm,
-            'main_queue': main_queue,
-            'send_queue': mqtt_send_queue,
+            "client": mqtt_comm,
+            "main_queue": main_queue,
+            "send_queue": mqtt_send_queue,
         },
     )
     mqtt_receive_thread.start()
     mqtt_send_thread.start()
     logger.success("初始化MQTT客户端完成")
-    #-------------------- 初始化MQTT客户端 --------------------#
+    # -------------------- 初始化MQTT客户端 --------------------#
 
     logger.success("init end")
-    #------------------------------ 初始化 ------------------------------#
+    # ------------------------------ 初始化 ------------------------------#
 
     # #------------------------------ 调整曝光1 ------------------------------#
     # adjust_exposure_full_res_for_loop(left_camera_queue)

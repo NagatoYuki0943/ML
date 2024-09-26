@@ -14,7 +14,9 @@ def min_max_contrast(image: np.ndarray | Image.Image) -> np.ndarray:
     return image_array.max(axis=(0, 1)) - image_array.min(axis=(0, 1))
 
 
-def get_min_max_contrast_threshold(image: np.ndarray | Image.Image, base: float | int = 10) -> float | int:
+def get_min_max_contrast_threshold(
+    image: np.ndarray | Image.Image, base: float | int = 10
+) -> float | int:
     min_max = min_max_contrast(image)
     return min_max / base
 
@@ -42,7 +44,9 @@ def root_mean_square_contrast(image: np.ndarray | Image.Image) -> np.ndarray:
     return np.sqrt(mean_square_contrast)
 
 
-def image_gradient(image: np.ndarray | Image.Image, iters=0) -> tuple[np.ndarray, np.ndarray]:
+def image_gradient(
+    image: np.ndarray | Image.Image, iters=0
+) -> tuple[np.ndarray, np.ndarray]:
     if len(np.shape(image)) == 3:
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     rows, cols = np.shape(image)
@@ -54,14 +58,14 @@ def image_gradient(image: np.ndarray | Image.Image, iters=0) -> tuple[np.ndarray
     if iters > 0:
         # smooth image
         weight = np.ones((3, 3), dtype=np.float64) / 9
-        image_smooth = ndimage.convolve(image, weight, mode='constant')
+        image_smooth = ndimage.convolve(image, weight, mode="constant")
 
     # compute partial derivatives 梯度计算
     Gx = np.zeros((rows, cols))
     Gx[0:, 1:-1] = 0.5 * (image_smooth[0:, 2:] - image_smooth[0:, 0:-2])
     Gy = np.zeros((rows, cols))
     Gy[1:-1, 0:] = 0.5 * (image_smooth[2:, 0:] - image_smooth[0:-2, 0:])
-    grad = np.sqrt(Gx ** 2 + Gy ** 2)       # 计算了每个像素点的梯度幅值
+    grad = np.sqrt(Gx**2 + Gy**2)  # 计算了每个像素点的梯度幅值
 
     grad_crop = grad[2:-2, 2:-2]
     return grad, grad_crop
@@ -83,7 +87,7 @@ def test():
     print(f"{rms_contrast = }")
     print()
 
-    image_gray = image.convert('L')
+    image_gray = image.convert("L")
     mean = mean_brightness(image_gray)
     min_max = min_max_contrast(image_gray)
     michelson = michelson_contrast(image_gray)

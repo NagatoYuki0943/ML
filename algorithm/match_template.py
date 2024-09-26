@@ -23,7 +23,9 @@ def box_iou(box1: list, box2: list) -> float:
     inner_box_x2 = min(box1[2], box2[2])
     inner_box_y2 = min(box1[3], box2[3])
     # max 用来判断是否重叠
-    inner_box_area = max(inner_box_x2 - inner_box_x1, 0) * max(inner_box_y2 - inner_box_y1, 0)
+    inner_box_area = max(inner_box_x2 - inner_box_x1, 0) * max(
+        inner_box_y2 - inner_box_y1, 0
+    )
 
     iou = inner_box_area / (box1_area + box2_area - inner_box_area)
     return iou
@@ -36,7 +38,9 @@ def test_box_iou():
     print(box_iou([0, 0, 1, 1], [1, 1, 2, 2]))  # 0.0
 
 
-def sort_boxes(boxes: np.ndarray | list, sort_by: Literal["x", "y", "xy"] = "x") -> np.ndarray:
+def sort_boxes(
+    boxes: np.ndarray | list, sort_by: Literal["x", "y", "xy"] = "x"
+) -> np.ndarray:
     """根据 x or y 从小到大排序对 boxes 进行排序
 
     Args:
@@ -46,22 +50,41 @@ def sort_boxes(boxes: np.ndarray | list, sort_by: Literal["x", "y", "xy"] = "x")
     Returns:
         np.ndarray: 排序的index
     """
-    assert sort_by in ["x", "y", "xy"], f"sort_by must be 'x', 'y' or 'xy' but got {sort_by}"
+    assert sort_by in [
+        "x",
+        "y",
+        "xy",
+    ], f"sort_by must be 'x', 'y' or 'xy' but got {sort_by}"
     boxes = np.array(boxes)
 
     # lexsort: 给定多个排序键, lexsort返回一个整数索引数组, 该数组按多个键描述排序顺序.序列中的最后一个键用于主排序, 倒数第二个键用于次排序, 以此类推.
     if sort_by == "x":
-        combined_indices = np.lexsort((boxes[:, 3], boxes[:, 1], boxes[:, 2], boxes[:, 0]))
+        combined_indices = np.lexsort(
+            (boxes[:, 3], boxes[:, 1], boxes[:, 2], boxes[:, 0])
+        )
     elif sort_by == "y":
-        combined_indices = np.lexsort((boxes[:, 2], boxes[:, 0], boxes[:, 3], boxes[:, 1]))
+        combined_indices = np.lexsort(
+            (boxes[:, 2], boxes[:, 0], boxes[:, 3], boxes[:, 1])
+        )
     else:
-        combined_indices = np.lexsort((boxes[:, 3], boxes[:, 2], boxes[:, 1], boxes[:, 0]))
+        combined_indices = np.lexsort(
+            (boxes[:, 3], boxes[:, 2], boxes[:, 1], boxes[:, 0])
+        )
 
     return combined_indices
 
 
 def test_sort_boxes():
-    boxes = np.array([[0, 4, 4, 5], [0, 0, 5, 4], [6, 6, 10, 11], [1, 6, 7, 8], [6, 4, 9, 7], [1, 8, 12, 10]])
+    boxes = np.array(
+        [
+            [0, 4, 4, 5],
+            [0, 0, 5, 4],
+            [6, 6, 10, 11],
+            [1, 6, 7, 8],
+            [6, 4, 9, 7],
+            [1, 8, 12, 10],
+        ]
+    )
     index = sort_boxes(boxes)
     print(index)
     print(boxes[index])
@@ -95,7 +118,9 @@ def test_sort_boxes():
     print()
 
 
-def sort_boxes_center(boxes: np.ndarray | list, sort_by: Literal["x", "y"] = "x") -> np.ndarray:
+def sort_boxes_center(
+    boxes: np.ndarray | list, sort_by: Literal["x", "y"] = "x"
+) -> np.ndarray:
     """根据 x or y 从小到大排序对 boxes 进行排序
 
     Args:
@@ -120,7 +145,16 @@ def sort_boxes_center(boxes: np.ndarray | list, sort_by: Literal["x", "y"] = "x"
 
 
 def test_sort_boxes_center():
-    boxes = np.array([[0, 4, 4, 5], [0, 0, 5, 4], [6, 6, 10, 11], [1, 6, 7, 8], [6, 4, 9, 7], [1, 8, 12, 10]])
+    boxes = np.array(
+        [
+            [0, 4, 4, 5],
+            [0, 0, 5, 4],
+            [6, 6, 10, 11],
+            [1, 6, 7, 8],
+            [6, 4, 9, 7],
+            [1, 8, 12, 10],
+        ]
+    )
     index = sort_boxes_center(boxes)
     print(index)
     print(boxes[index])
@@ -143,7 +177,9 @@ def test_sort_boxes_center():
     #  [ 1  8 12 10]]
 
 
-def iou_filter_by_threshold(boxes: list | np.ndarray, iou_threshold: float = 0.5) -> np.ndarray:
+def iou_filter_by_threshold(
+    boxes: list | np.ndarray, iou_threshold: float = 0.5
+) -> np.ndarray:
     """iou阈值过滤
 
     Args:
@@ -203,10 +239,10 @@ def match_template_max(
     template_h, template_w = template.shape[:2]
 
     match_image = cv2.matchTemplate(
-        image = image,          # 图片
-        templ = template,       # 模板
-        method = match_method,  # 匹配方法
-        mask = mask,            # 遮罩
+        image=image,  # 图片
+        templ=template,  # 模板
+        method=match_method,  # 匹配方法
+        mask=mask,  # 遮罩
     )
 
     # min_loc: [x, y]
@@ -262,10 +298,10 @@ def match_template_filter_by_threshold(
     template_h, template_w = template.shape[:2]
 
     match_image = cv2.matchTemplate(
-        image = image,          # 图片
-        templ = template,       # 模板
-        method = match_method,  # 匹配方法
-        mask = mask,            # 遮罩
+        image=image,  # 图片
+        templ=template,  # 模板
+        method=match_method,  # 匹配方法
+        mask=mask,  # 遮罩
     )
 
     # 在函数完成比较后, 可以使用minMaxLoc函数将最佳匹配作为全局最小值（当使用TM_SQDIFF时）或最大值（当采用TM_CCORR或TM_CCOEFF时）.
@@ -357,8 +393,12 @@ def multi_scale_match_template(
         resized_w = int(final_ratio * template_w)
         # 使用最终尺寸一次 resize 模板
         template_resized = cv2.resize(template, (resized_w, resized_h))
-        mask_resized = cv2.resize(mask, (resized_w, resized_h)) if mask is not None else None
-        logger.info(f"{scale = }, {final_ratio = }, resize template size h = {resized_h}, w = {resized_w}")
+        mask_resized = (
+            cv2.resize(mask, (resized_w, resized_h)) if mask is not None else None
+        )
+        logger.info(
+            f"{scale = }, {final_ratio = }, resize template size h = {resized_h}, w = {resized_w}"
+        )
         # 模糊模板
         # template_resized = cv2.GaussianBlur(template_resized, (3, 3), 0)
 
@@ -370,7 +410,7 @@ def multi_scale_match_template(
                 match_method,
                 mask_resized,
             )
-            score, box = match_result # 最高得分
+            score, box = match_result  # 最高得分
             match_results.append((final_ratio, score, box))
         else:
             # 通过阈值匹配
@@ -385,7 +425,9 @@ def multi_scale_match_template(
             # final_ratio: float
             # match_result: [[score, box], ...]  -> [[final_ratio, score, box], ...]
             # match_result = list(zip([final_ratio] * len(match_result), *list(zip(*match_result))))
-            match_result = [[final_ratio] + list(_match_result) for _match_result in match_result]
+            match_result = [
+                [final_ratio] + list(_match_result) for _match_result in match_result
+            ]
             match_results.extend(match_result)
 
     if match_method == cv2.TM_SQDIFF or match_method == cv2.TM_SQDIFF_NORMED:
@@ -471,7 +513,9 @@ def multi_target_multi_scale_match_template(
     logger.info(f"reserve_boxes:\n {reserve_boxes}")
 
     if len(reserve_boxes) < target_number:
-        logger.warning(f"couldn't find {target_number} boxes, only get {len(reserve_boxes)} boxes.")
+        logger.warning(
+            f"couldn't find {target_number} boxes, only get {len(reserve_boxes)} boxes."
+        )
 
     # 获取前 target_number 个匹配结果
     if target_number > 0:

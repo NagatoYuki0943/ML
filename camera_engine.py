@@ -18,7 +18,10 @@ def camera_engine(
 ):
     # 启动相机函数
     def start_camera_engine():
-        log_file_path = MainConfig.getattr("log_dir") / f"camera_{camera_index}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+        log_file_path = (
+            MainConfig.getattr("log_dir")
+            / f"camera_{camera_index}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+        )
         raspberry_cameras = RaspberryCameras(
             camera_index,
             MainConfig.getattr("log_level"),
@@ -48,9 +51,13 @@ def camera_engine(
             # 曝光时间
             exposure_time: int | None = CameraConfig.getattr("exposure_time")
             # 曝光时间宽容度
-            exposure_time_tolerance_percent: float = CameraConfig.getattr("exposure_time_tolerance_percent")
+            exposure_time_tolerance_percent: float = CameraConfig.getattr(
+                "exposure_time_tolerance_percent"
+            )
             if exposure_time is not None:
-                exposure_time_tolerance = exposure_time * exposure_time_tolerance_percent
+                exposure_time_tolerance = (
+                    exposure_time * exposure_time_tolerance_percent
+                )
             # 增益
             analogue_gain: float | None = CameraConfig.getattr("analogue_gain")
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S.%f")
@@ -63,24 +70,37 @@ def camera_engine(
             # logger.info(f"camera {camera_index} capture {timestamp} image")
 
             # 3.判断是否返回图片
-            return_image_time_interval = CameraConfig.getattr("return_image_time_interval")
+            return_image_time_interval = CameraConfig.getattr(
+                "return_image_time_interval"
+            )
             return_current_time = time.time()
             # 取整为时间周期
-            _return_before_time_period = int(return_before_time * 1000 // return_image_time_interval)
-            _return_current_time_period = int(return_current_time * 1000 // return_image_time_interval)
+            _return_before_time_period = int(
+                return_before_time * 1000 // return_image_time_interval
+            )
+            _return_current_time_period = int(
+                return_current_time * 1000 // return_image_time_interval
+            )
             # 曝光在设定的时间范围内就返回
             if _return_current_time_period > _return_before_time_period:
-                _ExposureTime = metadata['ExposureTime']
+                _ExposureTime = metadata["ExposureTime"]
                 # 默认 exposure_time 为 None,要手动设定
                 if exposure_time is None:
                     exposure_time = _ExposureTime
-                    exposure_time_tolerance = exposure_time * exposure_time_tolerance_percent
+                    exposure_time_tolerance = (
+                        exposure_time * exposure_time_tolerance_percent
+                    )
                     CameraConfig.setattr("exposure_time", exposure_time)
-                if _ExposureTime >= exposure_time - exposure_time_tolerance and _ExposureTime <= exposure_time + exposure_time_tolerance:
+                if (
+                    _ExposureTime >= exposure_time - exposure_time_tolerance
+                    and _ExposureTime <= exposure_time + exposure_time_tolerance
+                ):
                     # 如果队列满了，就删除队列的第一张图片
                     if queue.full():
                         queue.get()
-                        logger.warning(f"camera {camera_index} queue is full, delete the first image in queue")
+                        logger.warning(
+                            f"camera {camera_index} queue is full, delete the first image in queue"
+                        )
 
                     # 转换为Gray，Default: RGB
                     output_format = CameraConfig.getattr("output_format")
@@ -94,14 +114,19 @@ def camera_engine(
 
                     # 将图像放入队列中
                     queue.put((timestamp, image, metadata))
-                    logger.success(f"camera {camera_index} put {timestamp} image into queue")
+                    logger.success(
+                        f"camera {camera_index} put {timestamp} image into queue"
+                    )
                     return_before_time = return_current_time
 
             # sleep
             captime_time_end = time.time()
 
             capture_time_interval = CameraConfig.getattr("capture_time_interval")
-            sleep_time = max(0, capture_time_interval / 1000 - (captime_time_end - captime_time_begin))
+            sleep_time = max(
+                0,
+                capture_time_interval / 1000 - (captime_time_end - captime_time_begin),
+            )
             logger.info(f"camera {camera_index} {sleep_time = } s")
             time.sleep(sleep_time)
 
@@ -110,10 +135,16 @@ def camera_engine(
 
         else:
             # 相机超时重启
-            get_picture_timeout_threshold: int = MainConfig.getattr("get_picture_timeout_threshold")
-            get_picture_timeout_count: int = MainConfig.getattr("get_picture_timeout_count")
+            get_picture_timeout_threshold: int = MainConfig.getattr(
+                "get_picture_timeout_threshold"
+            )
+            get_picture_timeout_count: int = MainConfig.getattr(
+                "get_picture_timeout_count"
+            )
             if get_picture_timeout_count >= get_picture_timeout_threshold:
-                logger.warning(f"get picture timeout count: {get_picture_timeout_count} >= threshold: {get_picture_timeout_threshold}, restart camera")
+                logger.warning(
+                    f"get picture timeout count: {get_picture_timeout_count} >= threshold: {get_picture_timeout_threshold}, restart camera"
+                )
                 # 关闭相机
                 raspberry_cameras.close(camera_index)
                 raspberry_cameras.close_log_file()

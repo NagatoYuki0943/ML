@@ -3,7 +3,9 @@ from copy import deepcopy
 from loguru import logger
 
 
-def fit_circle_by_least_square0(points: list | np.ndarray) -> tuple[float, float, float, float, float, float, float, np.ndarray]:
+def fit_circle_by_least_square0(
+    points: list | np.ndarray,
+) -> tuple[float, float, float, float, float, float, float, np.ndarray]:
     """根据最小二乘法求圆心和半径
 
     https://www.cnblogs.com/xiaxuexiaoab/p/16276402.html
@@ -48,10 +50,10 @@ def fit_circle_by_least_square0(points: list | np.ndarray) -> tuple[float, float
         sum_xy2 += x * y2
         sum_x2y += x2 * y
 
-    C = N * sum_x2 - sum_x ** 2
+    C = N * sum_x2 - sum_x**2
     D = N * sum_xy - sum_x * sum_y
     E = N * sum_x3 + N * sum_xy2 - (sum_x2 + sum_y2) * sum_x
-    G = N * sum_y2 - sum_y ** 2
+    G = N * sum_y2 - sum_y**2
     H = N * sum_x2y + N * sum_y3 - (sum_x2 + sum_y2) * sum_y
 
     a = (H * D - E * G) / (C * G - D * D)
@@ -60,7 +62,7 @@ def fit_circle_by_least_square0(points: list | np.ndarray) -> tuple[float, float
 
     center_x = -a / 2.0
     center_y = -b / 2.0
-    radius = np.sqrt(a ** 2 + b ** 2 - 4 * c) / 2.0
+    radius = np.sqrt(a**2 + b**2 - 4 * c) / 2.0
 
     # err = 0.0
     # for point in points:
@@ -68,7 +70,9 @@ def fit_circle_by_least_square0(points: list | np.ndarray) -> tuple[float, float
     #     if e > err:
     #         err = e
     # 求每个点到求出来的中心的距离
-    points_to_center = np.sqrt(np.sum((points - np.array([center_x, center_y])) ** 2, axis=1))
+    points_to_center = np.sqrt(
+        np.sum((points - np.array([center_x, center_y])) ** 2, axis=1)
+    )
     # 计算中心距离和求出来的半径的差距
     radii_err = points_to_center - radius
     # 差距的均值
@@ -83,7 +87,9 @@ def fit_circle_by_least_square0(points: list | np.ndarray) -> tuple[float, float
     return center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err
 
 
-def fit_circle_by_least_square(points: list | np.ndarray) -> tuple[float, float, float, float, float, float, float, np.ndarray]:
+def fit_circle_by_least_square(
+    points: list | np.ndarray,
+) -> tuple[float, float, float, float, float, float, float, np.ndarray]:
     """根据最小二乘法求圆心和半径
 
     Args:
@@ -100,8 +106,8 @@ def fit_circle_by_least_square(points: list | np.ndarray) -> tuple[float, float,
 
     x = points[:, 0]
     y = points[:, 1]
-    x2 = x ** 2
-    y2 = y ** 2
+    x2 = x**2
+    y2 = y**2
 
     sum_x = x.sum()
     sum_y = y.sum()
@@ -113,10 +119,10 @@ def fit_circle_by_least_square(points: list | np.ndarray) -> tuple[float, float,
     sum_xy2 = (x * y2).sum()
     sum_x2y = (x2 * y).sum()
 
-    C = N * sum_x2 - sum_x ** 2
+    C = N * sum_x2 - sum_x**2
     D = N * sum_xy - sum_x * sum_y
     E = N * sum_x3 + N * sum_xy2 - (sum_x2 + sum_y2) * sum_x
-    G = N * sum_y2 - sum_y ** 2
+    G = N * sum_y2 - sum_y**2
     H = N * sum_x2y + N * sum_y3 - (sum_x2 + sum_y2) * sum_y
 
     a = (H * D - E * G) / (C * G - D * D)
@@ -125,10 +131,12 @@ def fit_circle_by_least_square(points: list | np.ndarray) -> tuple[float, float,
 
     center_x = -a / 2.0
     center_y = -b / 2.0
-    radius = np.sqrt(a ** 2 + b ** 2 - 4 * c) / 2.0
+    radius = np.sqrt(a**2 + b**2 - 4 * c) / 2.0
 
     # 求每个点到求出来的中心的距离
-    points_to_center = np.sqrt(np.sum((points - np.array([center_x, center_y])) ** 2, axis=1))
+    points_to_center = np.sqrt(
+        np.sum((points - np.array([center_x, center_y])) ** 2, axis=1)
+    )
     # 计算中心距离和求出来的半径的差距
     radii_err = points_to_center - radius
     # 差距的均值
@@ -145,7 +153,18 @@ def fit_circle_by_least_square(points: list | np.ndarray) -> tuple[float, float,
 
 def fit_circle_by_least_square_filter(
     points: list | np.ndarray, sigmas: list[float | int] | float | int = 0
-) -> tuple[float, float, float, float, float, float, float, np.ndarray, np.ndarray, None | np.ndarray]:
+) -> tuple[
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    np.ndarray,
+    np.ndarray,
+    None | np.ndarray,
+]:
     """通过求解出来的圆心点到每个真实点的距离，与求解出来的半径的标准差进行过滤
 
     Args:
@@ -160,7 +179,9 @@ def fit_circle_by_least_square_filter(
         tuple: results
     """
     # 第一次执行
-    center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err = fit_circle_by_least_square(points)
+    center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err = (
+        fit_circle_by_least_square(points)
+    )
 
     need_wrap = not isinstance(sigmas, list)
     sigmas = [sigmas] if need_wrap else sigmas
@@ -177,13 +198,39 @@ def fit_circle_by_least_square_filter(
         n_sigma = err_std * sigma
         # 先找忽略的，再找保留的，因为保留的数据会覆盖原数据
         # 要使用 or 不用 not
-        ignore_circle: np.ndarray = fit_circle[np.bitwise_or(radii_err <= err_avg - n_sigma, radii_err >= err_avg + n_sigma)]
-        fit_circle: np.ndarray = fit_circle[np.bitwise_and(radii_err > err_avg - n_sigma, radii_err < err_avg + n_sigma)]
+        ignore_circle: np.ndarray = fit_circle[
+            np.bitwise_or(
+                radii_err <= err_avg - n_sigma, radii_err >= err_avg + n_sigma
+            )
+        ]
+        fit_circle: np.ndarray = fit_circle[
+            np.bitwise_and(radii_err > err_avg - n_sigma, radii_err < err_avg + n_sigma)
+        ]
         points_num: int = fit_circle.shape[0]
         if points_num >= 3:
-            center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err = fit_circle_by_least_square(fit_circle)
+            (
+                center_x,
+                center_y,
+                radius,
+                err_avg,
+                err_var,
+                err_std,
+                err_abs,
+                radii_err,
+            ) = fit_circle_by_least_square(fit_circle)
         else:
             logger.error(f"用于拟合的圆的数量为{points_num}，无法过滤，跳过过滤步骤")
             break
 
-    return center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err, fit_circle, ignore_circle
+    return (
+        center_x,
+        center_y,
+        radius,
+        err_avg,
+        err_var,
+        err_std,
+        err_abs,
+        radii_err,
+        fit_circle,
+        ignore_circle,
+    )

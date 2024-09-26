@@ -54,7 +54,11 @@ def rings_location(
     Returns:
         dict: 检测结果
     """
-    timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime()) if timestamp is None else timestamp
+    timestamp = (
+        time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        if timestamp is None
+        else timestamp
+    )
     os.makedirs(save_dir, exist_ok=True)
 
     if len(image.shape) == 3:
@@ -63,8 +67,7 @@ def rings_location(
 
     # 检测边缘
     logger.info(f"{subpixel_edges_threshold = }")
-    edges, grad, \
-    absGxInner, absGyInner = subpixel_edges(
+    edges, grad, absGxInner, absGyInner = subpixel_edges(
         image,
         subpixel_edges_threshold,
         iters,
@@ -73,14 +76,14 @@ def rings_location(
 
     # 保存结果
     if save_grads:
-        with open(os.path.join(save_dir, f"{timestamp}-edges.pkl"), 'wb') as f:
+        with open(os.path.join(save_dir, f"{timestamp}-edges.pkl"), "wb") as f:
             pickle.dump(edges, f)
         np.save(os.path.join(save_dir, f"{timestamp}-grad"), grad)
         np.save(os.path.join(save_dir, f"{timestamp}-absGxInner"), absGxInner)
         np.save(os.path.join(save_dir, f"{timestamp}-absGyInner"), absGyInner)
 
     if save_detect_images:
-        plt.imshow(grad[2:-2, 2:-2]) # 忽略边缘
+        plt.imshow(grad[2:-2, 2:-2])  # 忽略边缘
         plt.colorbar()
         plt.savefig(os.path.join(save_dir, f"{timestamp}-grad.png"))
         plt.close()
@@ -98,7 +101,7 @@ def rings_location(
     logger.info(f"pixel_edges: {pixel_edges_xy.shape = }")
     if save_detect_images:
         figure = plt.figure(figsize=(6, 6))
-        plt.scatter(edges.pixel_x, edges.pixel_y, marker='.')
+        plt.scatter(edges.pixel_x, edges.pixel_y, marker=".")
         plt.grid()
         plt.title("pixel edges")
         figure.savefig(os.path.join(save_dir, f"{timestamp}-fig-pixel-edges.png"))
@@ -109,18 +112,23 @@ def rings_location(
     logger.info(f"subpixel_edges: {subpixel_edges_xy.shape = }")
     if save_detect_images:
         figure = plt.figure(figsize=(6, 6))
-        plt.scatter(edges.x, edges.y, marker='.')
+        plt.scatter(edges.x, edges.y, marker=".")
         plt.grid()
         plt.title("subpixel edges")
         figure.savefig(os.path.join(save_dir, f"{timestamp}-fig-subpixel-edges.png"))
         plt.close()
 
     # 分为单个圆环
-    group_rings = split_rings_adaptive(subpixel_edges_xy, rings_nums=rings_nums, min_group_size=min_group_size, init_threshold_range=0.5)
+    group_rings = split_rings_adaptive(
+        subpixel_edges_xy,
+        rings_nums=rings_nums,
+        min_group_size=min_group_size,
+        init_threshold_range=0.5,
+    )
     if save_detect_images:
         figure = plt.figure(figsize=(6, 6))
         for group_circle in group_rings:
-            plt.scatter(group_circle[:, 0], group_circle[:, 1], marker='.')
+            plt.scatter(group_circle[:, 0], group_circle[:, 1], marker=".")
         plt.grid()
         plt.title("group rings")
         figure.savefig(os.path.join(save_dir, f"{timestamp}-fig-group-rings.png"))
@@ -137,8 +145,18 @@ def rings_location(
     ignore_rings = []
     for i, group_circle in enumerate(group_rings):
         # logger.info(f"split ring: {i}, pixel numbers = {group_circle.shape[0]}")
-        center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err, fit_circle, ignore_circle = \
-            fit_circle_by_least_square_filter(group_circle, sigmas)
+        (
+            center_x,
+            center_y,
+            radius,
+            err_avg,
+            err_var,
+            err_std,
+            err_abs,
+            radii_err,
+            fit_circle,
+            ignore_circle,
+        ) = fit_circle_by_least_square_filter(group_circle, sigmas)
         center_xs.append(center_x)
         center_ys.append(center_y)
         radii.append(radius)
@@ -152,39 +170,41 @@ def rings_location(
         # 绘制过滤前和过滤后的图片
         fig, axes = plt.subplots(nrows=1, ncols=5, figsize=(45, 8))
         # 子像素边缘
-        axes[0].scatter(edges.x, edges.y, marker='.')
+        axes[0].scatter(edges.x, edges.y, marker=".")
         axes[0].grid()
         axes[0].set_title("subpixel edges")
         # 分组子像素边缘
         for group_circle in group_rings:
-            axes[1].scatter(group_circle[:, 0], group_circle[:, 1], marker='.')
+            axes[1].scatter(group_circle[:, 0], group_circle[:, 1], marker=".")
         axes[1].grid()
         axes[1].set_title("group rings")
         # 拟合的圆
         for circle in fit_rings:
-            axes[2].scatter(circle[:, 0], circle[:, 1], marker='.')
+            axes[2].scatter(circle[:, 0], circle[:, 1], marker=".")
         for center_x, center_y in zip(center_xs, center_ys):
-            axes[2].scatter(center_x, center_y, marker='.')
+            axes[2].scatter(center_x, center_y, marker=".")
         axes[2].grid()
         axes[2].set_title("fit rings")
         # 有忽略的圆才画
         if ignore_rings[0] is not None:
             # 忽略的圆
             for circle in ignore_rings:
-                axes[3].scatter(circle[:, 0], circle[:, 1], marker='.')
+                axes[3].scatter(circle[:, 0], circle[:, 1], marker=".")
             axes[3].grid()
             axes[3].set_title("ignore rings")
             # 拟合的圆和忽略的圆
             for fit_circle, ignore_circle in zip(fit_rings, ignore_rings):
-                axes[4].scatter(fit_circle[:, 0], fit_circle[:, 1], marker='.')
-                axes[4].scatter(ignore_circle[:, 0], ignore_circle[:, 1], marker='.')
+                axes[4].scatter(fit_circle[:, 0], fit_circle[:, 1], marker=".")
+                axes[4].scatter(ignore_circle[:, 0], ignore_circle[:, 1], marker=".")
             axes[4].grid()
             axes[4].set_title("fit & ignore rings")
         fig.savefig(os.path.join(save_dir, f"{timestamp}-fig-compare.png"))
         plt.close()
 
         # 创建高分辨率图片，用于绘制亚像素边缘
-        draw_image = np.repeat(np.repeat(image, repeats=draw_scale, axis=0), repeats=draw_scale, axis=1)
+        draw_image = np.repeat(
+            np.repeat(image, repeats=draw_scale, axis=0), repeats=draw_scale, axis=1
+        )
 
         # 绘制边缘
         for i, fit_circle in enumerate(fit_rings):
@@ -193,10 +213,10 @@ def rings_location(
                 center = np.round((fit_circle[j] + 0.5) * draw_scale).astype(np.int32)
                 draw_image = cv2.circle(
                     img=draw_image,
-                    center=center,          # center (x, y)
-                    radius=1,               # 半径
-                    color=(136, 14, 79),    # color
-                    thickness=1,            # 线宽
+                    center=center,  # center (x, y)
+                    radius=1,  # 半径
+                    color=(136, 14, 79),  # color
+                    thickness=1,  # 线宽
                 )
 
         # 绘制中心点
@@ -204,10 +224,10 @@ def rings_location(
             center = [round(center_x * draw_scale), round(center_y * draw_scale)]
             draw_image = cv2.circle(
                 img=draw_image,
-                center=center,          # center (x, y)
-                radius=1,               # 半径
-                color=(136, 14, 79),    # color
-                thickness=-1,           # 线宽
+                center=center,  # center (x, y)
+                radius=1,  # 半径
+                color=(136, 14, 79),  # color
+                thickness=-1,  # 线宽
             )
 
         # 保存图片
@@ -219,7 +239,9 @@ def rings_location(
     logger.info(f"所有圆的圆心坐标均值信息：{center_x_mean = }, {center_y_mean = }")
 
     if save_detect_results:
-        with open(os.path.join(save_dir, f"{timestamp}.json"), mode='w', encoding='utf-8') as f:
+        with open(
+            os.path.join(save_dir, f"{timestamp}.json"), mode="w", encoding="utf-8"
+        ) as f:
             image_data = {
                 "timestamp": timestamp,
                 "threshold": subpixel_edges_threshold,
@@ -227,7 +249,10 @@ def rings_location(
                 "subpixel_edges_xy": subpixel_edges_xy.tolist(),
                 "group_rings": [circle.tolist() for circle in group_rings],
                 "fit_rings": [circle.tolist() for circle in fit_rings],
-                "ignore_rings": [(None if circle is None else circle.tolist()) for circle in ignore_rings],
+                "ignore_rings": [
+                    (None if circle is None else circle.tolist())
+                    for circle in ignore_rings
+                ],
                 "center_xs": center_xs,
                 "center_ys": center_ys,
                 "radii": radii,
@@ -266,7 +291,7 @@ def multi_images_rings_location(
     rings_nums: int = 6,
     min_group_size: int = 3,
     sigmas: list[float | int] | float | int = 0,
-    save_dir = "./save_dir",
+    save_dir="./save_dir",
     draw_scale: int = 20,
     save_grads: bool = False,
     save_detect_images: bool = True,
@@ -297,25 +322,31 @@ def multi_images_rings_location(
     Returns:
         dict: 检测结果
     """
-    timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime()) if timestamp is None else timestamp
-    assert len(images) == len(roi_names), "images number must equal to roi_images number"
+    timestamp = (
+        time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        if timestamp is None
+        else timestamp
+    )
+    assert len(images) == len(
+        roi_names
+    ), "images number must equal to roi_images number"
 
     measure_results = {}
     for image, roi_name in zip(images, roi_names):
         measure_results[roi_name] = rings_location(
-            image = image,
-            timestamp = f"{timestamp}-{roi_name}",
-            subpixel_edges_threshold = subpixel_edges_threshold,
-            iters = iters,
-            order = order,
-            rings_nums = rings_nums,
-            min_group_size = min_group_size,
-            sigmas = sigmas,
-            save_dir = save_dir,
-            draw_scale = draw_scale,
-            save_grads = save_grads,
-            save_detect_images = save_detect_images,
-            save_detect_results = save_detect_results,
+            image=image,
+            timestamp=f"{timestamp}-{roi_name}",
+            subpixel_edges_threshold=subpixel_edges_threshold,
+            iters=iters,
+            order=order,
+            rings_nums=rings_nums,
+            min_group_size=min_group_size,
+            sigmas=sigmas,
+            save_dir=save_dir,
+            draw_scale=draw_scale,
+            save_grads=save_grads,
+            save_detect_images=save_detect_images,
+            save_detect_results=save_detect_results,
         )
     return measure_results
 
@@ -365,19 +396,19 @@ def adaptive_threshold_rings_location(
     threshold = get_gradient_threshold(grad_crop, gradient_threshold_percent)
 
     result = rings_location(
-        image = image,
-        timestamp = timestamp,
-        subpixel_edges_threshold = threshold,
-        iters = iters,
-        order = order,
-        rings_nums = rings_nums,
-        min_group_size = min_group_size,
-        sigmas = sigmas,
-        save_dir = save_dir,
-        draw_scale = draw_scale,
-        save_grads = save_grads,
-        save_detect_images = save_detect_images,
-        save_detect_results = save_detect_results,
+        image=image,
+        timestamp=timestamp,
+        subpixel_edges_threshold=threshold,
+        iters=iters,
+        order=order,
+        rings_nums=rings_nums,
+        min_group_size=min_group_size,
+        sigmas=sigmas,
+        save_dir=save_dir,
+        draw_scale=draw_scale,
+        save_grads=save_grads,
+        save_detect_images=save_detect_images,
+        save_detect_results=save_detect_results,
     )
     return result
 
@@ -387,18 +418,18 @@ if __name__ == "__main__":
     print(image.shape)
 
     result = adaptive_threshold_rings_location(
-        image = image,
-        timestamp = "circles2-7.5cm-500",
-        iters = 1,
-        order = 2,
-        rings_nums = 6,
-        min_group_size = 3,
-        sigmas = 2,
-        save_dir = "./save_dir",
-        draw_scale = 20,
-        save_grads = False,
-        save_detect_images = True,
-        save_detect_results = True,
-        gradient_threshold_percent = 0.6,
+        image=image,
+        timestamp="circles2-7.5cm-500",
+        iters=1,
+        order=2,
+        rings_nums=6,
+        min_group_size=3,
+        sigmas=2,
+        save_dir="./save_dir",
+        draw_scale=20,
+        save_grads=False,
+        save_detect_images=True,
+        save_detect_results=True,
+        gradient_threshold_percent=0.6,
     )
     print(result)

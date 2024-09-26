@@ -29,7 +29,9 @@ def drop_excessive_queue_items(queue: Queue):
     camera_qsize = queue.qsize()
     # 忽略多余的图片
     if camera_qsize > 1:
-        logger.warning(f"queue got {camera_qsize} items, ignore {camera_qsize - 1} itmes")
+        logger.warning(
+            f"queue got {camera_qsize} items, ignore {camera_qsize - 1} itmes"
+        )
         for _ in range(camera_qsize - 1):
             try:
                 queue.get(timeout=MainConfig.getattr("get_picture_timeout"))
@@ -37,7 +39,9 @@ def drop_excessive_queue_items(queue: Queue):
                 logger.error("get item timeout")
 
 
-def enhance_contrast_clahe(image: np.ndarray, clip_limit=2.0, tile_grid_size=(8, 8)) -> np.ndarray:
+def enhance_contrast_clahe(
+    image: np.ndarray, clip_limit=2.0, tile_grid_size=(8, 8)
+) -> np.ndarray:
     """clahe增强对比度"""
     # 创建CLAHE对象
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
@@ -48,24 +52,24 @@ def enhance_contrast_clahe(image: np.ndarray, clip_limit=2.0, tile_grid_size=(8,
     return enhanced_image
 
 
-def save_to_jsonl(data, file_path: str | Path, mode: str = 'a'):
+def save_to_jsonl(data, file_path: str | Path, mode: str = "a"):
     """
     Save data to a JSON lines file.
     """
     if data is None:
         # write an empty file if data is None
-        with open(file_path, mode='w', encoding='utf-8') as f:
-            f.write('')
+        with open(file_path, mode="w", encoding="utf-8") as f:
+            f.write("")
         return
     string = json.dumps(data, ensure_ascii=False)
-    with open(file_path, mode=mode, encoding='utf-8') as f:
+    with open(file_path, mode=mode, encoding="utf-8") as f:
         f.write(string + "\n")
 
 
 def load_standard_cycle_results(file_path: str | Path) -> dict | None:
     file_path = Path(file_path)
     if file_path.exists():
-        with open(file_path, mode='r', encoding='utf-8') as f:
+        with open(file_path, mode="r", encoding="utf-8") as f:
             # 读取第一行数据
             line = f.readline()
             if line:
@@ -76,12 +80,12 @@ def load_standard_cycle_results(file_path: str | Path) -> dict | None:
 
 
 def test_load_standard_cycle_results():
-    data = load_standard_cycle_results('results/history.jsonl')
+    data = load_standard_cycle_results("results/history.jsonl")
     print(data)
 
 
 def get_now_time():
-    return datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+    return datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def save_image(image: np.ndarray, file_path: str | Path):
@@ -95,10 +99,9 @@ def save_image(image: np.ndarray, file_path: str | Path):
 def get_picture_timeout_process():
     logger.error("get picture timeout")
     MainConfig.setattr(
-        "get_picture_timeout_count",
-        MainConfig.getattr("get_picture_timeout_count") + 1
+        "get_picture_timeout_count", MainConfig.getattr("get_picture_timeout_count") + 1
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_load_standard_cycle_results()

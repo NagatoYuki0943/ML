@@ -11,11 +11,10 @@ import yaml
 
 @dataclass
 class BaseConfig:
-
     @classmethod
     def getattr(cls, attr_name: str) -> Any:
         assert hasattr(cls, attr_name), f"{attr_name} not in {cls.__name__}"
-        if hasattr(cls, 'lock'):
+        if hasattr(cls, "lock"):
             with cls.lock:
                 return getattr(cls, attr_name)
         else:
@@ -23,7 +22,7 @@ class BaseConfig:
 
     @classmethod
     def setattr(cls, attr_name: str, value: Any) -> None:
-        if hasattr(cls, 'lock'):
+        if hasattr(cls, "lock"):
             with cls.lock:
                 setattr(cls, attr_name, value)
         else:
@@ -32,10 +31,12 @@ class BaseConfig:
 
 @dataclass
 class MainConfig(BaseConfig):
-    """主线程配置
-    """
-    lock = Lock()   # 锁, 在读取或者修改配置文件时要加锁
-    log_level: Literal['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO'
+    """主线程配置"""
+
+    lock = Lock()  # 锁, 在读取或者修改配置文件时要加锁
+    log_level: Literal[
+        "TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"
+    ] = "INFO"
     log_dir: Path = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
     loguru_log_path: str = log_dir / "runtime_{time}.log"
@@ -50,70 +51,91 @@ class MainConfig(BaseConfig):
     history_save_path = save_dir / "history.jsonl"
     standard_save_path = save_dir / "standard.jsonl"
     original_config_path = save_dir / "config_original.yaml"  # 原始 config, 用于重置
-    runtime_config_path = save_dir / "config_runtime.yaml"    # 运行时 config, 用于保存当前配置
-    main_sleep_interval: int = 500                                  # 主循环 sleep_time ms
-    cycle_time_interval: int = 15000                                # 主循环时间 ms
-    get_picture_timeout: int = 10                                   # 获取图片超时时间 s
-    get_picture_timeout_threshold: int = 10                         # 获取图片超时数量阈值
-    get_picture_timeout_count: int = 0                              # 获取图片超时计数
-    defalut_error_distance: float = 1e6                             # 错误默认距离 m
+    runtime_config_path = (
+        save_dir / "config_runtime.yaml"
+    )  # 运行时 config, 用于保存当前配置
+    main_sleep_interval: int = 500  # 主循环 sleep_time ms
+    cycle_time_interval: int = 15000  # 主循环时间 ms
+    get_picture_timeout: int = 10  # 获取图片超时时间 s
+    get_picture_timeout_threshold: int = 10  # 获取图片超时数量阈值
+    get_picture_timeout_count: int = 0  # 获取图片超时计数
+    defalut_error_distance: float = 1e6  # 错误默认距离 m
 
 
 @dataclass
 class CameraConfig(BaseConfig):
-    """相机配置
-    """
+    """相机配置"""
+
     lock = Lock()
-    low_res_ratio: float = 0.5                              # 相机拍摄低分辨率比率
-    exposure_time: int | None = 40000                       # 曝光时间 us
-    exposure_time_tolerance_percent: float = 0.01           # 曝光时间容差百分比 +/-0.01
-    analogue_gain: float | None = None                      # 模拟增益
-    capture_time_interval: int = 1000                       # 相机拍照间隔 ms
-    return_image_time_interval: int = 3000                  # 返回图片的检测 ms
-    capture_mode: Literal['preview', 'low', 'full'] = 'full'# 相机拍照模式
-    queue_maxsize: int = 5                                  # 相机拍照队列最大长度
-    camera_left_index: int = 1                              # 左侧相机 index
-    camera_right_index: int = 0                             # 右侧相机 index
-    output_format: Literal['rgb', 'gray'] = 'gray'          # 输出格式
-    has_filter_plate: bool = True                           # 是否有滤镜板
+    low_res_ratio: float = 0.5  # 相机拍摄低分辨率比率
+    exposure_time: int | None = 40000  # 曝光时间 us
+    exposure_time_tolerance_percent: float = 0.01  # 曝光时间容差百分比 +/-0.01
+    analogue_gain: float | None = None  # 模拟增益
+    capture_time_interval: int = 1000  # 相机拍照间隔 ms
+    return_image_time_interval: int = 3000  # 返回图片的检测 ms
+    capture_mode: Literal["preview", "low", "full"] = "full"  # 相机拍照模式
+    queue_maxsize: int = 5  # 相机拍照队列最大长度
+    camera_left_index: int = 1  # 左侧相机 index
+    camera_right_index: int = 0  # 右侧相机 index
+    output_format: Literal["rgb", "gray"] = "gray"  # 输出格式
+    has_filter_plate: bool = True  # 是否有滤镜板
 
 
 @dataclass
 class AdjustCameraConfig(BaseConfig):
-    """调整相机配置
-    """
+    """调整相机配置"""
+
     lock = Lock()
     mean_light_suitable_range: tuple[float, float] = (70, 160)  # (100, 160)
-    suitable_ignore_ratio: float = 0.1                          # 忽略 mean_light_suitable_range 最低和最高范围的百分比 [0, 100] -> [10, 90]
-    exposure_time_range: tuple[int, int] = (114, 1_000_000)     # 曝光时间范围 us
-    adjust_exposure_time_base_step: int = 100                   # 曝光调整基础步长 us
-    capture_mode: Literal['preview', 'low', 'full'] = 'low'     # 相机拍照模式
-    capture_time_interval: int = 100                            # 拍照间隔 us
-    return_image_time_interval: int = 100                       # 返回图片间隔 us
-    adjust_total_times: int = 100                               # 最高调整次数(每次调用调整曝光函数的内部调整次数)
-    adjust_with_falsh_total_times: int = 10                     # 最高调整次数(主循环中调整次数，使用闪光灯)
+    suitable_ignore_ratio: float = 0.1  # 忽略 mean_light_suitable_range 最低和最高范围的百分比 [0, 100] -> [10, 90]
+    exposure_time_range: tuple[int, int] = (114, 1_000_000)  # 曝光时间范围 us
+    adjust_exposure_time_base_step: int = 100  # 曝光调整基础步长 us
+    capture_mode: Literal["preview", "low", "full"] = "low"  # 相机拍照模式
+    capture_time_interval: int = 100  # 拍照间隔 us
+    return_image_time_interval: int = 100  # 返回图片间隔 us
+    adjust_total_times: int = 100  # 最高调整次数(每次调用调整曝光函数的内部调整次数)
+    adjust_with_falsh_total_times: int = (
+        10  # 最高调整次数(主循环中调整次数，使用闪光灯)
+    )
+
 
 @dataclass
 class StereoCalibrationConfig(BaseConfig):
-    """畸变矫正配置
-    """
+    """畸变矫正配置"""
+
     lock = Lock()
     camera_matrix_left = [
-        [7.44937603e+03, 0.00000000e+00, 1.79056889e+03],
-        [0.00000000e+00, 7.45022891e+03, 1.26665786e+03],
-        [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
+        [7.44937603e03, 0.00000000e00, 1.79056889e03],
+        [0.00000000e00, 7.45022891e03, 1.26665786e03],
+        [0.00000000e00, 0.00000000e00, 1.00000000e00],
     ]
     camera_matrix_right = [
-        [7.46471035e+03, 0.00000000e+00, 1.81985040e+03],
-        [0.00000000e+00, 7.46415680e+03, 1.38081032e+03],
-        [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
+        [7.46471035e03, 0.00000000e00, 1.81985040e03],
+        [0.00000000e00, 7.46415680e03, 1.38081032e03],
+        [0.00000000e00, 0.00000000e00, 1.00000000e00],
     ]
-    distortion_coefficients_left = [[-4.44924086e-01, 6.27814725e-01, -1.80510014e-03, -8.97545764e-04, -1.84473439e+01]]
-    distortion_coefficients_right = [[-4.07660445e-01, -2.23391154e+00, -1.09115383e-03, -3.04516347e-03, 7.45504877e+01]]
+    distortion_coefficients_left = [
+        [
+            -4.44924086e-01,
+            6.27814725e-01,
+            -1.80510014e-03,
+            -8.97545764e-04,
+            -1.84473439e01,
+        ]
+    ]
+    distortion_coefficients_right = [
+        [
+            -4.07660445e-01,
+            -2.23391154e00,
+            -1.09115383e-03,
+            -3.04516347e-03,
+            7.45504877e01,
+        ]
+    ]
     R = [
         [0.97743098, 0.00689964, 0.21114231],
         [-0.00564446, 0.99996264, -0.00654684],
-        [-0.2111796, 0.0052073, 0.97743341]
+        [-0.2111796, 0.0052073, 0.97743341],
     ]
     T = [[-476.53571438], [4.78988367], [49.50495583]]
     # 给定的传感器尺寸和图像分辨率
@@ -129,30 +151,38 @@ def get_reference_target_ids():
 
 @dataclass
 class MatchTemplateConfig(BaseConfig):
-    """模板匹配配置
-    """
+    """模板匹配配置"""
+
     lock = Lock()
-    template_size: tuple[int, int] = (100, 100)                         # 模板大小 (h, w), 单位为 mm
+    template_size: tuple[int, int] = (100, 100)  # 模板大小 (h, w), 单位为 mm
     template_path: Path = Path("assets/template/circles2-7.5cm-390.png")
-    match_method: int = cv2.TM_CCOEFF_NORMED                            # 匹配方法
-    init_scale: float = 0.025                                           # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
-    scales: tuple[float, float, float] = (1.0, 4.0, 0.1)                # 缩放 scale 范围 (start, end, step)
-    new_target_scales: tuple[float, float, float] = (0.5, 1.0, 0.05)    # 新目标的缩放 scale 范围 (start, end, step)
-    max_target_number: int = 10                                         # 最大目标数量
-    target_number: int = 0                                              # 默认靶标数量,初始化时为找到的靶标数量
-    got_target_number: int = 0                                          # 找到的靶标数量
-    iou_threshold: float = 0.5                                          # iou 阈值
-    use_threshold_match: bool = True                                    # 是否使用阈值匹配
-    threshold_match_threshold: float = 0.6                              # 阈值匹配阈值
-    threshold_iou_threshold: float = 0.5                                # 阈值匹配 iou 阈值
-    id2boxstate: dict[int, dict] | None = None                          # 靶标 id 到 boxes 的映射
-    search_range: float = 1                                             # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
+    match_method: int = cv2.TM_CCOEFF_NORMED  # 匹配方法
+    init_scale: float = 0.025  # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
+    scales: tuple[float, float, float] = (
+        1.0,
+        4.0,
+        0.1,
+    )  # 缩放 scale 范围 (start, end, step)
+    new_target_scales: tuple[float, float, float] = (
+        0.5,
+        1.0,
+        0.05,
+    )  # 新目标的缩放 scale 范围 (start, end, step)
+    max_target_number: int = 10  # 最大目标数量
+    target_number: int = 0  # 默认靶标数量,初始化时为找到的靶标数量
+    got_target_number: int = 0  # 找到的靶标数量
+    iou_threshold: float = 0.5  # iou 阈值
+    use_threshold_match: bool = True  # 是否使用阈值匹配
+    threshold_match_threshold: float = 0.6  # 阈值匹配阈值
+    threshold_iou_threshold: float = 0.5  # 阈值匹配 iou 阈值
+    id2boxstate: dict[int, dict] | None = None  # 靶标 id 到 boxes 的映射
+    search_range: float = 1  # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
 
 
 @dataclass
 class RingsLocationConfig(BaseConfig):
-    """圆环定位配置
-    """
+    """圆环定位配置"""
+
     lock = Lock()
     gradient_threshold_percent: float = 0.5
     iters: int = 1
@@ -164,15 +194,17 @@ class RingsLocationConfig(BaseConfig):
     save_grads: bool = False
     save_detect_images: bool = False
     save_detect_results: bool = False
-    move_threshold: float = 0.3 # 定位误差阈值, pixel
-    reference_target_id2offset: dict[int, list[float, float]] | None = None # 参考靶标 id 和 x y 的偏移(每次检测到都会偏移)
-    standard_cycle_results: dict | None = None # 标准循环结果
+    move_threshold: float = 0.3  # 定位误差阈值, pixel
+    reference_target_id2offset: dict[int, list[float, float]] | None = (
+        None  # 参考靶标 id 和 x y 的偏移(每次检测到都会偏移)
+    )
+    standard_cycle_results: dict | None = None  # 标准循环结果
 
 
 @dataclass
 class SerialCommConfig(BaseConfig):
-    """串口通讯模块配置
-    """
+    """串口通讯模块配置"""
+
     # 串口配置
     ports: list[str] = "/dev/ttyAMA1", "/dev/ttyAMA4"
     baudrate: int = 115200
@@ -181,13 +213,13 @@ class SerialCommConfig(BaseConfig):
     log_dir: Path = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
     temperature_data_save_path = log_dir / "temperature_data.json"
-    LOG_SIZE: int = 10_000_000 # 温度数据记录文件大小为10MB
+    LOG_SIZE: int = 10_000_000  # 温度数据记录文件大小为10MB
 
 
 @dataclass
 class MQTTConfig(BaseConfig):
-    """MQTT客户端配置
-    """
+    """MQTT客户端配置"""
+
     broker: str = "47.116.118.93"
     port: int = 1883
     timeout: int = 30
@@ -202,8 +234,8 @@ class MQTTConfig(BaseConfig):
 
 @dataclass
 class FTPConfig(BaseConfig):
-    """FTP配置
-    """
+    """FTP配置"""
+
     ip: str = "120.79.11.147"
     port: int = 21
     username: str = "vision"
@@ -226,8 +258,7 @@ ALL_CONFIGS = [
 
 
 def save_config_to_yaml(
-    configs: list[BaseConfig] = ALL_CONFIGS,
-    config_path: str | Path = "config.yaml"
+    configs: list[BaseConfig] = ALL_CONFIGS, config_path: str | Path = "config.yaml"
 ):
     """
     Save a configuration class to a YAML file.
@@ -239,20 +270,23 @@ def save_config_to_yaml(
     for config in configs:
         data = {}
         for attr in dir(config):
-            if not attr.startswith("__") and not callable(getattr(config, attr)) and not attr.startswith("lock"):
+            if (
+                not attr.startswith("__")
+                and not callable(getattr(config, attr))
+                and not attr.startswith("lock")
+            ):
                 value = config.getattr(attr)
                 if isinstance(value, Path):
                     value = str(value)
                 data[attr] = value
         class2data[config.__name__] = data
 
-    with open(config_path, 'w') as file:
+    with open(config_path, "w") as file:
         yaml.dump(class2data, file, default_flow_style=False, sort_keys=False)
 
 
 def load_config_from_yaml(
-    configs: list[BaseConfig] = ALL_CONFIGS,
-    config_path: str | Path = "config.yaml"
+    configs: list[BaseConfig] = ALL_CONFIGS, config_path: str | Path = "config.yaml"
 ):
     """
     Load configuration from a YAML file and update the given configuration class.
@@ -260,7 +294,7 @@ def load_config_from_yaml(
     :param configs: The configuration class to update. If None, all configuration classes will be updated. default: ALL_CONFIGS
     :param config_path: The path to the YAML file to load. default: "config.yaml"
     """
-    with open(config_path, 'r') as file:
+    with open(config_path, "r") as file:
         class2data = yaml.full_load(file)
 
     for config in configs:
@@ -272,15 +306,16 @@ def load_config_from_yaml(
                 if hasattr(config, key):
                     if isinstance(getattr(config, key), Path):
                         value = Path(value)
-                    logger.info(f"Setting {config.__name__}.{key}: from `{getattr(config, key)}` to `{value}`.")
+                    logger.info(
+                        f"Setting {config.__name__}.{key}: from `{getattr(config, key)}` to `{value}`."
+                    )
                     config.setattr(key, value)
                 else:
                     logger.warning(f"Config {config.__name__} has no attribute {key}.")
 
 
 def init_config_from_yaml(
-    configs: list[BaseConfig] = ALL_CONFIGS,
-    config_path: str | Path = "config.yaml"
+    configs: list[BaseConfig] = ALL_CONFIGS, config_path: str | Path = "config.yaml"
 ):
     """
     初始化配置

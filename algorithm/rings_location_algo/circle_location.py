@@ -49,7 +49,11 @@ def circle_location(
     Returns:
         dict: 检测结果
     """
-    timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime()) if timestamp is None else timestamp
+    timestamp = (
+        time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        if timestamp is None
+        else timestamp
+    )
     os.makedirs(save_dir, exist_ok=True)
 
     if len(image.shape) == 3:
@@ -58,8 +62,7 @@ def circle_location(
 
     # 检测边缘
     logger.info(f"{subpixel_edges_threshold = }")
-    edges, grad, \
-    absGxInner, absGyInner = subpixel_edges(
+    edges, grad, absGxInner, absGyInner = subpixel_edges(
         image,
         subpixel_edges_threshold,
         iters,
@@ -68,14 +71,14 @@ def circle_location(
 
     # 保存结果
     if save_grads:
-        with open(os.path.join(save_dir, f"{timestamp}-edges.pkl"), 'wb') as f:
+        with open(os.path.join(save_dir, f"{timestamp}-edges.pkl"), "wb") as f:
             pickle.dump(edges, f)
         np.save(os.path.join(save_dir, f"{timestamp}-grad"), grad)
         np.save(os.path.join(save_dir, f"{timestamp}-absGxInner"), absGxInner)
         np.save(os.path.join(save_dir, f"{timestamp}-absGyInner"), absGyInner)
 
     if save_detect_images:
-        plt.imshow(grad[2:-2, 2:-2]) # 忽略边缘
+        plt.imshow(grad[2:-2, 2:-2])  # 忽略边缘
         plt.colorbar()
         plt.savefig(os.path.join(save_dir, f"{timestamp}-grad.png"))
         plt.close()
@@ -93,7 +96,7 @@ def circle_location(
     logger.info(f"pixel_edges: {pixel_edges_xy.shape = }")
     if save_detect_images:
         figure = plt.figure(figsize=(6, 6))
-        plt.scatter(edges.pixel_x, edges.pixel_y, marker='.')
+        plt.scatter(edges.pixel_x, edges.pixel_y, marker=".")
         plt.grid()
         plt.title("pixel edges")
         figure.savefig(os.path.join(save_dir, f"{timestamp}-fig-pixel-edges.png"))
@@ -104,43 +107,55 @@ def circle_location(
     logger.info(f"subpixel_edges: {subpixel_edges_xy.shape = }")
     if save_detect_images:
         figure = plt.figure(figsize=(6, 6))
-        plt.scatter(edges.x, edges.y, marker='.')
+        plt.scatter(edges.x, edges.y, marker=".")
         plt.grid()
         plt.title("subpixel edges")
         figure.savefig(os.path.join(save_dir, f"{timestamp}-fig-subpixel-edges.png"))
         plt.close()
 
-    center_x, center_y, radius, err_avg, err_var, err_std, err_abs, radii_err, fit_circle, ignore_circle = \
-        fit_circle_by_least_square_filter(subpixel_edges_xy, sigmas)
+    (
+        center_x,
+        center_y,
+        radius,
+        err_avg,
+        err_var,
+        err_std,
+        err_abs,
+        radii_err,
+        fit_circle,
+        ignore_circle,
+    ) = fit_circle_by_least_square_filter(subpixel_edges_xy, sigmas)
 
     if save_detect_images:
         # 绘制过滤前和过滤后的图片
         fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(36, 8))
         # 子像素边缘
-        axes[0].scatter(edges.x, edges.y, marker='.')
+        axes[0].scatter(edges.x, edges.y, marker=".")
         axes[0].grid()
         axes[0].set_title("subpixel edges")
         # 拟合的圆
-        axes[1].scatter(fit_circle[:, 0], fit_circle[:, 1], marker='.')
-        axes[1].scatter(center_x, center_y, marker='.')
+        axes[1].scatter(fit_circle[:, 0], fit_circle[:, 1], marker=".")
+        axes[1].scatter(center_x, center_y, marker=".")
         axes[1].grid()
         axes[1].set_title("fit circle")
         # 有忽略的圆才画
         if ignore_circle is not None:
             # 忽略的圆
-            axes[2].scatter(ignore_circle[:, 0], ignore_circle[:, 1], marker='.')
+            axes[2].scatter(ignore_circle[:, 0], ignore_circle[:, 1], marker=".")
             axes[2].set_title("ignore circle")
             axes[2].grid()
             # 拟合的圆和忽略的圆
-            axes[3].scatter(fit_circle[:, 0], fit_circle[:, 1], marker='.')
-            axes[3].scatter(ignore_circle[:, 0], ignore_circle[:, 1], marker='.')
+            axes[3].scatter(fit_circle[:, 0], fit_circle[:, 1], marker=".")
+            axes[3].scatter(ignore_circle[:, 0], ignore_circle[:, 1], marker=".")
             axes[3].set_title("fit & ignore circle")
             axes[3].grid()
         fig.savefig(os.path.join(save_dir, f"{timestamp}-fig-compare.png"))
         plt.close()
 
         # 创建高分辨率图片，用于绘制亚像素边缘
-        draw_image = np.repeat(np.repeat(image, repeats=draw_scale, axis=0), repeats=draw_scale, axis=1)
+        draw_image = np.repeat(
+            np.repeat(image, repeats=draw_scale, axis=0), repeats=draw_scale, axis=1
+        )
 
         # 绘制边缘
         for j in range(len(fit_circle)):
@@ -148,34 +163,38 @@ def circle_location(
             center = np.round((fit_circle[j] + 0.5) * draw_scale).astype(np.int32)
             draw_image = cv2.circle(
                 img=draw_image,
-                center=center,          # center (x, y)
-                radius=1,               # 半径
-                color=(136, 14, 79),    # color
-                thickness=1,            # 线宽
+                center=center,  # center (x, y)
+                radius=1,  # 半径
+                color=(136, 14, 79),  # color
+                thickness=1,  # 线宽
             )
 
         # 绘制中心点
         center = [round(center_x * draw_scale), round(center_y * draw_scale)]
         draw_image = cv2.circle(
             img=draw_image,
-            center=center,          # center (x, y)
-            radius=1,               # 半径
-            color=(136, 14, 79),    # color
-            thickness=-1,           # 线宽
+            center=center,  # center (x, y)
+            radius=1,  # 半径
+            color=(136, 14, 79),  # color
+            thickness=-1,  # 线宽
         )
 
         # 保存图片
         cv2.imwrite(os.path.join(save_dir, f"{timestamp}-result.png"), draw_image)
 
     if save_detect_results:
-        with open(os.path.join(save_dir, f"{timestamp}.json"), mode='w', encoding='utf-8') as f:
+        with open(
+            os.path.join(save_dir, f"{timestamp}.json"), mode="w", encoding="utf-8"
+        ) as f:
             image_data = {
                 "timestamp": timestamp,
                 "threshold": subpixel_edges_threshold,
                 "pixel_edges_xy": pixel_edges_xy.tolist(),
                 "subpixel_edges_xy": subpixel_edges_xy.tolist(),
                 "fit_circle": fit_circle.tolist(),
-                "ignore_circle": (None if ignore_circle is None else ignore_circle.tolist()),
+                "ignore_circle": (
+                    None if ignore_circle is None else ignore_circle.tolist()
+                ),
                 "center_x": center_x,
                 "center_y": center_y,
                 "radius": radius,
@@ -241,17 +260,17 @@ def adaptive_threshold_circle_location(
     threshold = get_gradient_threshold(grad_crop, gradient_threshold_percent)
 
     result = circle_location(
-        image =  image,
-        timestamp = timestamp,
-        subpixel_edges_threshold = threshold,
-        iters = iters,
-        order = order,
-        sigmas = sigmas,
-        save_dir = save_dir,
-        draw_scale = draw_scale,
-        save_grads = save_grads,
-        save_detect_images = save_detect_images,
-        save_detect_results = save_detect_results,
+        image=image,
+        timestamp=timestamp,
+        subpixel_edges_threshold=threshold,
+        iters=iters,
+        order=order,
+        sigmas=sigmas,
+        save_dir=save_dir,
+        draw_scale=draw_scale,
+        save_grads=save_grads,
+        save_detect_images=save_detect_images,
+        save_detect_results=save_detect_results,
     )
     return result
 
@@ -261,16 +280,16 @@ if __name__ == "__main__":
     print(image.shape)
 
     result = adaptive_threshold_circle_location(
-        image = image,
-        timestamp = "circle1",
-        iters = 1,
-        order = 2,
-        sigmas = 2,
-        save_dir = "./save_dir",
-        draw_scale = 20,
-        save_grads = False,
-        save_detect_images = True,
-        save_detect_results = True,
-        gradient_threshold_percent = 0.6,
+        image=image,
+        timestamp="circle1",
+        iters=1,
+        order=2,
+        sigmas=2,
+        save_dir="./save_dir",
+        draw_scale=20,
+        save_grads=False,
+        save_detect_images=True,
+        save_detect_results=True,
+        gradient_threshold_percent=0.6,
     )
     print(result)

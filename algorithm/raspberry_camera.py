@@ -12,7 +12,7 @@ class RaspberryCameras:
     def __init__(
         self,
         camera_indexes: int | list[int] | tuple[int] = 0,
-        log_level: int = 'INFO',
+        log_level: int = "INFO",
         log_file_path: str | Path = Path("logs/camera.log"),
         low_res_ratio: float = 0.5,
         *args,
@@ -30,17 +30,19 @@ class RaspberryCameras:
         log_file_path.parent.mkdir(parents=True, exist_ok=True)
         self.log_file = open(log_file_path, "a", encoding="utf-8")
         _log_level = {
-            'TRACE': Picamera2.DEBUG,
-            'DEBUG': Picamera2.DEBUG,
-            'INFO': Picamera2.INFO,
-            'SUCCESS': Picamera2.INFO,
-            'WARNING': Picamera2.WARNING,
-            'ERROR': Picamera2.ERROR,
-            'CRITICAL': Picamera2.CRITICAL,
+            "TRACE": Picamera2.DEBUG,
+            "DEBUG": Picamera2.DEBUG,
+            "INFO": Picamera2.INFO,
+            "SUCCESS": Picamera2.INFO,
+            "WARNING": Picamera2.WARNING,
+            "ERROR": Picamera2.ERROR,
+            "CRITICAL": Picamera2.CRITICAL,
         }[log_level]
         Picamera2.set_logging(_log_level, self.log_file)
 
-        camera_indexes = [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        camera_indexes = (
+            [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        )
         self.camera_indexes = camera_indexes
 
         # 相机
@@ -57,16 +59,21 @@ class RaspberryCameras:
             self.picam2s[camera_index] = picam2
 
             # 预览分辨率
-            self.preview_configs[camera_index] = picam2.create_preview_configuration(main={"format": "BGR888"})
+            self.preview_configs[camera_index] = picam2.create_preview_configuration(
+                main={"format": "BGR888"}
+            )
 
             # 低分辨率
             sensor_resolution = picam2.sensor_resolution
             self.low_res_configs[camera_index] = picam2.create_still_configuration(
-                    main = {
-                        "format": "BGR888", # 默认就是 BGR888, RGB格式
-                        'size': (int(sensor_resolution[0] * low_res_ratio), int(sensor_resolution[1] * low_res_ratio))
-                    }
-                )
+                main={
+                    "format": "BGR888",  # 默认就是 BGR888, RGB格式
+                    "size": (
+                        int(sensor_resolution[0] * low_res_ratio),
+                        int(sensor_resolution[1] * low_res_ratio),
+                    ),
+                }
+            )
 
             # 全分辨率, 默认就是 BGR888, RGB格式
             full_res_config = picam2.create_still_configuration()
@@ -74,11 +81,9 @@ class RaspberryCameras:
             # 默认设置为高分辨率 config
             picam2.configure(full_res_config)
 
-
     def close_log_file(self) -> None:
         """关闭日志文件"""
         self.log_file.close()
-
 
     def start_preview(
         self,
@@ -96,11 +101,12 @@ class RaspberryCameras:
                 QT：值为 2，代表使用 Qt 框架进行预览。。
                 QTGL：值为 3，代表使用 Qt 和 OpenGL 进行预览。结合 Qt 使用 OpenGL 可以提供更丰富的图形效果和更高效的渲染性能。
         """
-        camera_indexes = [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        camera_indexes = (
+            [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        )
         for camera_index in camera_indexes:
             self.picam2s[camera_index].start_preview(preivew)
             logger.success(f"camera {camera_index} preview started!")
-
 
     def start_preview_all(
         self,
@@ -120,7 +126,6 @@ class RaspberryCameras:
             picam2.start_preview(preivew)
         logger.success("all camera preview started!")
 
-
     def start(
         self,
         camera_indexes: int | list[int] | tuple[int] = 0,
@@ -130,18 +135,18 @@ class RaspberryCameras:
         Args:
             camera_indexes (int | list[int] | tuple[int], optional): 相机 index. Defaults to 0.
         """
-        camera_indexes = [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        camera_indexes = (
+            [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        )
         for camera_index in camera_indexes:
             self.picam2s[camera_index].start()
             logger.success(f"camera {camera_index} started!")
-
 
     def start_all(self) -> None:
         """开启所有相机"""
         for picam2 in self.picam2s.values():
             picam2.start()
         logger.success("all cameras started!")
-
 
     def stop(
         self,
@@ -152,18 +157,18 @@ class RaspberryCameras:
         Args:
             camera_indexes (int | list[int] | tuple[int], optional): 相机 index. Defaults to 0.
         """
-        camera_indexes = [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        camera_indexes = (
+            [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        )
         for camera_index in camera_indexes:
             self.picam2s[camera_index].stop()
             logger.success(f"camera {camera_index} stoped!")
-
 
     def stop_all(self) -> None:
         """停止所有相机"""
         for picam2 in self.picam2s.values():
             picam2.stop()
         logger.success("all cameras stoped!")
-
 
     def close(
         self,
@@ -174,11 +179,12 @@ class RaspberryCameras:
         Args:
             camera_indexes (int | list[int] | tuple[int], optional): 相机 index. Defaults to 0.
         """
-        camera_indexes = [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        camera_indexes = (
+            [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        )
         for camera_index in camera_indexes:
             self.picam2s[camera_index].close()
             logger.success(f"camera {camera_index} closeed!")
-
 
     def close_all(self) -> None:
         """关闭所有相机"""
@@ -186,11 +192,10 @@ class RaspberryCameras:
             picam2.close()
         logger.success("all cameras closed!")
 
-
     def switch_mode(
         self,
         camera_indexes: int | list[int] | tuple[int] = 0,
-        capture_mode: Literal['preview', 'low', 'full'] = 'full',
+        capture_mode: Literal["preview", "low", "full"] = "full",
     ) -> None:
         """切换拍照模式
 
@@ -198,14 +203,20 @@ class RaspberryCameras:
             camera_indexes (int | list[int] | tuple[int], optional): 相机 index. Defaults to 0.
             capture_mode (Literal['full', 'low'], optional): 相机模式. Defaults to 'full'.
         """
-        assert capture_mode in ['preview', 'low', 'full'], f"capture_mode must in ['preview', 'low', 'full'], but got {capture_mode}."
+        assert capture_mode in [
+            "preview",
+            "low",
+            "full",
+        ], f"capture_mode must in ['preview', 'low', 'full'], but got {capture_mode}."
 
-        camera_indexes = [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        camera_indexes = (
+            [camera_indexes] if isinstance(camera_indexes, int) else camera_indexes
+        )
         for camera_index in camera_indexes:
             # 获取拍照配置
-            if capture_mode == 'preview':
+            if capture_mode == "preview":
                 camera_config = self.preview_configs[camera_index]
-            elif capture_mode == 'low':
+            elif capture_mode == "low":
                 camera_config = self.low_res_configs[camera_index]
             else:
                 camera_config = self.full_res_configs[camera_index]
@@ -213,29 +224,31 @@ class RaspberryCameras:
             self.picam2s[camera_index].switch_mode(camera_config)
             logger.success(f"camera {camera_index} switch mode to {capture_mode}.")
 
-
     def switch_mode_all(
         self,
-        capture_mode: Literal['preview', 'low', 'full'] = 'full',
+        capture_mode: Literal["preview", "low", "full"] = "full",
     ) -> None:
         """切换所有相机拍照模式
 
         Args:
             capture_mode (Literal['preview','full', 'low'], optional): 相机模式. Defaults to 'full'.
         """
-        assert capture_mode in ['preview', 'low', 'full'], f"capture_mode must in ['preview', 'low', 'full'], but got {capture_mode}."
+        assert capture_mode in [
+            "preview",
+            "low",
+            "full",
+        ], f"capture_mode must in ['preview', 'low', 'full'], but got {capture_mode}."
         # 获取拍照配置
         for camera_index, picam2 in self.picam2s.items():
             # 获取拍照配置
-            if capture_mode == 'preview':
+            if capture_mode == "preview":
                 camera_config = self.preview_configs[camera_index]
-            elif capture_mode == 'low':
+            elif capture_mode == "low":
                 camera_config = self.low_res_configs[camera_index]
             else:
                 camera_config = self.full_res_configs[camera_index]
             picam2.switch_mode(camera_config)
         logger.success(f"all camera switch mode to {capture_mode}.")
-
 
     def capture(
         self,
@@ -255,7 +268,11 @@ class RaspberryCameras:
         Returns:
             tuple[np.ndarray, dict]: 拍摄的照片和拍摄的 metadata
         """
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S.%f") if timestamp is None else timestamp
+        timestamp = (
+            datetime.now().strftime("%Y%m%d-%H%M%S.%f")
+            if timestamp is None
+            else timestamp
+        )
 
         camera_index = self.camera_indexes[0] if camera_index is None else camera_index
         picam2: Picamera2 = self.picam2s[camera_index]
@@ -267,16 +284,19 @@ class RaspberryCameras:
                 controls.AnalogueGain = AnalogueGain
 
         request: CompletedRequest = picam2.capture_request()
-        array: np.ndarray = request.make_array('main')
-        metadata = request.get_metadata() # this is the metadata for this image
+        array: np.ndarray = request.make_array("main")
+        metadata = request.get_metadata()  # this is the metadata for this image
         request.release()
-        logger.info(f"{timestamp} ExposureTime = {metadata['ExposureTime']}, AnalogueGain = {metadata['AnalogueGain']}")
+        logger.info(
+            f"{timestamp} ExposureTime = {metadata['ExposureTime']}, AnalogueGain = {metadata['AnalogueGain']}"
+        )
 
         return array, metadata
 
 
 def test_raspberry_cameras_single() -> None:
     import cv2
+
     camera_index = 0
     # 初始化类
     raspberry_cameras = RaspberryCameras(camera_index)
@@ -295,21 +315,21 @@ def test_raspberry_cameras_single() -> None:
     cv2.imwrite("single-full-resolution-1.jpg", image)
 
     # 切换拍照模式
-    raspberry_cameras.switch_mode(camera_index, 'preview')
+    raspberry_cameras.switch_mode(camera_index, "preview")
     # 拍摄图片
     image, metadata = raspberry_cameras.capture(camera_index)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     cv2.imwrite("single-preview.jpg", image)
 
     # 切换拍照模式
-    raspberry_cameras.switch_mode(camera_index, 'low')
+    raspberry_cameras.switch_mode(camera_index, "low")
     # 拍摄图片
     image, metadata = raspberry_cameras.capture(camera_index)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     cv2.imwrite("single-low-resolution.jpg", image)
 
     # 切换拍照模式
-    raspberry_cameras.switch_mode(camera_index, 'full')
+    raspberry_cameras.switch_mode(camera_index, "full")
     # 拍摄图片
     image, metadata = raspberry_cameras.capture(camera_index)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
@@ -327,6 +347,7 @@ def test_raspberry_cameras_single() -> None:
 
 def test_raspberry_cameras_double() -> None:
     import cv2
+
     camera_indexes = [0, 1]
     # 初始化类
     raspberry_cameras = RaspberryCameras(camera_indexes)
@@ -360,7 +381,7 @@ def test_raspberry_cameras_speed() -> None:
     raspberry_cameras.start(camera_index)
     time.sleep(1)
 
-    raspberry_cameras.switch_mode_all('low')
+    raspberry_cameras.switch_mode_all("low")
 
     capture_times = 100
     time_sum = 0
@@ -388,7 +409,6 @@ def test_raspberry_cameras_speed() -> None:
 
 
 def test_restart_raspberry_cameras() -> None:
-
     camera_index = 0
 
     print("start 1")

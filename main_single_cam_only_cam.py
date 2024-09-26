@@ -831,10 +831,10 @@ class Receive:
         elif cmd == 'targetcorrection':
             Receive.receive_target_correction_msg(received_msg)
 
-        elif cmd == 'removetarget':
+        elif cmd == 'deletedevicemap':
             Receive.receive_remove_target_msg(received_msg)
 
-        elif cmd == 'addtarget':
+        elif cmd == 'setdevicemap':
             Receive.receive_add_target_msg(received_msg)
 
         # 参考靶标设定消息
@@ -1003,7 +1003,7 @@ class Receive:
     def receive_remove_target_msg(received_msg: dict | None = None):
         """删除靶标消息"""
         # {
-        #     "cmd": "removetarget",
+        #     "cmd": "deletedevicemap",
         #     "msgid": "bb6f3eeb2",
         #     "body": {
         #         "remove_box_ids": ["L1_SJ_3", "L1_SJ_4"]
@@ -1072,7 +1072,7 @@ class Receive:
 
         # 删除靶标响应消息
         send_msg = {
-            "cmd": "removetarget",
+            "cmd": "deletedevicemap",
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),
@@ -1096,7 +1096,7 @@ class Receive:
     def receive_add_target_msg(received_msg: dict | None = None):
         """添加靶标消息"""
         # {
-        #     "cmd": "addtarget",
+        #     "cmd": "setdevicemap",
         #     "msgid": "bb6f3eeb2",
         #     "body": {
         #         "add_boxes":{
@@ -1169,7 +1169,7 @@ class Receive:
 
         # 添加靶标响应消息
         send_msg = {
-            "cmd": "addtarget",
+            "cmd": "setdevicemap",
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),

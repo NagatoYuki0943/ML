@@ -1,14 +1,17 @@
 import ftplib
 from loguru import logger
 import os
+import time
 
 class RaspberryFTP:
     def __init__(
         self,
-        ip: str = "localhost",
+        ip: str = "120.79.11.147",
         port: int = 21,
-        username: str = "admin",
-        password: str = "123456",
+        username: str = "vision",
+        password: str = "GLspepec123",
+        max_retries: int = 3,
+        delay: int = 1
     ):
         """
         Args:
@@ -16,21 +19,25 @@ class RaspberryFTP:
             port (int): FTP服务器端口. Defaults to 21.
             username (str): 连接FTP服务器用户名. Defaults to "admin".
             password (str): 连接FTP服务器密码.
+            max_retries (int): 最大重试次数. Defaults to 3.
+            delay (int): 重试间隔时间(秒). Defaults to 1.
         """
         self.ip = ip
         self.port = port
         self.username = username
         self.password = password
+        self.max_retries = max_retries
+        self.delay = delay
         self.ftp = ftplib.FTP()
 
     def ftp_connect(self):
         try:
-            self.ftp.connect(self.ip, self.port)
+            self.ftp.connect(self.ip, self.port, timeout=1)
             self.ftp.login(self.username, self.password)
             # 设置为主动模式
             self.ftp.set_pasv(False)
             logger.info("FTP server connected")
-        except ftplib.Error as e:
+        except Exception as e:
             logger.error(f"FTP server unreachable : {e}")
             raise
 
@@ -41,35 +48,41 @@ class RaspberryFTP:
             local_file_name (list[str] | str): 上传的文件名
             ftpurl (str): 上传到FTP服务器的路径.
         """
+        delay_uploads = self.delay
         # 单个字符串转换为列表
-        try:
-            if isinstance(local_file_name, str):
-                local_file_name = [local_file_name]
-            if isinstance(local_file_path, str):
-                local_file_path = [local_file_path]
-            # 检查每个本地文件是否存在
-            for file_path in local_file_path:
-                if not os.path.exists(file_path):
-                    raise FileNotFoundError(f"Local file does not exist: {file_path}")
-            self.ftp_connect()
-            # 创建子目录
+        if isinstance(local_file_name, str):
+            local_file_name = [local_file_name]
+        if isinstance(local_file_path, str):
+            local_file_path = [local_file_path]
+        # 检查每个本地文件是否存在
+        for file_path in local_file_path:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Local file does not exist: {file_path}")
+        for attempt in range(self.max_retries):
             try:
+                self.ftp_connect()
+                # 检查并创建子目录
+                try:
+                    self.ftp.cwd(ftpurl)
+                except ftplib.error_perm:
+                    self.ftp.mkd(ftpurl)
                 self.ftp.cwd(ftpurl)
-            except ftplib.error_perm:
-                self.ftp.mkd(ftpurl)
-            self.ftp.cwd(ftpurl)
-            for file_path, file_name in zip(local_file_path, local_file_name):
-                with open(file_path, 'rb') as f:
-                    self.ftp.storbinary(f"STOR {file_name}", f)
-                    logger.info(f"Uploaded file from {file_path} to FTP server")
-            self.ftp_close()
-        except FileNotFoundError as e:
-            logger.error(e)
-            raise
-        except Exception as e:
-            self.ftp.rmd(ftpurl)
-            logger.error(f"FTP uploads error:{e}")
-            raise
+                # 绑定路径与文件名进行上传
+                for file_path, file_name in zip(local_file_path, local_file_name):
+                    with open(file_path, 'rb') as f:
+                        self.ftp.storbinary(f"STOR {file_name}", f)
+                logger.info(f"Uploaded file from {file_path} to FTP server")
+                self.ftp_close()
+                break
+            except Exception as e:
+                if attempt < self.max_retries:
+                    logger.warning(f"Uploads failed, retrying in {delay_uploads} seconds...(attempt {attempt + 1} / {self.max_retries})")
+                    delay_uploads *= 2
+                    time.sleep(delay_uploads)
+                else:
+                    logger.error(f"FTP uploads error:{e}")
+                    self.ftp.rmd(ftpurl)
+                    raise
 
     def download_file(self, local_file_path, remote_file_name, ftpurl):
         """下载配置文件
@@ -78,16 +91,24 @@ class RaspberryFTP:
             remote_file_name (str): FTP服务器上待下载的文件名.
             ftpurl (str): FTP服务器上的下载路径
         """
-        try:
-            self.ftp.connect()
-            remote_file = f"{ftpurl}/{remote_file_name}"
-            with open(local_file_path, 'wb') as f:
-                self.ftp.retrbinary(f"RETR {remote_file}", f.write)
+        delay_downloads = self.delay
+        for attempt in range(self.max_retries):
+            try:
+                self.ftp.connect()
+                remote_file = f"{ftpurl}/{remote_file_name}"
+                with open(local_file_path, 'wb') as f:
+                    self.ftp.retrbinary(f"RETR {remote_file}", f.write)
+                self.ftp_close()
                 logger.info(f"Downloaded {local_file_path} from {remote_file}")
-            self.ftp_close()
-        except ftplib.error_perm as e:
-            logger.error(f"FTP downloads error:{e}")
-            raise
+                break
+            except ftplib.Error as e:
+                if attempt < self.max_retries:
+                    logger.warning(f"Downloads failed, retrying in {delay_downloads} seconds...(attempt {attempt + 1} / {self.max_retries})")
+                    delay_downloads *= 2
+                    time.sleep(delay_downloads)
+                else:
+                    logger.error(f"FTP downloads error:{e}")
+                    raise
 
     def ftp_close(self):
         self.ftp.quit()

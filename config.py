@@ -248,6 +248,8 @@ class FTPConfig(BaseConfig):
     password: str = "GLspepec123"
     image_base_url: str = "/7804d2/img"
     config_base_url: str = "/7804d2/config"
+    max_retries: int = 3
+    delay: int = 1
 
 
 ALL_CONFIGS = [

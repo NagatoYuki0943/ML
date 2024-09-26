@@ -3,6 +3,7 @@ import time
 from algorithm import RaspberryMQTT, RaspberryFTP
 from queue import Queue
 from config import MQTTConfig, RingsLocationConfig, CameraConfig, MatchTemplateConfig, MainConfig, FTPConfig
+import config
 from loguru import logger
 import subprocess
 
@@ -44,13 +45,19 @@ def mqtt_send(
         if body:
             try:
                 if "img" in body:
-                    timestamp = time.strftime("%Y%m%d%H%M%S")
+                    if "T" in body['at'] or "Z" in body['at']:
+                        timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "")
+                    else:
+                        timestamp = body['at']
                     ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
                     ftp.upload_file(body['path'], body['img'], ftpurl)
                     message['body'].pop('path')
                     message['body']['ftpurl'] = ftpurl
                 elif "config" in body:
-                    timestamp = time.strftime("%Y%m%d%H%M%S")
+                    if "T" in body['at'] or "Z" in body['at']:
+                        timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "")
+                    else:
+                        timestamp = body['at']
                     ftpurl = f"{FTPConfig.getattr('config_base_url')}/{cmd}/{timestamp}"
                     ftp.upload_file(body['path'], body['config'], ftpurl)
                     message['body'].pop('path')
@@ -66,7 +73,9 @@ def ftp_object_create():
         FTPConfig.getattr('ip'),
         FTPConfig.getattr('port'),
         FTPConfig.getattr('username'),
-        FTPConfig.getattr('password')
+        FTPConfig.getattr('password'),
+        FTPConfig.getattr('max_retries'),
+        FTPConfig.getattr('delay')
     )
 
 def message_handler(message, send_queue, ftp, main_queue):
@@ -147,12 +156,15 @@ def config_getter(message, send_queue):
         config_body = {}
         # 遍历配置映射，获取每个配置项的当前值
         for key, config in config_map().items():
-            config_class, config_attr = config
-            value = getattr(config_class, config_attr)
-            if isinstance(value, tuple):
-                config_body[key] = list(value)
+            if isinstance(config, tuple):
+                config_class, config_attr = config
+                value = getattr(config_class, config_attr)
+                if isinstance(value, tuple):
+                    config_body[key] = list(value)
+                else:
+                    config_body[key] = value
             else:
-                config_body[key] = value
+                config_body[key] = config
         config_body['code'] = 200
         config_body['msg'] = "getconfig succeed" 
         # 返回成功的消息，包含所有配置项的当前值
@@ -177,7 +189,7 @@ def config_map():
         'displacement_threshold': (RingsLocationConfig, 'move_threshold'),  # 告警位移阈值
         'target_number': (MatchTemplateConfig, 'target_number'), # 靶标数量
         'target_size': (MatchTemplateConfig, 'template_size'),  # 靶标尺寸
-        'reference_target': (MatchTemplateConfig, 'reference_target_ids'), # 参考靶标
+        'reference_target': (config.get_reference_target_ids()), # 参考靶标
         'data_report_interval': (MainConfig, 'cycle_time_interval'), # 上报数据时间间隔
         'capture_interval': (CameraConfig, 'capture_time_interval'), # 拍照时间间隔
         'did': (MQTTConfig, 'did'), # divece id

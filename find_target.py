@@ -490,7 +490,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
         logger.warning("id2boxstate is None, use find_target")
         return find_target(image)
 
-    image = image.copy()
+    _image = image.copy()
     loss_ids = []
     # 循环box，将box区域屏蔽
     for i, boxestate in id2boxstate.items():
@@ -500,7 +500,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
             continue
         # 屏蔽其他box
         box_x1, box_y1, box_x2, box_y2 = box
-        image[box_y1:box_y2, box_x1:box_x2] = 0
+        _image[box_y1:box_y2, box_x1:box_x2] = np.random.randint(0, 256, (box_y2 - box_y1, box_x2 - box_x1))
     logger.warning(f"find lost target, loss_ids: {loss_ids}")
 
     # 查找丢失的目标
@@ -509,7 +509,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
     # scores: [...]
     # boxes: [[x_min, y_min, x_max, y_max], ...]
     ratios, scores, boxes = multi_target_multi_scale_match_template(
-        image,
+        _image,
         template,
         match_method,
         init_scale,

@@ -229,7 +229,8 @@ def main() -> None:
         get_picture_timeout_process()
 
     logger.info("ajust exposure 1 start")
-    adjust_exposure_full_res_for_loop(camera_queue)
+    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+    adjust_exposure_full_res_for_loop(camera_queue, id2boxstate, True)
     logger.success("ajust exposure 1 end")
     try:
         _, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
@@ -352,7 +353,12 @@ def main() -> None:
                         Send.send_adjust_led_level_msg(adjust_led_level_param)
 
                     # 调整曝光
-                    _, need_darker, need_lighter = adjust_exposure_full_res_for_loop(camera_queue)
+                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+                    _, need_darker, need_lighter = adjust_exposure_full_res_for_loop(
+                        camera_queue,
+                        id2boxstate,
+                        True,
+                    )
 
                     #-------------------- 补光灯 --------------------#
                     if need_darker or need_lighter:

@@ -18,8 +18,78 @@ def adjust_exposure_by_mean(
     adjust_exposure_time_base_step: float = 100,
     suitable_ignore_ratio: float = 0.0,
 ) -> tuple[float, int]:
-    # 计算当前图像的平均亮度
+    """计算当前图像的平均亮度, 根据平均亮度测试是否需要调整曝光, 并调整曝光时间
+
+    Args:
+        image (np.ndarray): 图片
+        exposure_time (float): 当前曝光时间
+        mean_light_suitable_range (tuple[float, float]): 合适平均亮度范围
+        adjust_exposure_time_base_step (float, optional): 调整曝光的步长. Defaults to 100.
+        suitable_ignore_ratio (float, optional): 忽略合适的范围的比例, 0.1代表忽略最低 10% 和最高 10% 的范围. Defaults to 0.0.
+
+    Returns:
+        tuple[float, int]: 新的曝光值和调整方向
+    """
     mean_bright = float(mean_brightness(image))
+
+    # 动态 step, 根据距离合适的范围的中心距离调整
+    suitable_range_middle = (mean_light_suitable_range[0] + mean_light_suitable_range[1]) / 2
+    step = int((suitable_range_middle - mean_bright) * adjust_exposure_time_base_step)
+
+    # 缩小 mean_light_suitable_range 区间，让它更加宽松
+    suitable_range = mean_light_suitable_range[1] - mean_light_suitable_range[0]
+    ignore_range = suitable_range * suitable_ignore_ratio
+    low = mean_light_suitable_range[0] + ignore_range
+    high = mean_light_suitable_range[1] - ignore_range
+
+    if mean_bright < low:
+        logger.info(f"current_exposure_time = {exposure_time}, {mean_bright = }, {step = }, direction = 1")
+        return exposure_time + step, 1
+    elif mean_bright > high:
+        logger.info(f"current_exposure_time = {exposure_time}, {mean_bright = }, {step = }, direction = -1")
+        return exposure_time + step, -1
+    else:
+        logger.info(f"current_exposure_time = {exposure_time}, {mean_bright = }, direction = 0")
+        return exposure_time, 0
+
+
+def adjust_exposure_by_mean_cuts(
+    image: np.ndarray,
+    boxes: list[list[int]],
+    exposure_time: float,
+    mean_light_suitable_range: tuple[float, float],
+    adjust_exposure_time_base_step: float = 100,
+    suitable_ignore_ratio: float = 0.0,
+) -> tuple[float, int]:
+    """先将图像切割为多个小图, 计算每个小图的平均亮度, 再计算所有小图的平均亮度, 根据平均亮度测试是否需要调整曝光, 并调整曝光时间
+
+    Args:
+        image (np.ndarray): 图片
+        boxes (list[list[int]]): 图像切割的box
+        exposure_time (float): 当前曝光时间
+        mean_light_suitable_range (tuple[float, float]): 合适平均亮度范围
+        adjust_exposure_time_base_step (float, optional): 调整曝光的步长. Defaults to 100.
+        suitable_ignore_ratio (float, optional): 忽略合适的范围的比例, 0.1代表忽略最低 10% 和最高 10% 的范围. Defaults to 0.0.
+
+    Returns:
+        tuple[float, int]: 新的曝光值和调整方向
+    """
+    if len(boxes) == 0:
+        return adjust_exposure_by_mean(
+            image,
+            exposure_time,
+            mean_light_suitable_range,
+            adjust_exposure_time_base_step,
+            suitable_ignore_ratio,
+        )
+
+    mean_brights = []
+    for box in boxes:
+        cut_image = image[box[1]:box[3], box[0]:box[2]]
+        mean_brights.append(mean_brightness(cut_image))
+
+    # 计算所有小图的
+    mean_bright = float(np.mean(mean_brights))
 
     # 动态 step, 根据距离合适的范围的中心距离调整
     suitable_range_middle = (mean_light_suitable_range[0] + mean_light_suitable_range[1]) / 2
@@ -235,6 +305,7 @@ def adjust_exposure_full_res_recursive(
 def adjust_exposure_full_res_for_loop(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
+    cut_boxes_in_one_image: bool = False,
 ) -> tuple[dict[int, dict | None], bool, bool]:
     """使用循环实现快速调节曝光，全程使用高分辨率拍摄
 
@@ -249,6 +320,7 @@ def adjust_exposure_full_res_for_loop(
                 },
                 ...
             }
+        cut_boxes_in_one_image (bool, optional): 是否将box切割到一张图片, 而不是分别调整每个box. Defaults to False.
 
     Returns:
         tuple[dict[int, dict | None], bool, bool]: 曝光对应不同的box状态 和 需要更暗 和 需要更亮
@@ -321,8 +393,9 @@ def adjust_exposure_full_res_for_loop(
             image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
             logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
 
-            # 全图调整
             if current_id2boxstate is None:
+                # 全图调整
+                logger.info("adjust exposure for full picture")
                 new_exposure_time, direction = adjust_exposure_by_mean(
                     image,
                     image_metadata['ExposureTime'],
@@ -340,8 +413,32 @@ def adjust_exposure_full_res_for_loop(
                     logger.info(f"{new_exposure_time = }, {direction = }")
                     stack.append((None, new_exposure_time))
 
-            # 划分box调整
+            elif cut_boxes_in_one_image:
+                # 全图调整, 一次性切割全部 box
+                logger.info("adjust exposure for full picture with cut boxes")
+                # 获取 boxes
+                boxes = [boxstate['box'] for boxstate in current_id2boxstate.values() if boxstate['box'] is not None]
+                new_exposure_time, direction = adjust_exposure_by_mean_cuts(
+                    image,
+                    boxes,
+                    image_metadata['ExposureTime'],
+                    AdjustCameraConfig.getattr("mean_light_suitable_range"),
+                    AdjustCameraConfig.getattr("adjust_exposure_time_base_step"),
+                    AdjustCameraConfig.getattr("suitable_ignore_ratio"),
+                )
+
+                # 可以
+                if direction == 0:
+                    exposure2id2boxstate[new_exposure_time] = current_id2boxstate
+                    logger.success(f"full picture exposure time {new_exposure_time} us is ok")
+                # 需要调整
+                else:
+                    logger.info(f"{new_exposure_time = }, {direction = }")
+                    stack.append((current_id2boxstate, new_exposure_time))
+
             else:
+                # 每个 box 单独调整
+                logger.info("adjust exposure for every box")
                 # directions 和 new_exposure_times 的 key 对应 boxid
                 directions = {}
                 new_exposure_times = {}
@@ -455,6 +552,7 @@ def adjust_exposure_full_res_for_loop(
 def adjust_exposure_low_res_for_loop(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
+    cut_boxes_in_one_image: bool = False,
 ) -> tuple[dict[int, dict | None], bool, bool]:
     """使用循环实现快速调节曝光，全程使用低分辨率拍摄
 
@@ -469,6 +567,7 @@ def adjust_exposure_low_res_for_loop(
                 },
                 ...
             }
+        cut_boxes_in_one_image (bool, optional): 是否将box切割到一张图片, 而不是分别调整每个box. Defaults to False.
 
     Returns:
         tuple[dict[int, dict | None], bool, bool]: 曝光对应不同的box状态 和 需要更暗 和 需要更亮
@@ -550,8 +649,9 @@ def adjust_exposure_low_res_for_loop(
             image_timestamp, image, image_metadata = camera_queue.get(timeout=get_picture_timeout)
             logger.info(f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}")
 
-            # 全图调整
             if current_id2boxstate is None:
+                # 全图调整
+                logger.info("adjust exposure for full picture")
                 new_exposure_time, direction = adjust_exposure_by_mean(
                     image,
                     image_metadata['ExposureTime'],
@@ -569,8 +669,34 @@ def adjust_exposure_low_res_for_loop(
                     logger.info(f"{new_exposure_time = }, {direction = }")
                     stack.append((None, new_exposure_time))
 
-            # 划分box调整
+            elif cut_boxes_in_one_image:
+                # 全图调整, 一次性切割全部 box
+                logger.info("adjust exposure for full picture with cut boxes")
+                # 获取 boxes
+                boxes = [boxstate['box'] for boxstate in current_id2boxstate.values() if boxstate['box'] is not None]
+                # 调整 box 大小
+                boxes = [[int(b * low_res_ratio) for b in box] for box in boxes]
+                new_exposure_time, direction = adjust_exposure_by_mean_cuts(
+                    image,
+                    boxes,
+                    image_metadata['ExposureTime'],
+                    AdjustCameraConfig.getattr("mean_light_suitable_range"),
+                    AdjustCameraConfig.getattr("adjust_exposure_time_base_step"),
+                    AdjustCameraConfig.getattr("suitable_ignore_ratio"),
+                )
+
+                # 可以
+                if direction == 0:
+                    exposure2id2boxstate[new_exposure_time] = current_id2boxstate
+                    logger.success(f"full picture exposure time {new_exposure_time} us is ok")
+                # 需要调整
+                else:
+                    logger.info(f"{new_exposure_time = }, {direction = }")
+                    stack.append((current_id2boxstate, new_exposure_time))
+
             else:
+                # 每个 box 单独调整
+                logger.info("adjust exposure for every box")
                 # directions 和 new_exposure_times 的 key 对应 boxid
                 directions = {}
                 new_exposure_times = {}

@@ -155,7 +155,7 @@ class MatchTemplateConfig(BaseConfig):
 
     lock = Lock()
     template_size: tuple[int, int] = (100, 100)  # 模板大小 (h, w), 单位为 mm
-    template_path: Path = Path("assets/template/6circles/6circles-2-7.5cm-390pixel.png")
+    template_path: Path = Path("assets/template/2circles/2circles-6_5-3-390pixel.png")
     match_method: int = cv2.TM_CCOEFF_NORMED  # 匹配方法
     init_scale: float = 0.025  # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
     scales: tuple[float, float, float] = (
@@ -187,7 +187,7 @@ class RingsLocationConfig(BaseConfig):
     gradient_threshold_percent: float = 0.5
     iters: int = 1
     order: int = 2
-    rings_nums: int = 6
+    rings_nums: int = 2
     min_group_size: int = 5
     sigmas: list[float | int] | float | int = 2
     draw_scale: int = 20

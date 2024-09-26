@@ -500,7 +500,9 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
             continue
         # 屏蔽其他box
         box_x1, box_y1, box_x2, box_y2 = box
-        _image[box_y1:box_y2, box_x1:box_x2] = np.random.randint(0, 256, (box_y2 - box_y1, box_x2 - box_x1))
+        _image[box_y1:box_y2, box_x1:box_x2] = np.random.randint(
+            0, 256, (box_y2 - box_y1, box_x2 - box_x1)
+        )
     logger.warning(f"find lost target, loss_ids: {loss_ids}")
 
     # 查找丢失的目标

@@ -15,6 +15,8 @@ from algorithm import (
     RaspberryMQTT,
     RaspberrySerialPort,
     sort_boxes_center,
+    pixel_num2object_distance,
+    pixel_num2object_size,
 )
 from config import (
     MainConfig,
@@ -135,27 +137,27 @@ logger.success("初始化畸变矫正完成")
 # -------------------- 初始化MQTT客户端 --------------------#
 # logger.info("开始初始化MQTT客户端")
 # mqtt_comm = RaspberryMQTT(
-#     MQTTConfig.getattr('broker'),
-#     MQTTConfig.getattr('port'),
-#     MQTTConfig.getattr('timeout'),
-#     MQTTConfig.getattr('topic'),
-#     MQTTConfig.getattr('username'),
-#     MQTTConfig.getattr('password'),
-#     MQTTConfig.getattr('clientId'),
-#     MQTTConfig.getattr('apikey'),
+#     MQTTConfig.getattr("broker"),
+#     MQTTConfig.getattr("port"),
+#     MQTTConfig.getattr("timeout"),
+#     MQTTConfig.getattr("topic"),
+#     MQTTConfig.getattr("username"),
+#     MQTTConfig.getattr("password"),
+#     MQTTConfig.getattr("clientId"),
+#     MQTTConfig.getattr("apikey"),
 # )
 # mqtt_send_thread = ThreadWrapper(
-#     target_func = mqtt_send,
-#     queue_maxsize = MQTTConfig.getattr('send_queue_maxsize'),
-#     client = mqtt_comm,
+#     target_func=mqtt_send,
+#     queue_maxsize=MQTTConfig.getattr("send_queue_maxsize"),
+#     client=mqtt_comm,
 # )
 # mqtt_send_queue = mqtt_send_thread.queue
 # mqtt_receive_thread = Thread(
-#     target = mqtt_receive,
+#     target=mqtt_receive,
 #     kwargs={
-#         'client': mqtt_comm,
-#         'main_queue': main_queue,
-#         'send_queue': mqtt_send_queue,
+#         "client": mqtt_comm,
+#         "main_queue": main_queue,
+#         "send_queue": mqtt_send_queue,
 #     },
 # )
 # mqtt_receive_thread.start()
@@ -576,29 +578,58 @@ def main() -> None:
                                 # 保存到文件
                                 save_to_jsonl(result, camera_result_save_path)
                                 logger.success(f"box {j} rings location success")
+
                                 center = [
                                     float(result["center_x_mean"] + _box[0]),
                                     float(result["center_y_mean"] + _box[1]),
                                 ]
-                                cycle_results[j] = {
+                                if np.any(np.isnan(center)):
+                                    center = None
+                                    logger.warning(f"box {j} center is nan")
+
+                                radii: list[float] = [
+                                    float(radius) for radius in result["radii"]
+                                ]
+                                if np.any(np.isnan(radii)):
+                                    radii = None
+
+                                # 根据最大圆环直径计算距离
+                                distance: float = 0
+                                if radii is not None:
+                                    distance = pixel_num2object_distance(
+                                        radii[-1] * 2,  # 半径转为直径
+                                        CameraConfig.getattr("pixel_size"),
+                                        CameraConfig.getattr("focus"),
+                                        MatchTemplateConfig.getattr(
+                                            "template_circles_size"
+                                        )[0],
+                                    )
+
+                                cycle_result = {
                                     "image_timestamp": f"image--{image_timestamp}--{j}",
                                     "box": _box,
-                                    "center": None
-                                    if np.isnan(center[0]) or np.isnan(center[1])
-                                    else center,
+                                    "center": center,
+                                    "radii": radii,
+                                    "distance": distance,
                                     "exposure_time": exposure_time,
                                     "offset": [0, 0],
                                 }
+                                logger.info(f"{cycle_result = }")
+                                cycle_results[j] = cycle_result
                             except Exception as e:
                                 logger.error(e)
                                 logger.error(f"box {j} rings location failed")
-                                cycle_results[j] = {
+                                cycle_result = {
                                     "image_timestamp": f"image--{image_timestamp}--{j}",
                                     "box": _box,
                                     "center": None,  # 丢失目标, 置为 None
+                                    "radii": None,
+                                    "distance": None,
                                     "exposure_time": exposure_time,
                                     "offset": [0, 0],
                                 }
+                                logger.info(f"{cycle_result = }")
+                                cycle_results[j] = cycle_result
                     # -------------------- single box location --------------------#
 
                     # ------------------------- 检测目标 -------------------------#
@@ -713,6 +744,10 @@ def main() -> None:
                                 k: result["offset"]
                                 for k, result in standard_cycle_results.items()
                             }
+                            standard_cycle_distance = {
+                                k: result["distance"]
+                                for k, result in standard_cycle_results.items()
+                            }
                             new_cycle_centers = {
                                 k: result["center"]
                                 for k, result in cycle_results.items()
@@ -723,6 +758,9 @@ def main() -> None:
                             logger.info(
                                 f"standard_cycle_offsets: {standard_cycle_offsets}"
                             )
+                            logger.info(
+                                f"standard_cycle_distance: {standard_cycle_distance}"
+                            )
                             logger.info(f"new_cycle_centers: {new_cycle_centers}")
 
                             # 计算移动距离
@@ -731,19 +769,42 @@ def main() -> None:
                                 if (
                                     res_k in new_cycle_centers.keys()
                                     and new_cycle_centers[res_k] is not None
+                                    and standard_cycle_distance[res_k] is not None
                                 ):
                                     # 移动距离 = 当前位置 - 标准位置 - 补偿值
-                                    distance_x: float = (
+                                    pixel_distance_x: float = (
                                         new_cycle_centers[res_k][0]
                                         - standard_cycle_centers[res_k][0]
                                         - standard_cycle_offsets[res_k][0]
                                     )
-                                    distance_y: float = (
+                                    real_distance_x: float = pixel_num2object_size(
+                                        pixel_distance_x,
+                                        standard_cycle_distance[res_k],
+                                        CameraConfig.getattr("pixel_size"),
+                                        CameraConfig.getattr("focus"),
+                                    )
+                                    # y 轴方向相反
+                                    pixel_distance_y: float = -(
                                         new_cycle_centers[res_k][1]
                                         - standard_cycle_centers[res_k][1]
                                         - standard_cycle_offsets[res_k][1]
                                     )
-                                    distance_result[res_k] = (distance_x, distance_y)
+                                    real_distance_y: float = pixel_num2object_size(
+                                        pixel_distance_y,
+                                        standard_cycle_distance[res_k],
+                                        CameraConfig.getattr("pixel_size"),
+                                        CameraConfig.getattr("focus"),
+                                    )
+                                    logger.info(
+                                        f"{pixel_distance_x = } pixel, {real_distance_x = } mm, distance = {standard_cycle_distance[res_k]} mm"
+                                    )
+                                    logger.info(
+                                        f"{pixel_distance_y = } pixel, {real_distance_y = } mm, distance = {standard_cycle_distance[res_k]} mm"
+                                    )
+                                    distance_result[res_k] = (
+                                        real_distance_x,
+                                        real_distance_y,
+                                    )
                                 else:
                                     # box没找到将移动距离设置为 一个很大的数
                                     distance_result[res_k] = (
@@ -811,21 +872,21 @@ def main() -> None:
                                 if abs(distance_x) > move_threshold:
                                     over_distance_ids.add(idx)
                                     logger.warning(
-                                        f"box {idx} x move distance {distance_x} is over threshold {move_threshold}."
+                                        f"box {idx} x move distance {distance_x} mm is over threshold {move_threshold} mm."
                                     )
                                 else:
                                     logger.info(
-                                        f"box {idx} x move distance {distance_x} is under threshold {move_threshold}."
+                                        f"box {idx} x move distance {distance_x} mm is under threshold {move_threshold} mm."
                                     )
 
                                 if abs(distance_y) > move_threshold:
                                     over_distance_ids.add(idx)
                                     logger.warning(
-                                        f"box {idx} y move distance {distance_y} is over threshold {move_threshold}."
+                                        f"box {idx} y move distance {distance_y} mm is over threshold {move_threshold} mm."
                                     )
                                 else:
                                     logger.info(
-                                        f"box {idx} y move distance {distance_y} is under threshold {move_threshold}."
+                                        f"box {idx} y move distance {distance_y} mm is under threshold {move_threshold} mm."
                                     )
 
                             logger.info(f"distance_result: {distance_result}")

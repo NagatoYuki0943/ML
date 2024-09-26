@@ -67,6 +67,8 @@ class CameraConfig(BaseConfig):
     """相机配置"""
 
     lock = Lock()
+    pixel_size: float = 1.55  # 像素大小 um
+    focus: float = 8  # 焦距 mm
     low_res_ratio: float = 0.5  # 相机拍摄低分辨率比率
     exposure_time: int | None = 40000  # 曝光时间 us
     exposure_time_tolerance_percent: float = 0.01  # 曝光时间容差百分比 +/-0.01
@@ -155,6 +157,10 @@ class MatchTemplateConfig(BaseConfig):
 
     lock = Lock()
     template_size: tuple[int, int] = (100, 100)  # 模板大小 (h, w), 单位为 mm
+    template_circles_size: tuple[float, float] = (
+        65,
+        30,
+    )  # 模板圆环直径 (r, r), 单位为 mm
     template_path: Path = Path("assets/template/2circles/2circles-6_5-3-390pixel.png")
     match_method: int = cv2.TM_CCOEFF_NORMED  # 匹配方法
     init_scale: float = 0.025  # 初始 scale 8 mm: 0.025, 12 mm: 0.03, 25 mm: 0.075, 35 mm: 0.085, 50 mm: 0.15, 15m: 0.01
@@ -194,7 +200,7 @@ class RingsLocationConfig(BaseConfig):
     save_grads: bool = False
     save_detect_images: bool = False
     save_detect_results: bool = False
-    move_threshold: float = 0.3  # 定位误差阈值, pixel
+    move_threshold: float = 1  # 定位误差阈值, mm
     reference_target_id2offset: dict[int, list[float, float]] | None = (
         None  # 参考靶标 id 和 x y 的偏移(每次检测到都会偏移)
     )

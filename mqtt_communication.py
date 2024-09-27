@@ -3,9 +3,7 @@ import time
 from algorithm import RaspberryMQTT, RaspberryFTP
 from queue import Queue
 from config import MQTTConfig, RingsLocationConfig, CameraConfig, MatchTemplateConfig, MainConfig, FTPConfig
-import config
 from loguru import logger
-import subprocess
 
 # MQTT 客户端接收线程
 def mqtt_receive(
@@ -21,6 +19,17 @@ def mqtt_receive(
     client.set_message_callback(
         lambda msg: message_handler(msg, send_queue, ftp, main_queue)
     )
+    # 检查设备是否由命令重启
+    if os.path.exists("reboot_info.txt"):
+        with open("reboot_info.txt", "r") as f:
+            msgid = f.read()
+        create_message(
+            "reboot",
+            {"code":200,"msg":"reboot succeed","at":get_current_time(), "did":MQTTConfig.getattr('did')},
+            msgid,
+            send_queue
+        )
+        os.remove("reboot_info.txt")
     while True:
         client.loop()
         time.sleep(0.1)
@@ -45,19 +54,13 @@ def mqtt_send(
         if body:
             try:
                 if "img" in body:
-                    if "T" in body['at'] or "Z" in body['at']:
-                        timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "")
-                    else:
-                        timestamp = body['at']
+                    timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "")
                     ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
                     ftp.upload_file(body['path'], body['img'], ftpurl)
                     message['body'].pop('path')
                     message['body']['ftpurl'] = ftpurl
                 elif "config" in body:
-                    if "T" in body['at'] or "Z" in body['at']:
-                        timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "")
-                    else:
-                        timestamp = body['at']
+                    timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "")
                     ftpurl = f"{FTPConfig.getattr('config_base_url')}/{cmd}/{timestamp}"
                     ftp.upload_file(body['path'], body['config'], ftpurl)
                     message['body'].pop('path')
@@ -85,6 +88,7 @@ def message_handler(message, send_queue, ftp, main_queue):
         'setconfig': config_setter,
         'getconfig': config_getter,
         'updateconfigfile': config_file_update,
+        'reboot': device_reboot,
     }
     handler = cmd_handlers.get(cmd)
     if handler:
@@ -110,16 +114,17 @@ def config_file_update(message, send_queue, ftp: RaspberryFTP):
         message['body'].pop('ftpurl')
         return message
     except Exception as e:
-        create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)
+        create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}",
+        "at":get_current_time(), "did":MQTTConfig.getattr('did')}, msgid, send_queue)
         return None
 
 def config_setter(message, send_queue):
     """根据命令中携带的配置参数修改配置"""
     cmd = "setconfig"
     msgid = message.get("msgid", "unknown")
-    map = config_map()
     success = True
     failed_keys = []
+    map = config_map()
     # 根据key来选择配置的参数
     try:
         config_body = message.get("body", {})
@@ -129,9 +134,32 @@ def config_setter(message, send_queue):
                 failed_keys.append(f"{key} is not a valid key")
                 success = False
                 continue
+            # 获取当前配置
             config = map[key]
             config_class, config_attr = config
+            # 根据key做特殊处理
+            if key == "reference_target_id2offset":
+                if not isinstance(value, dict):
+                    failed_keys.append(f"{key} must be a dictionary")
+                    success = False
+                    continue
+                try:
+                    # 将Key转换为int类型
+                    value = {int(k): v for k, v in value.items()}
+                except ValueError:
+                    failed_keys.append(f"{key} keys must be convertible to int")
+                    success = False
+                    continue
+                # 判断要更改的配置内容是否和当前参数类型相符
+                if not all(isinstance(k, int) and 
+                           isinstance(v, list) and len(v) == 2 for k, v in value.items()):
+                    failed_keys.append(f"{key} must be a dictionary with int keys and list of two float values")
+                    success = False
+                    continue
+                setattr(config_class, config_attr, tuple(value))
+            # 当前配置中的值
             current_value = getattr(config_class, config_attr)
+            # 处理配置中默认为tuple类型的参数
             if isinstance(current_value, tuple):
                 if not isinstance(value, (list, tuple)) or len(value) != len(current_value):
                     failed_keys.append(f"{key} must be a tuple with {len(current_value)} values")
@@ -139,13 +167,17 @@ def config_setter(message, send_queue):
                     continue
                 setattr(config_class, config_attr, tuple(value))
                 continue
+            # 设置普通类型参数
             setattr(config_class, config_attr, value)
         if success:
-            create_message(cmd, {"code":200,"msg":f"{cmd} succeed"}, msgid, send_queue)
+            create_message(cmd, {"code":200,"msg":f"{cmd} succeed",
+            "at":get_current_time(), "did":MQTTConfig.getattr('did')}, msgid, send_queue)
         else:
-            create_message(cmd, {"code":206,"msg":f"{cmd} partially failed, failed keys:{failed_keys}"}, msgid, send_queue)
+            create_message(cmd, {"code":206,"msg":f"{cmd} failed, failed keys:{failed_keys}",
+            "at":get_current_time(), "did":MQTTConfig.getattr('did')}, msgid, send_queue)
     except Exception as e:
-        create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)
+        create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}",
+        "at":get_current_time(), "did":MQTTConfig.getattr('did')}, msgid, send_queue)
 
 def config_getter(message, send_queue):
     """获取所有的配置项"""
@@ -156,22 +188,38 @@ def config_getter(message, send_queue):
         config_body = {}
         # 遍历配置映射，获取每个配置项的当前值
         for key, config in config_map().items():
-            if isinstance(config, tuple):
-                config_class, config_attr = config
-                value = getattr(config_class, config_attr)
-                if isinstance(value, tuple):
-                    config_body[key] = list(value)
-                else:
-                    config_body[key] = value
+            config_class, config_attr = config
+            value = getattr(config_class, config_attr)
+            if isinstance(value, tuple):
+                config_body[key] = list(value)
             else:
-                config_body[key] = config
+                config_body[key] = value
         config_body['code'] = 200
-        config_body['msg'] = "getconfig succeed" 
+        config_body['msg'] = "getconfig succeed"
+        config_body['at'] = get_current_time()
+        config_body['did'] = MQTTConfig.getattr('did') 
         # 返回成功的消息，包含所有配置项的当前值
         create_message(cmd, config_body, msgid, send_queue)
     except Exception as e:
         # 返回失败的消息
-        create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}"}, msgid, send_queue)
+        create_message(cmd, {"code":400,"msg":f"{cmd} failed:{e}",
+        "at":get_current_time(), "did":MQTTConfig.getattr('did')}, msgid, send_queue)
+
+def device_reboot(message, send_queue):
+    msgid = message['msgid']
+    cmd = "reboot"
+    try:
+        with open("reboot_info.txt", "w") as f:
+            f.write(msgid)
+        logger.info("Device will be reboot in 1 second")
+        time.sleep(1)
+        os.system("sudo reboot")
+    except Exception as e:
+        logger.error(f"Device reboot faild: {e}")
+        create_message(cmd, {"code":400,"msg":f"{cmd} faild:{e}",
+        "at":get_current_time(), "did":MQTTConfig.getattr('did')},msgid, send_queue)
+
+
 
 def create_message(cmd, body, msgid, send_queue):
     """响应消息模板"""
@@ -183,13 +231,16 @@ def create_message(cmd, body, msgid, send_queue):
         }
     send_queue.put(reply)
 
+def get_current_time():
+    return time.strftime("%Y-%m-%dT%H:%:%SZ")
+
 def config_map():
     """设备中需要修改或查询的配置项"""
     return {
         'displacement_threshold': (RingsLocationConfig, 'move_threshold'),  # 告警位移阈值
         'target_number': (MatchTemplateConfig, 'target_number'), # 靶标数量
         'target_size': (MatchTemplateConfig, 'template_size'),  # 靶标尺寸
-        'reference_target': (config.get_reference_target_ids()), # 参考靶标
+        'reference_target': (RingsLocationConfig, 'reference_target_id2offset'), # 参考靶标
         'data_report_interval': (MainConfig, 'cycle_time_interval'), # 上报数据时间间隔
         'capture_interval': (CameraConfig, 'capture_time_interval'), # 拍照时间间隔
         'did': (MQTTConfig, 'did'), # divece id

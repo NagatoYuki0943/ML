@@ -71,7 +71,7 @@ class RaspberryFTP:
                 for file_path, file_name in zip(local_file_path, local_file_name):
                     with open(file_path, 'rb') as f:
                         self.ftp.storbinary(f"STOR {file_name}", f)
-                logger.info(f"Uploaded file from {file_path} to FTP server")
+                    logger.info(f"Uploaded file from {file_path} to FTP server")
                 self.ftp_close()
                 break
             except Exception as e:
@@ -94,7 +94,7 @@ class RaspberryFTP:
         delay_downloads = self.delay
         for attempt in range(self.max_retries):
             try:
-                self.ftp.connect()
+                self.ftp_connect()
                 remote_file = f"{ftpurl}/{remote_file_name}"
                 with open(local_file_path, 'wb') as f:
                     self.ftp.retrbinary(f"RETR {remote_file}", f.write)

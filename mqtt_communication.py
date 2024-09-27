@@ -138,7 +138,7 @@ def config_setter(message, send_queue):
             config = map[key]
             config_class, config_attr = config
             # 根据key做特殊处理
-            if key == "reference_target_id2offset":
+            if key == "camera0_reference_target_id2offset" or key == "camera1_reference_target_id2offset":
                 if not isinstance(value, dict):
                     failed_keys.append(f"{key} must be a dictionary")
                     success = False
@@ -240,7 +240,8 @@ def config_map():
         'displacement_threshold': (RingsLocationConfig, 'move_threshold'),  # 告警位移阈值
         'target_number': (MatchTemplateConfig, 'target_number'), # 靶标数量
         'target_size': (MatchTemplateConfig, 'template_size'),  # 靶标尺寸
-        'reference_target': (RingsLocationConfig, 'reference_target_id2offset'), # 参考靶标
+        'camera0_reference_target': (RingsLocationConfig, 'camera0_reference_target_id2offset'), # 参考靶标
+        'camera1_reference_target': (RingsLocationConfig, 'camera1_reference_target_id2offset'), # 参考靶标
         'data_report_interval': (MainConfig, 'cycle_time_interval'), # 上报数据时间间隔
         'capture_interval': (CameraConfig, 'capture_time_interval'), # 拍照时间间隔
         'did': (MQTTConfig, 'did'), # divece id

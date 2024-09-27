@@ -1421,13 +1421,21 @@ class Receive:
             and reference_target_id2offset is not None
         ):
             ref_id: int = list(reference_target_id2offset.keys())[0]
-            ref_value = reference_target_id2offset[ref_id]
-            for key, value in standard_cycle_results.items():
-                if key != ref_id:
-                    standard_cycle_results[key]["offset"] = [
-                        value["offset"][0] + ref_value[0],
-                        value["offset"][1] + ref_value[1],
-                    ]
+            ref_distance_x, ref_distance_y = reference_target_id2offset[ref_id]
+            if (
+                abs(ref_distance_x) >= defalut_error_distance
+                or abs(ref_distance_y) >= defalut_error_distance
+            ):
+                logger.warning(
+                    f"reference target {ref_id} offset is too large, can not add to other target's center offset."
+                )
+            else:
+                for key, value in standard_cycle_results.items():
+                    if key != ref_id:
+                        standard_cycle_results[key]["offset"] = [
+                            value["offset"][0] + ref_distance_x,
+                            value["offset"][1] + ref_distance_y,
+                        ]
         else:
             logger.warning(
                 "standard_cycle_results or reference_target_id2offset is None, can not add center offset."

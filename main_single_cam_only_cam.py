@@ -1114,10 +1114,10 @@ class Receive:
         elif cmd == "targetcorrection":
             Receive.receive_target_correction_msg(received_msg)
 
-        elif cmd == "deletedevicemap":
+        elif cmd == "removetarget":
             Receive.receive_remove_target_msg(received_msg)
 
-        elif cmd == "setdevicemap":
+        elif cmd == "addtarget":
             Receive.receive_add_target_msg(received_msg)
 
         # 参考靶标设定消息
@@ -1291,7 +1291,7 @@ class Receive:
         global need_send_remove_target_msg
         global last_cycle_results
         # {
-        #     "cmd": "deletedevicemap",
+        #     "cmd": "removetarget",
         #     "msgid": "bb6f3eeb2",
         #     "body": {
         #         "remove_box_ids": ["L1_SJ_3", "L1_SJ_4"]
@@ -1368,7 +1368,7 @@ class Receive:
         global need_send_add_target_msg
         global last_cycle_results
         # {
-        #     "cmd": "setdevicemap",
+        #     "cmd": "addtarget",
         #     "msgid": "bb6f3eeb2",
         #     "body": {
         #         "add_boxes":{
@@ -1919,7 +1919,7 @@ class Send:
 
         # 删除靶标响应消息
         send_msg = {
-            "cmd": "deletedevicemap",
+            "cmd": "removetarget",
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),
@@ -1971,7 +1971,7 @@ class Send:
 
         # 添加靶标响应消息
         send_msg = {
-            "cmd": "setdevicemap",
+            "cmd": "addtarget",
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),

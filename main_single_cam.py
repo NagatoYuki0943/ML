@@ -1537,6 +1537,7 @@ class Receive:
                     "code": 200,
                     "did": MQTTConfig.getattr("did"),
                     "at": get_now_time(),
+                    "reference_target": reference_target,
                     "msg": "set succeed",
                 },
                 "msgid": "bb6f3eeb2",
@@ -1553,7 +1554,8 @@ class Receive:
                     "code": 200,
                     "did": MQTTConfig.getattr("did"),
                     "at": get_now_time(),
-                    "msg": "set fail, reference_target not exist",
+                    "reference_target": "",
+                    "msg": "set failed, reference_target not exist",
                 },
                 "msgid": "bb6f3eeb2",
             }

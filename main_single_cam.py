@@ -816,6 +816,7 @@ def main() -> None:
                                     )
 
                             # 使用参考靶标校准其他靶标
+                            # TODO: 参考靶标进行滤波处理
                             reference_target_id2offset: (
                                 dict[int, tuple[float, float]] | None
                             ) = RingsLocationConfig.getattr(

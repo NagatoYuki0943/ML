@@ -235,7 +235,9 @@ def main() -> None:
         get_picture_timeout_process()
 
     logger.info("ajust exposure 1 start")
-    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
+        "camera0_id2boxstate"
+    )
     adjust_exposure_full_res_for_loop(camera_queue, id2boxstate, True)
     logger.success("ajust exposure 1 end")
     try:
@@ -267,7 +269,9 @@ def main() -> None:
         logger.info("image find target start")
 
         target_number: int = MatchTemplateConfig.getattr("target_number")
-        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
+            "camera0_id2boxstate"
+        )
         # {
         #     i: {
         #         "ratio": ratio,
@@ -377,7 +381,7 @@ def main() -> None:
 
                     # 调整曝光
                     id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
-                        "id2boxstate"
+                        "camera0_id2boxstate"
                     )
                     _, need_darker, need_lighter = adjust_exposure_full_res_for_loop(
                         camera_queue,
@@ -447,10 +451,6 @@ def main() -> None:
                         logger.warning(
                             "find_around_target find no target found in the image"
                         )
-                        # _, got_target_number = find_lost_target(rectified_image)
-                        # if got_target_number == 0:
-                        #     logger.error("no target found in the image, exit")
-                        # continue
                     # -------------------- 小区域模板匹配 --------------------#
 
                     # -------------------- 调整 box 曝光 --------------------#
@@ -460,7 +460,7 @@ def main() -> None:
                     #     1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}
                     # }
                     id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
-                        "id2boxstate"
+                        "camera0_id2boxstate"
                     )
                     # exposure2id2boxstate example: {
                     #     60000: {0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
@@ -694,7 +694,7 @@ def main() -> None:
                                     reference_target_id2offset: (
                                         dict[int, tuple[float, float]] | None
                                     ) = RingsLocationConfig.getattr(
-                                        "reference_target_id2offset"
+                                        "camera0_reference_target_id2offset"
                                     )
                                     if reference_target_id2offset is not None:
                                         ref_id: int = list(
@@ -820,7 +820,7 @@ def main() -> None:
                             reference_target_id2offset: (
                                 dict[int, tuple[float, float]] | None
                             ) = RingsLocationConfig.getattr(
-                                "reference_target_id2offset"
+                                "camera0_reference_target_id2offset"
                             )
                             if reference_target_id2offset is not None:
                                 ref_id: int = list(reference_target_id2offset.keys())[0]
@@ -840,7 +840,7 @@ def main() -> None:
                                     else:
                                         # 参考靶标正常
                                         RingsLocationConfig.setattr(
-                                            "reference_target_id2offset",
+                                            "camera0_reference_target_id2offset",
                                             {ref_id: [ref_distance_x, ref_distance_y]},
                                         )
                                         logger.info(
@@ -943,7 +943,7 @@ def main() -> None:
                         # ------------------------- 检查是否丢失目标 -------------------------#
                         target_number = MatchTemplateConfig.getattr("target_number")
                         got_target_number = MatchTemplateConfig.getattr(
-                            "got_target_number"
+                            "camera0_got_target_number"
                         )
 
                         # 丢失目标
@@ -971,7 +971,7 @@ def main() -> None:
                                     "target_number"
                                 )
                                 got_target_number = MatchTemplateConfig.getattr(
-                                    "got_target_number"
+                                    "camera0_got_target_number"
                                 )
                                 # -------------------- 模板匹配 --------------------#
 
@@ -982,7 +982,9 @@ def main() -> None:
                                     # ❌️❌️❌️ 重新查找完成之后仍然不够 ❌️❌️❌️
                                     # 获取丢失的box idx
                                     id2boxstate: dict[int, dict] | None = (
-                                        MatchTemplateConfig.getattr("id2boxstate")
+                                        MatchTemplateConfig.getattr(
+                                            "camera0_id2boxstate"
+                                        )
                                     )
                                     if id2boxstate is not None:
                                         loss_ids = [
@@ -1193,7 +1195,9 @@ class Receive:
         #         "box": box
         #     }
         # }
-        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
+            "camera0_id2boxstate"
+        )
         remove_box_ids: list[str] = received_msg["body"].get("remove_box_ids", [])
         logger.info(f"remove_box_ids: {remove_box_ids}")
         # -1 因为 id 从 0 开始
@@ -1252,9 +1256,9 @@ class Receive:
 
         # 设置新目标数量和靶标信息
         MatchTemplateConfig.setattr("target_number", target_number)
-        MatchTemplateConfig.setattr("id2boxstate", new_id2boxstate)
+        MatchTemplateConfig.setattr("camera0_id2boxstate", new_id2boxstate)
         # 删除参考靶标
-        RingsLocationConfig.setattr("reference_target_id2offset", None)
+        RingsLocationConfig.setattr("camera0_reference_target_id2offset", None)
         # 因为重设了靶标，所以需要重新初始化标准靶标
         RingsLocationConfig.setattr("standard_cycle_results", None)
 
@@ -1305,7 +1309,9 @@ class Receive:
         #         "box": box
         #     }
         # }
-        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
+            "camera0_id2boxstate"
+        )
         remove_box_ids: list[str] = received_msg["body"].get("remove_box_ids", [])
         logger.info(f"remove_box_ids: {remove_box_ids}")
         # -1 因为 id 从 0 开始
@@ -1339,16 +1345,16 @@ class Receive:
 
         # 设置新目标数量和靶标信息
         MatchTemplateConfig.setattr("target_number", target_number)
-        MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
+        MatchTemplateConfig.setattr("camera0_id2boxstate", id2boxstate)
 
         # 可能删除参考靶标
         reference_target_id2offset: dict[int, tuple[float, float]] | None = (
-            RingsLocationConfig.getattr("reference_target_id2offset")
+            RingsLocationConfig.getattr("camera0_reference_target_id2offset")
         )
         if reference_target_id2offset is not None:
             reference_target_id: int = list(reference_target_id2offset.keys())[0]
             if reference_target_id in _remove_box_ids:
-                RingsLocationConfig.setattr("reference_target_id2offset", None)
+                RingsLocationConfig.setattr("camera0_reference_target_id2offset", None)
                 logger.warning(
                     f"reference target {reference_target_id} is removed, reset reference_target_id2offset."
                 )
@@ -1419,7 +1425,9 @@ class Receive:
         #         "box": box
         #     }
         # }
-        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
+            "camera0_id2boxstate"
+        )
 
         new_boxes: dict[str, list[int]] = received_msg["body"].get("add_boxes", {})
         logger.info(f"new_boxes: {new_boxes}")
@@ -1439,14 +1447,14 @@ class Receive:
 
         # 设置新目标数量和靶标信息
         MatchTemplateConfig.setattr("target_number", target_number)
-        MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
+        MatchTemplateConfig.setattr("camera0_id2boxstate", id2boxstate)
 
         # 由于添加了新的box, 因此参考靶标也会更新为最新的, 因此除了参考靶标之外的其他靶标的偏移量需要重新计算, 计算方式为原本的偏移量加上参考靶标的偏移量
         standard_cycle_results: dict | None = RingsLocationConfig.getattr(
             "standard_cycle_results"
         )
         reference_target_id2offset: dict[int, tuple[float, float]] | None = (
-            RingsLocationConfig.getattr("reference_target_id2offset")
+            RingsLocationConfig.getattr("camera0_reference_target_id2offset")
         )
         if (
             standard_cycle_results is not None
@@ -1525,10 +1533,12 @@ class Receive:
             int(reference_target.split("_")[-1]) - 1
         )  # -1 因为 id 从 0 开始
 
-        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
+            "camera0_id2boxstate"
+        )
         if reference_target_id in id2boxstate.keys():
             RingsLocationConfig.setattr(
-                "reference_target_id2offset", {reference_target_id: [0, 0]}
+                "camera0_reference_target_id2offset", {reference_target_id: [0, 0]}
             )
             # 参考靶标设定响应消息
             send_msg = {

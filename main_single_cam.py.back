@@ -234,7 +234,7 @@ def main() -> None:
         logger.info("image find target start")
 
         target_number: int = MatchTemplateConfig.getattr("target_number")
-        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+        id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("camera0_id2boxstate")
         # {
         #     i: {
         #         "ratio": ratio,
@@ -405,7 +405,7 @@ def main() -> None:
                     #     0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
                     #     1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}
                     # }
-                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("camera0_id2boxstate")
                     # exposure2id2boxstate example: {
                     #     60000: {0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
                     #     62000: {1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}}
@@ -664,7 +664,7 @@ def main() -> None:
 
                         #------------------------- 检查是否丢失目标 -------------------------#
                         target_number = MatchTemplateConfig.getattr("target_number")
-                        got_target_number = MatchTemplateConfig.getattr("got_target_number")
+                        got_target_number = MatchTemplateConfig.getattr("camera0_got_target_number")
 
                         # 丢失目标
                         if target_number > got_target_number or target_number == 0:
@@ -684,13 +684,13 @@ def main() -> None:
                                 #-------------------- 模板匹配 --------------------#
                                 find_lost_target(rectified_image)
                                 target_number = MatchTemplateConfig.getattr("target_number")
-                                got_target_number = MatchTemplateConfig.getattr("got_target_number")
+                                got_target_number = MatchTemplateConfig.getattr("camera0_got_target_number")
                                 #-------------------- 模板匹配 --------------------#
 
                                 if target_number > got_target_number or target_number == 0:
                                     # ❌️❌️❌️ 重新查找完成之后仍然不够 ❌️❌️❌️
                                     # 获取丢失的box idx
-                                    id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("id2boxstate")
+                                    id2boxstate: dict[int, dict] | None  = MatchTemplateConfig.getattr("camera0_id2boxstate")
                                     if id2boxstate is not None:
                                         loss_ids = [i for i, boxestate in id2boxstate.items() if boxestate['box'] is None]
                                     else:
@@ -785,7 +785,7 @@ def main() -> None:
                     #         "box": box
                     #     }
                     # }
-                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("camera0_id2boxstate")
                     remove_box_ids: list[str] = received_msg['body'].get('remove_box_ids', [])
                     logger.info(f"remove_box_ids: {remove_box_ids}")
                     # -1 因为 id 从 0 开始
@@ -832,7 +832,7 @@ def main() -> None:
 
                     # 设置新目标数量和靶标信息
                     MatchTemplateConfig.setattr("target_number", target_number)
-                    MatchTemplateConfig.setattr("id2boxstate", new_boxstates)
+                    MatchTemplateConfig.setattr("camera0_id2boxstate", new_boxstates)
                     # 删除参考靶标
                     MatchTemplateConfig.setattr("reference_target_ids", tuple())
                     # 因为重设了靶标，所以需要重新初始化标准靶标
@@ -878,7 +878,7 @@ def main() -> None:
                     reference_target = received_msg['body']['reference_target']
                     reference_target_id = int(reference_target.split('_')[-1]) - 1 # -1 因为 id 从 0 开始
 
-                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("id2boxstate")
+                    id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr("camera0_id2boxstate")
                     if reference_target_id in id2boxstate.keys():
                         MatchTemplateConfig.setattr("reference_target_ids", (reference_target_id,))
                         # 参考靶标设定响应消息

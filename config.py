@@ -176,12 +176,14 @@ class MatchTemplateConfig(BaseConfig):
     )  # 新目标的缩放 scale 范围 (start, end, step)
     max_target_number: int = 10  # 最大目标数量
     target_number: int = 0  # 默认靶标数量,初始化时为找到的靶标数量
-    got_target_number: int = 0  # 找到的靶标数量
     iou_threshold: float = 0.5  # iou 阈值
     use_threshold_match: bool = True  # 是否使用阈值匹配
     threshold_match_threshold: float = 0.6  # 阈值匹配阈值
     threshold_iou_threshold: float = 0.5  # 阈值匹配 iou 阈值
-    id2boxstate: dict[int, dict] | None = None  # 靶标 id 到 boxes 的映射
+    camera0_got_target_number: int = 0  # 找到的靶标数量
+    camera1_got_target_number: int = 0  # 找到的靶标数量
+    camera0_id2boxstate: dict[int, dict] | None = None  # 靶标 id 到 boxes 的映射
+    camera1_id2boxstate: dict[int, dict] | None = None  # 靶标 id 到 boxes 的映射
     search_range: float = 1  # 假设为1，box 为 [x1, y1, x2, y2], w, h, 则搜索范围为 [x1 - 1 * w, y1 - 1 * h, x2 + 1 * w, y2 + 1 * h]
 
 
@@ -201,7 +203,10 @@ class RingsLocationConfig(BaseConfig):
     save_detect_images: bool = False
     save_detect_results: bool = False
     move_threshold: float = 1  # 定位误差阈值, mm
-    reference_target_id2offset: dict[int, list[float, float]] | None = (
+    camera0_reference_target_id2offset: dict[int, list[float, float]] | None = (
+        None  # 参考靶标 id 和 x y 的偏移(每次检测到都会偏移)
+    )
+    camera1_reference_target_id2offset: dict[int, list[float, float]] | None = (
         None  # 参考靶标 id 和 x y 的偏移(每次检测到都会偏移)
     )
     standard_cycle_results: dict | None = None  # 标准循环结果

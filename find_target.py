@@ -50,7 +50,7 @@ from config import MatchTemplateConfig
 #     MatchTemplateConfig.setattr("ratios", sorted_ratios)
 #     MatchTemplateConfig.setattr("scores", sorted_scores)
 #     MatchTemplateConfig.setattr("boxes", sorted_boxes)
-#     MatchTemplateConfig.setattr("got_target_number", got_target_number)
+#     MatchTemplateConfig.setattr("camera0_got_target_number", got_target_number)
 
 #     if got_target_number < target_number:
 #         logger.error(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
@@ -150,7 +150,7 @@ from config import MatchTemplateConfig
 #     MatchTemplateConfig.setattr("ratios", sorted_ratios)
 #     MatchTemplateConfig.setattr("scores", sorted_scores)
 #     MatchTemplateConfig.setattr("boxes", sorted_boxes)
-#     MatchTemplateConfig.setattr("got_target_number", got_target_number)
+#     MatchTemplateConfig.setattr("camera0_got_target_number", got_target_number)
 
 #     if got_target_number < target_number:
 #         logger.error(f"find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}")
@@ -197,8 +197,8 @@ def find_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
     # 没有找到任何目标
     if len(ratios) == 0:
         logger.warning("can not find any target")
-        MatchTemplateConfig.setattr("id2boxstate", None)
-        MatchTemplateConfig.setattr("got_target_number", 0)
+        MatchTemplateConfig.setattr("camera0_id2boxstate", None)
+        MatchTemplateConfig.setattr("camera0_got_target_number", 0)
         return None, 0
 
     # 排序 box，不是必须的
@@ -218,9 +218,9 @@ def find_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
             "box": box.tolist(),
         }
 
-    MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
+    MatchTemplateConfig.setattr("camera0_id2boxstate", id2boxstate)
     got_target_number = len(id2boxstate)
-    MatchTemplateConfig.setattr("got_target_number", got_target_number)
+    MatchTemplateConfig.setattr("camera0_got_target_number", got_target_number)
 
     if got_target_number < target_number:
         logger.warning(
@@ -266,7 +266,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
     #         "box": box
     #     }
     # }
-    id2boxstate: dict | None = MatchTemplateConfig.getattr("id2boxstate")
+    id2boxstate: dict | None = MatchTemplateConfig.getattr("camera0_id2boxstate")
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
         logger.warning("id2boxstate is None, use find_target")
@@ -428,7 +428,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
     ):
         logger.warning("find around target failed, no target found")
 
-    MatchTemplateConfig.setattr("id2boxstate", new_id2boxstate)
+    MatchTemplateConfig.setattr("camera0_id2boxstate", new_id2boxstate)
     # 更新got_target_number
     got_target_number = len(
         [
@@ -437,7 +437,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
             if boxestate["box"] is not None
         ]
     )
-    MatchTemplateConfig.setattr("got_target_number", got_target_number)
+    MatchTemplateConfig.setattr("camera0_got_target_number", got_target_number)
 
     if got_target_number < target_number:
         logger.error(
@@ -484,7 +484,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
     #         "box": box
     #     }
     # }
-    id2boxstate: dict | None = MatchTemplateConfig.getattr("id2boxstate")
+    id2boxstate: dict | None = MatchTemplateConfig.getattr("camera0_id2boxstate")
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
         logger.warning("id2boxstate is None, use find_target")
@@ -559,7 +559,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
         }
         logger.info(f"find lost target {loss_ids[i]}, {ratio = }, {score = }, {box = }")
 
-    MatchTemplateConfig.setattr("id2boxstate", id2boxstate)
+    MatchTemplateConfig.setattr("camera0_id2boxstate", id2boxstate)
     # 更新got_target_number
     got_target_number = len(
         [
@@ -568,7 +568,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
             if boxestate["box"] is not None
         ]
     )
-    MatchTemplateConfig.setattr("got_target_number", got_target_number)
+    MatchTemplateConfig.setattr("camera0_got_target_number", got_target_number)
 
     logger.info("find lost target end")
 

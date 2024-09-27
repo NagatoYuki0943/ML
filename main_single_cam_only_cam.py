@@ -208,6 +208,12 @@ logger.success("init config success")
 last_cycle_results = None
 # 是否需要发送部署信息
 need_send_device_deploying_msg = False
+# 是否需要发送靶标校正响应消息
+need_send_target_correction_msg = False
+# 是否需要发送删除靶标响应消息
+need_send_remove_target_msg = False
+# 是否需要发送添加靶标响应消息
+need_send_add_target_msg = False
 # 是否需要发送获取状态信息
 need_send_get_status_msg = False
 # 是否收到温控回复命令
@@ -707,6 +713,9 @@ def main() -> None:
                                             standard_cycle_results[ref_id] = (
                                                 cycle_results[ref_id]
                                             )
+                                            logger.info(
+                                                f"update reference target {ref_id}"
+                                            )
 
                                     logger.info(
                                         f"update standard_cycle_results: {standard_cycle_results}"
@@ -903,7 +912,7 @@ def main() -> None:
                                     f"box {over_distance_ids} move distance is over threshold {move_threshold}."
                                 )
 
-                                # 保存丢失的图片
+                                # 保存位移的图片
                                 image_path = save_dir / "target_displacement.jpg"
                                 save_image(image, image_path)
                                 logger.info(
@@ -1163,18 +1172,25 @@ class Receive:
         #     "msgid":"bb6f3eeb2",
         # }
         global need_send_device_deploying_msg
+        global last_cycle_results
 
         logger.info("device deploying, reset config and init target")
         # 设备部署，重置配置和初始靶标
         load_config_from_yaml(config_path=original_config_path)
         RingsLocationConfig.setattr("standard_cycle_results", None)
-        logger.success("reset config and init target success")
-        # 需要发送部署消息
+        # 重设上次的结果(用于发送新的消息)
+        last_cycle_results = None
+        # 需要发送部署相应消息
         need_send_device_deploying_msg = True
+        logger.success(
+            "device deploying success, reset config and init target, reset last_cycle_results"
+        )
 
     @staticmethod
     def receive_target_correction_msg(received_msg: dict | None = None):
         """靶标校正消息"""
+        global need_send_target_correction_msg
+        global last_cycle_results
 
         # {
         #     "cmd":"targetcorrection",
@@ -1187,7 +1203,7 @@ class Receive:
         #         "remove_box_ids": ["L1_SJ_3", "L1_SJ_4"]
         #     }
         # }
-        logger.info("target correction, update target")
+        logger.info("target correction")
         # id2boxstate: {
         #     i: {
         #         "ratio": ratio,
@@ -1262,38 +1278,18 @@ class Receive:
         # 因为重设了靶标，所以需要重新初始化标准靶标
         RingsLocationConfig.setattr("standard_cycle_results", None)
 
-        _data = {}
-        for i, boxstate in new_id2boxstate.items():
-            box = boxstate["box"]
-            _data[f"L1_SJ_{i+1}"] = {
-                "X": (box[0] + box[2]) / 2,
-                "Y": (box[1] + box[3]) / 2,
-                "Z": 0,
-            }
+        # 重设上次的结果(用于发送新的消息)
+        last_cycle_results = None
+        # 需要发送靶标校正响应消息
+        need_send_target_correction_msg = True
 
-        # 靶标校正响应消息
-        send_msg = {
-            "cmd": "targetcorrection",
-            "body": {
-                "code": 200,
-                "did": MQTTConfig.getattr("did"),
-                "at": get_now_time(),
-                "msg": "correction succeed",
-                "data": _data,
-                # "data": {
-                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
-                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
-                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
-                # },
-            },
-            "msgid": "bb6f3eeb2",
-        }
-        # mqtt_send_queue.put(send_msg)
-        logger.success("update target success")
+        logger.success("target correction success")
 
     @staticmethod
     def receive_remove_target_msg(received_msg: dict | None = None):
         """删除靶标消息"""
+        global need_send_remove_target_msg
+        global last_cycle_results
         # {
         #     "cmd": "deletedevicemap",
         #     "msgid": "bb6f3eeb2",
@@ -1359,54 +1355,18 @@ class Receive:
                     f"reference target {reference_target_id} is removed, reset reference_target_id2offset."
                 )
 
-        _data = {}
-        for i, boxstate in id2boxstate.items():
-            box = boxstate["box"]
-            _data[f"L1_SJ_{i+1}"] = {
-                "X": (box[0] + box[2]) / 2,
-                "Y": (box[1] + box[3]) / 2,
-                "Z": 0,
-            }
+        # 重设上次的结果(用于发送新的消息)
+        last_cycle_results = None
+        # 需要发送删除靶标响应消息
+        need_send_remove_target_msg = True
 
-        try:
-            # 获取照片
-            _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-            image_path = save_dir / "remove_target.jpg"
-            save_image(image, image_path)
-            logger.info(f"save `remove target` success, save image to {image_path}")
-        except queue.Empty:
-            image_path = None
-            get_picture_timeout_process()
-
-        # 删除靶标响应消息
-        send_msg = {
-            "cmd": "deletedevicemap",
-            "body": {
-                "code": 200,
-                "did": MQTTConfig.getattr("did"),
-                "at": get_now_time(),
-                "msg": "remove target succeed",
-                "data": _data,
-                # "data": {
-                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
-                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
-                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
-                # },
-                "path": str(image_path)
-                if image_path is not None
-                else "",  # 图片本地路径
-                "img": "remove_target.jpg"
-                if image_path is not None
-                else "",  # 文件名称
-            },
-            "msgid": "bb6f3eeb2",
-        }
-        # mqtt_send_queue.put(send_msg)
-        logger.success("delete target success")
+        logger.success("remove target success")
 
     @staticmethod
     def receive_add_target_msg(received_msg: dict | None = None):
         """添加靶标消息"""
+        global need_send_add_target_msg
+        global last_cycle_results
         # {
         #     "cmd": "setdevicemap",
         #     "msgid": "bb6f3eeb2",
@@ -1417,7 +1377,7 @@ class Receive:
         #         }
         #     }
         # }
-        logger.info("add targe")
+        logger.info("add target")
         # id2boxstate: {
         #     i: {
         #         "ratio": ratio,
@@ -1469,50 +1429,16 @@ class Receive:
                         value["offset"][1] + ref_value[1],
                     ]
         else:
-            logger.warning("standard_cycle_results is None, can not add box.")
+            logger.warning(
+                "standard_cycle_results or reference_target_id2offset is None, can not add center offset."
+            )
         RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
 
-        _data = {}
-        for i, boxstate in id2boxstate.items():
-            box = boxstate["box"]
-            _data[f"L1_SJ_{i+1}"] = {
-                "X": (box[0] + box[2]) / 2,
-                "Y": (box[1] + box[3]) / 2,
-                "Z": 0,
-            }
+        # 重设上次的结果(用于发送新的消息)
+        last_cycle_results = None
+        # 需要发送添加靶标响应消息
+        need_send_add_target_msg = True
 
-        try:
-            # 获取照片
-            _, image, _ = camera_queue.get(timeout=get_picture_timeout)
-            image_path = save_dir / "add_target.jpg"
-            save_image(image, image_path)
-            logger.info(f"save `add target` success, save image to {image_path}")
-        except queue.Empty:
-            image_path = None
-            get_picture_timeout_process()
-
-        # 添加靶标响应消息
-        send_msg = {
-            "cmd": "setdevicemap",
-            "body": {
-                "code": 200,
-                "did": MQTTConfig.getattr("did"),
-                "at": get_now_time(),
-                "msg": "add target succeed",
-                "data": _data,
-                # "data": {
-                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
-                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
-                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
-                # },
-                "path": str(image_path)
-                if image_path is not None
-                else "",  # 图片本地路径
-                "img": "add_target.jpg" if image_path is not None else "",  # 文件名称
-            },
-            "msgid": "bb6f3eeb2",
-        }
-        # mqtt_send_queue.put(send_msg)
         logger.success("add target success")
 
     @staticmethod
@@ -1805,6 +1731,18 @@ class Send:
         if need_send_device_deploying_msg:
             Send.send_device_deploying_msg()
 
+        # 发送靶标校正响应消息
+        if need_send_target_correction_msg:
+            Send.send_target_correction_msg()
+
+        # 发送删除靶标响应消息
+        if need_send_remove_target_msg:
+            Send.send_remove_target_msg()
+
+        # 发送添加靶标响应消息
+        if need_send_add_target_msg:
+            Send.send_add_target_msg()
+
         # 设备状态查询响应消息
         if need_send_get_status_msg:
             Send.send_getstatus_msg()
@@ -1843,6 +1781,31 @@ class Send:
             MainConfig.setattr("get_picture_timeout_count", 0)
 
     @staticmethod
+    def get_xyz(cycle_results: dict[int, dict]):
+        # cycle_results: {
+        #     "0": {
+        #         "image_timestamp": "image--20240927-105451.193949--0",
+        #         "box": [1808, 1034, 1906, 1132],
+        #         "center": [1856.2635982759466, 1082.2241236800633],
+        #         "radii": [19.452733149311193, 42.37471354702409],
+        #         "distance": 3958.5385113630155,
+        #         "exposure_time": 140685,
+        #         "offset": [0, 0]
+        #     },
+        #     ...
+        # }
+        data = {
+            f"L1_SJ_{k+1}": {
+                "X": v["center"][0],
+                "Y": v["center"][1],
+                "Z": v["distance"],
+            }
+            for k, v in cycle_results.items()
+            if v["center"] is not None
+        }
+        return data
+
+    @staticmethod
     def send_device_deploying_msg():
         """设备部署响应消息"""
         global need_send_device_deploying_msg
@@ -1855,17 +1818,6 @@ class Send:
             )
             return
 
-        # last_cycle_results: {
-        #     1: {"image_timestamp": "image--20240912-181027.873617--1", "box": [1920, 1872, 2421, 2373], "center": [2170.8123043636415, 2123.2532707504965], "exposure_time": 102000},
-        #     2: {"image_timestamp": "image--20240912-181027.873617--2", "box": [1440, 2151, 1759, 2470], "center": [1603.7810010310484, 2320.5031554379793], "exposure_time": 102000},
-        #     0: {"image_timestamp": "image--20240912-181030.874671--0", "box": [1502, 965, 1821, 1284], "center": [1661.350502281842, 1124.590099588648], "exposure_time": 108000}
-        # }
-        _data = {
-            f"L1_SJ_{k+1}": {"X": v["center"][0], "Y": v["center"][1], "Z": 0}
-            for k, v in last_cycle_results.items()
-            if v["center"] is not None
-        }
-
         try:
             # 获取照片
             _, image, _ = camera_queue.get(timeout=get_picture_timeout)
@@ -1875,6 +1827,8 @@ class Send:
         except queue.Empty:
             image_path = None
             get_picture_timeout_process()
+
+        _data = Send.get_xyz(last_cycle_results)
 
         send_msg = {
             "cmd": "devicedeploying",
@@ -1903,15 +1857,160 @@ class Send:
         logger.success("send device deploying msg success")
 
     @staticmethod
+    def send_target_correction_msg():
+        """发送靶标校正响应消息"""
+        global need_send_target_correction_msg
+
+        logger.info("send target correction msg")
+
+        if last_cycle_results is None:
+            logger.warning(
+                "last_cycle_results is None, can't send target correction msg, wait for next cycle."
+            )
+            return
+
+        _data = Send.get_xyz(last_cycle_results)
+
+        # 靶标校正响应消息
+        send_msg = {
+            "cmd": "targetcorrection",
+            "body": {
+                "code": 200,
+                "did": MQTTConfig.getattr("did"),
+                "at": get_now_time(),
+                "msg": "correction succeed",
+                "data": _data,
+                # "data": {
+                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
+                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
+                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
+                # },
+            },
+            "msgid": "bb6f3eeb2",
+        }
+        # mqtt_send_queue.put(send_msg)
+        need_send_target_correction_msg = False
+        logger.success("target correction success")
+
+    @staticmethod
+    def send_remove_target_msg():
+        """发送删除靶标响应消息"""
+        global need_send_remove_target_msg
+
+        logger.info("send remove target msg")
+
+        if last_cycle_results is None:
+            logger.warning(
+                "last_cycle_results is None, can't send remove target msg, wait for next cycle."
+            )
+            return
+
+        try:
+            # 获取照片
+            _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+            image_path = save_dir / "remove_target.jpg"
+            save_image(image, image_path)
+            logger.info(f"save `remove target` success, save image to {image_path}")
+        except queue.Empty:
+            image_path = None
+            get_picture_timeout_process()
+
+        _data = Send.get_xyz(last_cycle_results)
+
+        # 删除靶标响应消息
+        send_msg = {
+            "cmd": "deletedevicemap",
+            "body": {
+                "code": 200,
+                "did": MQTTConfig.getattr("did"),
+                "at": get_now_time(),
+                "msg": "remove target succeed",
+                "data": _data,
+                # "data": {
+                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
+                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
+                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
+                # },
+                "path": str(image_path)
+                if image_path is not None
+                else "",  # 图片本地路径
+                "img": "remove_target.jpg"
+                if image_path is not None
+                else "",  # 文件名称
+            },
+            "msgid": "bb6f3eeb2",
+        }
+        # mqtt_send_queue.put(send_msg)
+        need_send_remove_target_msg = False
+        logger.success("send remove target msg success")
+
+    @staticmethod
+    def send_add_target_msg():
+        """发送添加靶标响应消息"""
+        global need_send_add_target_msg
+
+        logger.info("send add target msg")
+
+        if last_cycle_results is None:
+            logger.warning(
+                "last_cycle_results is None, can't send add target msg, wait for next cycle."
+            )
+            return
+
+        try:
+            # 获取照片
+            _, image, _ = camera_queue.get(timeout=get_picture_timeout)
+            image_path = save_dir / "add_target.jpg"
+            save_image(image, image_path)
+            logger.info(f"save `add target` success, save image to {image_path}")
+        except queue.Empty:
+            image_path = None
+            get_picture_timeout_process()
+
+        _data = Send.get_xyz(last_cycle_results)
+
+        # 添加靶标响应消息
+        send_msg = {
+            "cmd": "setdevicemap",
+            "body": {
+                "code": 200,
+                "did": MQTTConfig.getattr("did"),
+                "at": get_now_time(),
+                "msg": "add target succeed",
+                "data": _data,
+                # "data": {
+                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
+                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
+                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
+                # },
+                "path": str(image_path)
+                if image_path is not None
+                else "",  # 图片本地路径
+                "img": "add_target.jpg" if image_path is not None else "",  # 文件名称
+            },
+            "msgid": "bb6f3eeb2",
+        }
+        # mqtt_send_queue.put(send_msg)
+        need_send_add_target_msg = False
+        logger.success("send add target msg success")
+
+    @staticmethod
     def send_getstatus_msg():
         """设备状态查询响应消息"""
         global need_send_get_status_msg
 
         logger.info("send getstatus msg")
         # last_cycle_results: {
-        #     1: {"image_timestamp": "image--20240912-181027.873617--1", "box": [1920, 1872, 2421, 2373], "center": [2170.8123043636415, 2123.2532707504965], "exposure_time": 102000},
-        #     2: {"image_timestamp": "image--20240912-181027.873617--2", "box": [1440, 2151, 1759, 2470], "center": [1603.7810010310484, 2320.5031554379793], "exposure_time": 102000},
-        #     0: {"image_timestamp": "image--20240912-181030.874671--0", "box": [1502, 965, 1821, 1284], "center": [1661.350502281842, 1124.590099588648], "exposure_time": 108000}
+        #     "0": {
+        #         "image_timestamp": "image--20240927-105451.193949--0",
+        #         "box": [1808, 1034, 1906, 1132],
+        #         "center": [1856.2635982759466, 1082.2241236800633],
+        #         "radii": [19.452733149311193, 42.37471354702409],
+        #         "distance": 3958.5385113630155,
+        #         "exposure_time": 140685,
+        #         "offset": [0, 0]
+        #     },
+        #     ...
         # }
         sensor_state = {
             "L3_WK_1": 0,  # 0表示无错误，-1供电异常，
@@ -1922,11 +2021,10 @@ class Send:
             "L3_WK_6": -1,
         }
 
-        box_sensor_state = {}
-
         standard_cycle_results: dict | None = RingsLocationConfig.getattr(
             "standard_cycle_results"
         )
+        box_sensor_state = {}
         if standard_cycle_results is not None and last_cycle_results is not None:
             for k in standard_cycle_results.keys():
                 if k in last_cycle_results.keys():

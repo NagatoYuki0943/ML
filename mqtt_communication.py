@@ -232,7 +232,7 @@ def create_message(cmd, body, msgid, send_queue):
     send_queue.put(reply)
 
 def get_current_time():
-    return time.strftime("%Y-%m-%dT%H:%:%SZ")
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 def config_map():
     """设备中需要修改或查询的配置项"""

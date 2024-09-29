@@ -235,7 +235,7 @@ class MQTTConfig(BaseConfig):
     port: int = 1883
     timeout: int = 30
     topic: str = "$creq/7804d2/+"
-    username: str = "admin"
+    username: str = "7804d2"
     password: str = "123456"
     clientId: str = "7804d2"
     apikey: str = "123456"

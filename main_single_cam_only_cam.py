@@ -1116,7 +1116,7 @@ def main() -> None:
 
         # 测试调整相机
         if i > 5000:
-            break
+            os._exit(0)
         logger.warning(f"{i = }")
         i += 1
 

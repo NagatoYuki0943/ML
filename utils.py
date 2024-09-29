@@ -85,7 +85,7 @@ def test_load_standard_cycle_results():
 
 
 def get_now_time():
-    return datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def save_image(image: np.ndarray, file_path: str | Path):

@@ -54,7 +54,7 @@ def mqtt_send(
         if body:
             try:
                 if "img" in body:
-                    timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "")
+                    timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "").replace(" ", "")
                     ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
                     ftp.upload_file(body['path'], body['img'], ftpurl)
                     message['body'].pop('path')

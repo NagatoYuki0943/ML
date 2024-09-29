@@ -805,10 +805,10 @@ def main() -> None:
                                         CameraConfig.getattr("focus"),
                                     )
                                     logger.info(
-                                        f"{pixel_distance_x = } pixel, {real_distance_x = } mm, distance = {standard_cycle_distance[res_k]} mm"
+                                        f"box {res_k} move {pixel_distance_x = } pixel, {real_distance_x = } mm, distance = {standard_cycle_distance[res_k]} mm"
                                     )
                                     logger.info(
-                                        f"{pixel_distance_y = } pixel, {real_distance_y = } mm, distance = {standard_cycle_distance[res_k]} mm"
+                                        f"box {res_k} move {pixel_distance_y = } pixel, {real_distance_y = } mm, distance = {standard_cycle_distance[res_k]} mm"
                                     )
                                     distance_result[res_k] = (
                                         real_distance_x,

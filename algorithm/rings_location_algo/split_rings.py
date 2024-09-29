@@ -10,7 +10,7 @@ def split_rings(
     threshold_range: float = 0.5,
     min_group_size: int = 0,
     momentum: float = 0.9,
-) -> list:
+) -> list[np.ndarray]:
     """将同心圆环坐标分为多个独立的圆环
     assist by kimi
 
@@ -22,8 +22,11 @@ def split_rings(
         momentum (float, optional): 通过动量动态更新⚪的半径. Defaults to 0.9.
 
     Returns:
-        list: 分组的坐标
+        list: 分组的坐标, 分为几个圆环, 数组长度就为几, [group1_points1, group2_points2, ...]
     """
+    if rings_nums <= 1:
+        return [points]
+
     assert (
         momentum >= 0 and momentum <= 1
     ), f"momentum should be between 0 and 1, got {momentum}"
@@ -91,7 +94,7 @@ def split_rings_adaptive(
     init_threshold_range: float = 0.5,
     range_change: float = 0.01,
     times: int = 100,
-) -> list:
+) -> list[np.ndarray]:
     """找到的圆环数量如果大于指定的数量，要调高 threshold_range，否则减小 threshold_range
 
     Args:
@@ -104,13 +107,20 @@ def split_rings_adaptive(
         momentum (float, optional): 通过动量动态更新⚪的半径. Defaults to 0.9.
 
     Returns:
-        list: 分组的坐标
+        list[np.ndarray]: 分组的坐标, 分为几个圆环, 数组长度就为几, [group1_points1, group2_points2, ...]
     """
+    if rings_nums <= 1:
+        return [points]
+
     threshold_range = init_threshold_range
     for i in range(times):
         # 检测圆环
         group_rings = split_rings(
-            points, rings_nums, threshold_range, min_group_size, momentum
+            points,
+            rings_nums,
+            threshold_range,
+            min_group_size,
+            momentum
         )
         # 检测到的圆环数量
         detect_rings_nums = len(group_rings)

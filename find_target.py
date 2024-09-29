@@ -465,7 +465,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
     match_method: int = MatchTemplateConfig.getattr("match_method")
     init_scale: float = MatchTemplateConfig.getattr("init_scale")
     scales: tuple[float] = MatchTemplateConfig.getattr("scales")
-    # target_number: int = MatchTemplateConfig.getattr("target_number")
+    target_number: int = MatchTemplateConfig.getattr("target_number")
     iou_threshold: float = MatchTemplateConfig.getattr("iou_threshold")
     use_threshold_match: bool = MatchTemplateConfig.getattr("use_threshold_match")
     threshold_match_threshold: float = MatchTemplateConfig.getattr(
@@ -485,6 +485,9 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
     #     }
     # }
     id2boxstate: dict | None = MatchTemplateConfig.getattr("camera0_id2boxstate")
+    camera0_got_target_number: int = MatchTemplateConfig.getattr(
+        "camera0_got_target_number"
+    )
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
         logger.warning("id2boxstate is None, use find_target")
@@ -507,6 +510,13 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
 
     # 查找丢失的目标
     loss_target_number = len(loss_ids)
+    if loss_target_number <= 0:
+        logger.warning(
+            "no need to find lost target, return original id2boxstate, set target_number to got_target_number"
+        )
+        MatchTemplateConfig.setattr("target_number", camera0_got_target_number)
+        return id2boxstate, camera0_got_target_number
+
     # ratios: [...]
     # scores: [...]
     # boxes: [[x_min, y_min, x_max, y_max], ...]

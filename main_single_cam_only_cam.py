@@ -728,9 +728,20 @@ def main() -> None:
                                 # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                                 logger.success("send init data message.")
                                 send_msg_data = {
+                                    "L3_WK_1": 20,  # 温度传感器
+                                    "L3_WK_2": 20,
+                                    "L3_WK_3": 20,
+                                    "L3_WK_4": 20,
+                                    "L3_WK_5": 20,
+                                    "L3_WK_6": 20,
+                                    "L3_WK_7": 20,
+                                    "L3_WK_8": 20,
+                                }
+                                _send_msg_data = {
                                     f"L1_SJ_{k+1}": {"X": 0, "Y": 0}
                                     for k in standard_cycle_results.keys()
                                 }
+                                send_msg_data.update(_send_msg_data)
                                 send_msg = {
                                     "cmd": "update",
                                     "did": MQTTConfig.getattr("did"),
@@ -832,7 +843,9 @@ def main() -> None:
                                 "camera0_reference_target_id2offset"
                             )
                             if reference_target_id2offset is not None:
-                                ref_id: int = list(reference_target_id2offset.keys())[0]
+                                ref_id: int = int(
+                                    list(reference_target_id2offset.keys())[0]
+                                )
                                 if ref_id in distance_result.keys():
                                     # 找到参考靶标
                                     ref_distance_x, ref_distance_y = distance_result[
@@ -860,13 +873,16 @@ def main() -> None:
                                             distance_y,
                                         ) in distance_result.items():
                                             if idx != ref_id:
+                                                new_distance_x = distance_x - ref_distance_x
+                                                new_distance_y = distance_y - ref_distance_y
                                                 distance_result[idx] = (
-                                                    distance_x - ref_distance_x,
-                                                    distance_y - ref_distance_y,
+                                                    new_distance_x,
+                                                    new_distance_y,
                                                 )
+                                                logger.info(f"box {idx} after reference, move {new_distance_x = } mm, {new_distance_y = } mm")
                                 else:
                                     logger.warning(
-                                        f"reference box {ref_id} not found in distance_result, don't calibrate other targets."
+                                        f"reference box {ref_id} not found in distance_result, can't calibrate other targets."
                                     )
                             else:
                                 logger.warning(
@@ -902,9 +918,20 @@ def main() -> None:
                             logger.info(f"distance_result: {distance_result}")
                             logger.info(f"over_distance_ids: {over_distance_ids}")
                             send_msg_data = {
+                                "L3_WK_1": 20,  # 温度传感器
+                                "L3_WK_2": 20,
+                                "L3_WK_3": 20,
+                                "L3_WK_4": 20,
+                                "L3_WK_5": 20,
+                                "L3_WK_6": 20,
+                                "L3_WK_7": 20,
+                                "L3_WK_8": 20,
+                            }
+                            _send_msg_data = {
                                 f"L1_SJ_{k+1}": {"X": v[0], "Y": v[1]}
                                 for k, v in distance_result.items()
                             }
+                            send_msg_data.update(_send_msg_data)
                             logger.info(f"send_msg_data: {send_msg_data}")
                             if len(over_distance_ids) > 0:
                                 # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
@@ -1308,6 +1335,10 @@ class Receive:
         id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
             "camera0_id2boxstate"
         )
+        standard_cycle_results: dict | None = RingsLocationConfig.getattr(
+            "standard_cycle_results"
+        )
+
         remove_box_ids: list[str] = received_msg["body"].get("remove_box_ids", [])
         logger.info(f"remove_box_ids: {remove_box_ids}")
         # -1 因为 id 从 0 开始
@@ -1316,39 +1347,43 @@ class Receive:
         ]
         logger.info(f"int(remove_box_ids): {_remove_box_ids}")
 
-        standard_cycle_results: dict | None = RingsLocationConfig.getattr(
-            "standard_cycle_results"
-        )
-        if standard_cycle_results is not None:
-            # 去除多余的 box
-            for remove_box_id in _remove_box_ids:
-                if remove_box_id in id2boxstate.keys():
-                    logger.info(
-                        f"remove box {remove_box_id}, boxstate: {id2boxstate[remove_box_id]}"
-                    )
-                    id2boxstate.pop(remove_box_id, None)
-                    # 因为重设了靶标，所以需要删除部分初始化标准靶标
-                    standard_cycle_results.pop(remove_box_id, None)
-                else:
-                    logger.warning(f"box {remove_box_id} not found in id2boxstate.")
-        else:
-            logger.warning("standard_cycle_results is None, can not remove box.")
-        RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
+        # 去除多余的 box
+        for remove_box_id in _remove_box_ids:
+            if id2boxstate is not None and remove_box_id in id2boxstate.keys():
+                id2boxstate.pop(remove_box_id, None)
+                logger.info(
+                    f"remove box {remove_box_id}, boxstate: {id2boxstate[remove_box_id]}"
+                )
+            else:
+                logger.warning(f"box {remove_box_id} not found in id2boxstate or id2boxstate is None.")
+
+            if standard_cycle_results is not None and remove_box_id in standard_cycle_results.keys():
+                # 因为重设了靶标，所以需要删除部分初始化标准靶标
+                standard_cycle_results.pop(remove_box_id, None)
+                logger.info(
+                    f"remove box {remove_box_id}, standard_cycle_result: {standard_cycle_results[remove_box_id]}"
+                )
+            else:
+                logger.warning(
+                    f"box {remove_box_id} not found in standard_cycle_results or standard_cycle_results is None."
+                )
 
         target_number = len(id2boxstate)
-        logger.info(f"new_id2boxstate: {id2boxstate}")
         logger.info(f"target_number: {target_number}")
+        logger.info(f"new_id2boxstate: {id2boxstate}")
+        logger.info(f"new_standard_cycle_results: {standard_cycle_results}")
 
         # 设置新目标数量和靶标信息
         MatchTemplateConfig.setattr("target_number", target_number)
         MatchTemplateConfig.setattr("camera0_id2boxstate", id2boxstate)
+        RingsLocationConfig.setattr("standard_cycle_results", standard_cycle_results)
 
         # 可能删除参考靶标
         reference_target_id2offset: dict[int, tuple[float, float]] | None = (
             RingsLocationConfig.getattr("camera0_reference_target_id2offset")
         )
         if reference_target_id2offset is not None:
-            reference_target_id: int = list(reference_target_id2offset.keys())[0]
+            reference_target_id: int = int(list(reference_target_id2offset.keys())[0])
             if reference_target_id in _remove_box_ids:
                 RingsLocationConfig.setattr("camera0_reference_target_id2offset", None)
                 logger.warning(
@@ -1395,7 +1430,7 @@ class Receive:
         for new_key, new_box in new_boxes.items():
             _new_key = int(new_key.split("_")[-1]) - 1  # -1 因为 id 从 0 开始
             if _new_key in id2boxstate.keys():
-                logger.warning(f"box {_new_key} already exist in id2boxstate.")
+                logger.warning(f"box {_new_key} already exist in id2boxstate, ignore.")
             else:
                 new_boxstate = {"ratio": None, "score": None, "box": new_box}
                 id2boxstate[_new_key] = new_boxstate
@@ -1420,7 +1455,7 @@ class Receive:
             standard_cycle_results is not None
             and reference_target_id2offset is not None
         ):
-            ref_id: int = list(reference_target_id2offset.keys())[0]
+            ref_id: int = int(list(reference_target_id2offset.keys())[0])
             ref_distance_x, ref_distance_y = reference_target_id2offset[ref_id]
             if (
                 abs(ref_distance_x) >= defalut_error_distance
@@ -1436,6 +1471,9 @@ class Receive:
                             value["offset"][0] + ref_distance_x,
                             value["offset"][1] + ref_distance_y,
                         ]
+                logger.info(
+                    "use reference target to add center offset to other target's center offset."
+                )
         else:
             logger.warning(
                 "standard_cycle_results or reference_target_id2offset is None, can not add center offset."

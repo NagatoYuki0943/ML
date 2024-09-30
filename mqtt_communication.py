@@ -4,6 +4,7 @@ from algorithm import RaspberryMQTT, RaspberryFTP
 from queue import Queue
 from config import MQTTConfig, RingsLocationConfig, CameraConfig, MatchTemplateConfig, MainConfig, FTPConfig
 from loguru import logger
+import sys
 
 # MQTT 客户端接收线程
 def mqtt_receive(
@@ -138,25 +139,22 @@ def config_setter(message, send_queue):
             config = map[key]
             config_class, config_attr = config
             # 根据key做特殊处理
-            if key == "camera0_reference_target_id2offset" or key == "camera1_reference_target_id2offset":
+            if key == "camera0_reference_target" or key == "camera1_reference_target":
                 if not isinstance(value, dict):
                     failed_keys.append(f"{key} must be a dictionary")
                     success = False
                     continue
                 try:
                     # 将Key转换为int类型
-                    value = {int(k): v for k, v in value.items()}
+                    key_int = int(list(value.keys())[0])
+                    val = list(value.values())[0]
+                    value = [key_int, val]
+                    logger.success(value)
                 except ValueError:
                     failed_keys.append(f"{key} keys must be convertible to int")
                     success = False
                     continue
-                # 判断要更改的配置内容是否和当前参数类型相符
-                if not all(isinstance(k, int) and 
-                           isinstance(v, list) and len(v) == 2 for k, v in value.items()):
-                    failed_keys.append(f"{key} must be a dictionary with int keys and list of two float values")
-                    success = False
-                    continue
-                setattr(config_class, config_attr, tuple(value))
+                setattr(config_class, config_attr, value)
             # 当前配置中的值
             current_value = getattr(config_class, config_attr)
             # 处理配置中默认为tuple类型的参数
@@ -208,12 +206,19 @@ def config_getter(message, send_queue):
 def device_reboot(message, send_queue):
     msgid = message['msgid']
     cmd = "reboot"
+    type = message['type']
     try:
         with open("reboot_info.txt", "w") as f:
             f.write(msgid)
-        logger.info("Device will be reboot in 1 second")
-        time.sleep(1)
-        os.system("sudo reboot")
+        if type == "device":
+            logger.info("Device will be reboot in 1 second")
+            time.sleep(1)
+            os.system("sudo reboot")
+        elif type == "process":
+            logger.info("Process will be reboot in 1 second")
+            time.sleep(1)
+            python = sys.executable
+            os.execv(python, [python] + sys.argv)
     except Exception as e:
         logger.error(f"Device reboot faild: {e}")
         create_message(cmd, {"code":400,"msg":f"{cmd} faild:{e}",

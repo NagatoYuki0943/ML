@@ -34,7 +34,7 @@ class RaspberryMQTT:
         self.topic = topic
         self.apikey = apikey
 
-        self.client = mqtt.Client(client_id=clientId, clean_session=False)
+        self.client = mqtt.Client(client_id=clientId, clean_session=True)
         self.client.username_pw_set(username=username, password=password)
         self.message_callback = None
         self.client.on_message = self.on_message

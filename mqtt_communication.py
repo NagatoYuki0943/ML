@@ -207,6 +207,8 @@ def device_reboot(message, send_queue):
     msgid = message['msgid']
     cmd = "reboot"
     type = message['type']
+    if os.path.exists("reboot_info.txt"):
+        return
     try:
         with open("reboot_info.txt", "w") as f:
             f.write(msgid)

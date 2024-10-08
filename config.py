@@ -211,7 +211,8 @@ class RingsLocationConfig(BaseConfig):
     camera1_reference_target_id2offset: dict[int, list[float, float]] | None = (
         None  # 参考靶标 id 和 x y 的偏移(每次检测到都会偏移)
     )
-    standard_cycle_results: dict | None = None  # 标准循环结果
+    camera0_standard_results: dict | None = None  # camera0 标准结果
+    camera1_standard_results: dict | None = None  # camera1 标准结果
 
 
 @dataclass

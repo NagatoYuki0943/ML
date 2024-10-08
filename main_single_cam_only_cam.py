@@ -376,8 +376,8 @@ def main() -> None:
                 logger.info("full image ajust exposure start")
 
                 # 每次使用补光灯调整曝光的总次数
-                adjust_with_falsh_total_times: int = AdjustCameraConfig.getattr(
-                    "adjust_with_falsh_total_times"
+                adjust_with_flash_total_times: int = AdjustCameraConfig.getattr(
+                    "adjust_with_flash_total_times"
                 )
                 adjust_with_falsh_total_time = 0
                 while True:
@@ -430,9 +430,9 @@ def main() -> None:
                         break
 
                     adjust_with_falsh_total_time += 1
-                    if adjust_with_falsh_total_time >= adjust_with_falsh_total_times:
+                    if adjust_with_falsh_total_time >= adjust_with_flash_total_times:
                         logger.warning(
-                            f"adjust_exposure_full_res_for_loop failed in {adjust_with_falsh_total_times} times, use last result"
+                            f"adjust_exposure_full_res_for_loop failed in {adjust_with_flash_total_times} times, use last result"
                         )
                         break
 

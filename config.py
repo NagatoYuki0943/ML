@@ -96,7 +96,7 @@ class AdjustCameraConfig(BaseConfig):
     capture_time_interval: int = 100  # 拍照间隔 us
     return_image_time_interval: int = 100  # 返回图片间隔 us
     adjust_total_times: int = 100  # 最高调整次数(每次调用调整曝光函数的内部调整次数)
-    adjust_with_falsh_total_times: int = (
+    adjust_with_flash_total_times: int = (
         10  # 最高调整次数(主循环中调整次数，使用闪光灯)
     )
 

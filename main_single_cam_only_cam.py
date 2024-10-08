@@ -753,8 +753,11 @@ def main() -> None:
                             logger.info(
                                 "try to compare standard_cycle_results and cycle_results"
                             )
-                            move_threshold = RingsLocationConfig.getattr(
-                                "move_threshold"
+                            x_move_threshold = RingsLocationConfig.getattr(
+                                "x_move_threshold"
+                            )
+                            y_move_threshold = RingsLocationConfig.getattr(
+                                "y_move_threshold"
                             )
                             standard_cycle_centers = {
                                 k: result["center"]
@@ -895,24 +898,24 @@ def main() -> None:
                                 distance_x,
                                 distance_y,
                             ) in distance_result.items():
-                                if abs(distance_x) > move_threshold:
+                                if abs(distance_x) > x_move_threshold:
                                     over_distance_ids.add(idx)
                                     logger.warning(
-                                        f"box {idx} x move distance {distance_x} mm is over threshold {move_threshold} mm."
+                                        f"box {idx} x move distance {distance_x} mm is over threshold {x_move_threshold} mm."
                                     )
                                 else:
                                     logger.info(
-                                        f"box {idx} x move distance {distance_x} mm is under threshold {move_threshold} mm."
+                                        f"box {idx} x move distance {distance_x} mm is under threshold {x_move_threshold} mm."
                                     )
 
-                                if abs(distance_y) > move_threshold:
+                                if abs(distance_y) > y_move_threshold:
                                     over_distance_ids.add(idx)
                                     logger.warning(
-                                        f"box {idx} y move distance {distance_y} mm is over threshold {move_threshold} mm."
+                                        f"box {idx} y move distance {distance_y} mm is over threshold {y_move_threshold} mm."
                                     )
                                 else:
                                     logger.info(
-                                        f"box {idx} y move distance {distance_y} mm is under threshold {move_threshold} mm."
+                                        f"box {idx} y move distance {distance_y} mm is under threshold {y_move_threshold} mm."
                                     )
 
                             logger.info(f"distance_result: {distance_result}")
@@ -936,7 +939,7 @@ def main() -> None:
                             if len(over_distance_ids) > 0:
                                 # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
                                 logger.warning(
-                                    f"box {over_distance_ids} move distance is over threshold {move_threshold}."
+                                    f"box {over_distance_ids} move distance is over threshold {x_move_threshold} mm, {y_move_threshold = } mm."
                                 )
 
                                 # 保存位移的图片
@@ -964,7 +967,7 @@ def main() -> None:
                             else:
                                 # ✅️✅️✅️ 所有 box 移动距离都小于阈值 ✅️✅️✅️
                                 logger.success(
-                                    f"All box move distance is under threshold {move_threshold}."
+                                    "All box move distance is under threshold."
                                 )
                                 # 正常数据消息
                                 send_msg = {

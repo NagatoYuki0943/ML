@@ -123,7 +123,6 @@ def config_setter(message, send_queue):
     """根据命令中携带的配置参数修改配置"""
     cmd = "setconfig"
     msgid = message.get("msgid", "unknown")
-    success = True
     failed_keys = []
     map = config_map()
     # 根据key来选择配置的参数
@@ -133,41 +132,39 @@ def config_setter(message, send_queue):
             # 检查配置项是否存在于设备中
             if key not in map:
                 failed_keys.append(f"{key} is not a valid key")
-                success = False
                 continue
             # 获取当前配置
-            config = map[key]
-            config_class, config_attr = config
+            config_class = map[key]
             # 根据key做特殊处理
-            if key == "camera0_reference_target" or key == "camera1_reference_target":
+            if key == "camera0_reference_target_id2offset" or key == "camera1_reference_target_id2offset":
                 if not isinstance(value, dict):
                     failed_keys.append(f"{key} must be a dictionary")
-                    success = False
+                # 使用迭代器直接获取第一个值
+                target_key, target_val = next(iter(value.items()))
+                if not isinstance(target_val, list) or len(target_val) != 2:
+                    failed_keys.append(f"{key}'s value must be a list of 2 floats")
                     continue
                 try:
-                    # 将Key转换为int类型
-                    key_int = int(list(value.keys())[0])
-                    val = list(value.values())[0]
-                    value = [key_int, val]
-                    logger.success(value)
+                    # target_id转换为int类型
+                    target_key_int = int(target_key)
                 except ValueError:
                     failed_keys.append(f"{key} keys must be convertible to int")
-                    success = False
                     continue
-                setattr(config_class, config_attr, value)
+                value = [target_key_int, target_val]
+                config_class.setattr(key, value)
+                continue
             # 当前配置中的值
-            current_value = getattr(config_class, config_attr)
+            current_value = config_class.getattr(key)
             # 处理配置中默认为tuple类型的参数
             if isinstance(current_value, tuple):
                 if not isinstance(value, (list, tuple)) or len(value) != len(current_value):
                     failed_keys.append(f"{key} must be a tuple with {len(current_value)} values")
-                    success = False
                     continue
-                setattr(config_class, config_attr, tuple(value))
+                config_class.setattr(key, tuple(value))
                 continue
             # 设置普通类型参数
-            setattr(config_class, config_attr, value)
-        if success:
+            config_class.setattr(key, value)
+        if not failed_keys:
             create_message(cmd, {"code":200,"msg":f"{cmd} succeed",
             "at":get_current_time(), "did":MQTTConfig.getattr('did')}, msgid, send_queue)
         else:
@@ -185,9 +182,8 @@ def config_getter(message, send_queue):
         # 存储配置项和值
         config_body = {}
         # 遍历配置映射，获取每个配置项的当前值
-        for key, config in config_map().items():
-            config_class, config_attr = config
-            value = getattr(config_class, config_attr)
+        for key, config_class in config_map().items():
+            value = config_class.getattr(key)
             if isinstance(value, tuple):
                 config_body[key] = list(value)
             else:
@@ -239,19 +235,21 @@ def create_message(cmd, body, msgid, send_queue):
     send_queue.put(reply)
 
 def get_current_time():
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return time.strftime("%Y-%m-%d %H:%M:%S")
 
 def config_map():
     """设备中需要修改或查询的配置项"""
     return {
-        'displacement_threshold': (RingsLocationConfig, 'move_threshold'),  # 告警位移阈值
-        'target_number': (MatchTemplateConfig, 'target_number'), # 靶标数量
-        'target_size': (MatchTemplateConfig, 'template_size'),  # 靶标尺寸
-        'camera0_reference_target': (RingsLocationConfig, 'camera0_reference_target_id2offset'), # 参考靶标
-        'camera1_reference_target': (RingsLocationConfig, 'camera1_reference_target_id2offset'), # 参考靶标
-        'data_report_interval': (MainConfig, 'cycle_time_interval'), # 上报数据时间间隔
-        'capture_interval': (CameraConfig, 'capture_time_interval'), # 拍照时间间隔
-        'did': (MQTTConfig, 'did'), # divece id
-        'max_target_number': (MatchTemplateConfig, 'max_target_number'),  # 最大支持靶标个数
-        'log_level': (MainConfig, 'log_level') # 日志等级
+        'x_move_threshold': RingsLocationConfig,  # X轴位移告警阈值
+        'y_move_threshold': RingsLocationConfig,  # X轴位移告警阈值
+        'z_move_threshold': RingsLocationConfig,  # X轴位移告警阈值
+        'target_number': MatchTemplateConfig, # 靶标数量
+        'template_size': MatchTemplateConfig,  # 靶标尺寸
+        'camera0_reference_target_id2offset': RingsLocationConfig, # 参考靶标
+        'camera1_reference_target_id2offset': RingsLocationConfig, # 参考靶标
+        'cycle_time_interval': MainConfig, # 上报数据时间间隔
+        'capture_time_interval': CameraConfig, # 拍照时间间隔
+        'did': MQTTConfig, # divece id
+        'max_target_number': MatchTemplateConfig, # 最大支持靶标个数
+        'log_level': MainConfig, # 日志等级
     }

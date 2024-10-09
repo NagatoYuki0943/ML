@@ -12,7 +12,7 @@ from config import MatchTemplateConfig
 
 
 def find_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
-    logger.info(f"{camera_index = } find target start")
+    logger.info(f"camera {camera_index} find target start")
     # 匹配参数
     template_path: Path = MatchTemplateConfig.getattr("template_path")
     match_method: int = MatchTemplateConfig.getattr("match_method")
@@ -46,7 +46,7 @@ def find_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
     )
     # 没有找到任何目标
     if len(ratios) == 0:
-        logger.warning(f"{camera_index = } can not find any target")
+        logger.warning(f"camera {camera_index} can not find any target")
         if camera_index == 0:
             MatchTemplateConfig.setattr("camera0_id2boxstate", None)
             MatchTemplateConfig.setattr("camera0_got_target_number", 0)
@@ -87,29 +87,29 @@ def find_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
 
     if got_target_number < target_number:
         logger.warning(
-            f"{camera_index = } find target number: {got_target_number} less than target number: {target_number}"
+            f"camera {camera_index} find target number: {got_target_number} less than target number: {target_number}"
         )
     elif got_target_number > target_number:
         logger.warning(
-            f"{camera_index = } find target number: {got_target_number} more than target number: {got_target_number}"
+            f"camera {camera_index} find target number: {got_target_number} more than target number: {got_target_number}"
         )
         if target_number == 0:
             logger.warning(
-                f"{camera_index = } target_number is 0, use got_target_number: {got_target_number} as target_number"
+                f"camera {camera_index} target_number is 0, use got_target_number: {got_target_number} as target_number"
             )
             MatchTemplateConfig.setattr("target_number", got_target_number)
     else:
         logger.success(
-            f"{camera_index = } find target number {got_target_number} == set target number {target_number}"
+            f"camera {camera_index} find target number {got_target_number} == set target number {target_number}"
         )
 
-    logger.info(f"{camera_index = } find target end")
+    logger.info(f"camera {camera_index} find target end")
     return id2boxstate, got_target_number
 
 
 # 在原来box周围扩大范围搜寻
 def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
-    logger.info(f"{camera_index = } find around target start")
+    logger.info(f"camera {camera_index} find around target start")
     # 匹配参数
     template_path: Path = MatchTemplateConfig.getattr("template_path")
     match_method: int = MatchTemplateConfig.getattr("match_method")
@@ -138,7 +138,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
 
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
-        logger.warning(f"{camera_index = } id2boxstate is None, use find_target")
+        logger.warning(f"camera {camera_index} id2boxstate is None, use find_target")
         return find_target(image, camera_index)
 
     image_h, image_w = image.shape[:2]
@@ -172,7 +172,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
             )
             ratios = (ratio * new_scales).tolist()
             logger.info(
-                f"{camera_index = } find around target {i = } original ratio is None, use {ratios = } to search"
+                f"camera {camera_index} find around target {i = } original ratio is None, use {ratios = } to search"
             )
         else:
             ratios = [ratio]
@@ -220,11 +220,11 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
                 "box": new_box,
             }
             logger.info(
-                f"{camera_index = } original target {i}, {new_ratio = }, {new_score = }, {new_box = } is ok"
+                f"camera {camera_index} original target {i}, {new_ratio = }, {new_score = }, {new_box = } is ok"
             )
         else:
             logger.warning(
-                f"{camera_index = } original target {i}, {ratio = }, {score = }, {box = } not found, dilate search range"
+                f"camera {camera_index} original target {i}, {ratio = }, {score = }, {box = } not found, dilate search range"
             )
             # 没有找到目标,扩大匹配区域
             box_h = box_y2 - box_y1
@@ -277,7 +277,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
                     "box": new_box,
                 }
                 logger.info(
-                    f"{camera_index = } original target {i}, {ratio = }, {score = }, {box = } not found, but found in dilate range, {new_ratio = }, {new_box = }"
+                    f"camera {camera_index} original target {i}, {ratio = }, {score = }, {box = } not found, but found in dilate range, {new_ratio = }, {new_box = }"
                 )
             else:
                 # 没有找到目标
@@ -287,7 +287,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
                     "box": None,
                 }
                 logger.warning(
-                    f"{camera_index = } in dilate range, original target {i}, {ratio = }, {score = }, {box = } not found"
+                    f"camera {camera_index} in dilate range, original target {i}, {ratio = }, {score = }, {box = } not found"
                 )
 
     # 如果检测不到全部的 box, 则不设置全局变量
@@ -295,7 +295,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
         (True if boxestate["box"] is None else False)
         for boxestate in new_id2boxstate.values()
     ):
-        logger.warning(f"{camera_index = } find around target failed, no target found")
+        logger.warning(f"camera {camera_index} find around target failed, no target found")
 
     got_target_number = len(
         [
@@ -316,25 +316,25 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
 
     if got_target_number < target_number:
         logger.error(
-            f"{camera_index = } find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}"
+            f"camera {camera_index} find target number less than target number, got_target_number: {got_target_number}, target_number: {target_number}"
         )
     elif got_target_number > target_number:
         logger.warning(
-            f"{camera_index = } find target number more than target number, got_target_number: {got_target_number}, target_number: {target_number}, please update config"
+            f"camera {camera_index} find target number more than target number, got_target_number: {got_target_number}, target_number: {target_number}, please update config"
         )
     else:
         logger.success(
-            f"{camera_index = } find target number {got_target_number} = set target number {target_number}"
+            f"camera {camera_index} find target number {got_target_number} = set target number {target_number}"
         )
 
-    logger.info(f"{camera_index = } find around target end")
+    logger.info(f"camera {camera_index} find around target end")
 
     return new_id2boxstate, got_target_number
 
 
 # 全局查找丢失的box，屏蔽已知的box
 def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, int]:
-    logger.info(f"{camera_index = } find lost target start")
+    logger.info(f"camera {camera_index} find lost target start")
     # 匹配参数
     template_path: Path = MatchTemplateConfig.getattr("template_path")
     match_method: int = MatchTemplateConfig.getattr("match_method")
@@ -373,7 +373,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
 
     # 如果没有目标，则直接全图查找
     if id2boxstate is None:
-        logger.warning(f"{camera_index = } id2boxstate is None, use find_target")
+        logger.warning(f"camera {camera_index} id2boxstate is None, use find_target")
         return find_target(image, camera_index)
 
     _image = image.copy()
@@ -389,13 +389,13 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
         _image[box_y1:box_y2, box_x1:box_x2] = np.random.randint(
             0, 256, (box_y2 - box_y1, box_x2 - box_x1)
         )
-    logger.warning(f"{camera_index = } find lost target, loss_ids: {loss_ids}")
+    logger.warning(f"camera {camera_index} find lost target, loss_ids: {loss_ids}")
 
     # 查找丢失的目标
     loss_target_number = len(loss_ids)
     if loss_target_number <= 0:
         logger.warning(
-            f"{camera_index = } no need to find lost target, return original id2boxstate, set target_number to got_target_number"
+            f"camera {camera_index} no need to find lost target, return original id2boxstate, set target_number to got_target_number"
         )
         MatchTemplateConfig.setattr("target_number", got_target_number)
         return id2boxstate, got_target_number
@@ -417,7 +417,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
     )
     # 如果没有检测到任何丢失的目标，就不会修改原始值
     if len(ratios) == 0:
-        logger.warning(f"{camera_index = } find lost target failed, no target found")
+        logger.warning(f"camera {camera_index} find lost target failed, no target found")
         got_target_number = len(
             [
                 boxestate
@@ -435,11 +435,11 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
 
     if len(sorted_ratios) < len(loss_ids):
         logger.error(
-            f"{camera_index = } find lost target number less than loss target number, find_lost_target_number: {len(sorted_ratios)}, loss_target_number: {len(loss_ids)}"
+            f"camera {camera_index} find lost target number less than loss target number, find_lost_target_number: {len(sorted_ratios)}, loss_target_number: {len(loss_ids)}"
         )
     else:
         logger.success(
-            f"{camera_index = } find_lost_target_number {len(sorted_ratios)} = loss_target_number {len(loss_ids)}"
+            f"camera {camera_index} find_lost_target_number {len(sorted_ratios)} = loss_target_number {len(loss_ids)}"
         )
 
     for i, (ratio, score, box) in enumerate(
@@ -450,7 +450,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
             "score": float(score),
             "box": box.tolist(),
         }
-        logger.info(f"{camera_index = } find lost target {loss_ids[i]}, {ratio = }, {score = }, {box = }")
+        logger.info(f"camera {camera_index} find lost target {loss_ids[i]}, {ratio = }, {score = }, {box = }")
 
     got_target_number = len(
         [
@@ -469,6 +469,6 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
     else:
         raise ValueError(f"camera_index should be 0 or 1, but got {camera_index}")
 
-    logger.info(f"{camera_index = } find lost target end")
+    logger.info(f"camera {camera_index} find lost target end")
 
     return id2boxstate, got_target_number

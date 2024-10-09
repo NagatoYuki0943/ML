@@ -204,16 +204,16 @@ save_config_to_yaml(config_path=original_config_path)
 init_config_from_yaml(config_path=runtime_config_path)
 logger.success("init config success")
 
-# 上一个周期的结果(原因是 camera0_cycle_results 每个周期最后都会被清空)
-camera0_last_cycle_results = None
+# 周期结果
+camera0_cycle_results = {}
 # 是否需要发送部署信息
 need_send_device_deploying_msg = False
 # 是否需要发送靶标校正响应消息
 need_send_target_correction_msg = False
 # 是否需要发送删除靶标响应消息
-need_send_remove_target_msg = False
+need_send_delete_target_msg = False
 # 是否需要发送添加靶标响应消息
-need_send_add_target_msg = False
+need_send_set_target_msg = False
 # 是否需要发送获取状态信息
 need_send_get_status_msg = False
 # 是否收到温控回复命令
@@ -229,7 +229,7 @@ logger.success("init end")
 
 
 def main() -> None:
-    global camera0_last_cycle_results
+    global camera0_cycle_results
 
     # ------------------------------ 调整曝光 ------------------------------ #
     try:
@@ -341,8 +341,7 @@ def main() -> None:
     # 每个周期的间隔时间
     cycle_time_interval: int = MainConfig.getattr("cycle_time_interval")
     cycle_before_time = time.time()
-    # 一个周期内的结果
-    camera0_cycle_results = {}
+
     # 是否使用补光灯
     use_flash = False
     adjust_led_level_param = (
@@ -369,6 +368,10 @@ def main() -> None:
             # 每个周期的第一次循环
             if cycle_loop_count == -1:
                 logger.success("The cycle is started.")
+
+                # 周期结果重置
+                camera0_cycle_results = {}
+
                 # -------------------- 调整全图曝光 -------------------- #
                 logger.info("full image0 ajust exposure start")
 
@@ -448,7 +451,9 @@ def main() -> None:
                     # -------------------- 畸变矫正 -------------------- #
 
                     # -------------------- 小区域模板匹配 -------------------- #
-                    _, camera0_got_target_number = find_around_target(rectified_image0, 0)
+                    _, camera0_got_target_number = find_around_target(
+                        rectified_image0, 0
+                    )
                     if camera0_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
                         logger.warning(
@@ -682,9 +687,7 @@ def main() -> None:
                                 logger.warning(
                                     "no box found in camera0_cycle_centers, can't init camera0_standard_results."
                                 )
-                            elif any(
-                                v is None for v in camera0_cycle_centers.values()
-                            ):
+                            elif any(v is None for v in camera0_cycle_centers.values()):
                                 logger.warning(
                                     "some box not found in camera0_cycle_centers, can't init camera0_standard_results."
                                 )
@@ -1006,7 +1009,10 @@ def main() -> None:
                         )
 
                         # 丢失目标
-                        if target_number > camera0_got_target_number or target_number == 0:
+                        if (
+                            target_number > camera0_got_target_number
+                            or target_number == 0
+                        ):
                             logger.warning(
                                 f"The target number {target_number} is not enough, got {camera0_got_target_number} targets, start to find lost target."
                             )
@@ -1098,10 +1104,6 @@ def main() -> None:
                         # ------------------------- 检查是否丢失目标 ------------------------- #
 
                         # ------------------------- 结束周期 ------------------------- #
-                        # 保存当前周期的结果
-                        camera0_last_cycle_results = camera0_cycle_results
-                        # 重置周期内结果
-                        camera0_cycle_results = {}
                         # 重置周期内循环计数
                         cycle_loop_count = -1
 
@@ -1164,11 +1166,11 @@ class Receive:
         elif cmd == "targetcorrection":
             Receive.receive_target_correction_msg(received_msg)
 
-        elif cmd == "removetarget":
-            Receive.receive_remove_target_msg(received_msg)
+        elif cmd == "deletetarget":
+            Receive.receive_delete_target_msg(received_msg)
 
-        elif cmd == "addtarget":
-            Receive.receive_add_target_msg(received_msg)
+        elif cmd == "settarget":
+            Receive.receive_set_target_msg(received_msg)
 
         # 参考靶标设定消息
         elif cmd == "setreferencetarget":
@@ -1222,25 +1224,25 @@ class Receive:
         #     "msgid":"bb6f3eeb2",
         # }
         global need_send_device_deploying_msg
-        global camera0_last_cycle_results
+        global camera0_cycle_results
 
         logger.info("device deploying, reset config and init target")
         # 设备部署，重置配置和初始靶标
         load_config_from_yaml(config_path=original_config_path)
         RingsLocationConfig.setattr("camera0_standard_results", None)
-        # 重设上次的结果(用于发送新的消息)
-        camera0_last_cycle_results = None
+        # 重设检测的结果(用于发送新的消息)
+        camera0_cycle_results = {}
         # 需要发送部署相应消息
         need_send_device_deploying_msg = True
         logger.success(
-            "device deploying success, reset config and init target, reset camera0_last_cycle_results"
+            "device deploying success, reset config and init target, reset camera0_cycle_results"
         )
 
     @staticmethod
     def receive_target_correction_msg(received_msg: dict | None = None):
         """靶标校正消息"""
         global need_send_target_correction_msg
-        global camera0_last_cycle_results
+        global camera0_cycle_results
 
         # {
         #     "cmd":"targetcorrection",
@@ -1278,7 +1280,7 @@ class Receive:
                 logger.info(
                     f"remove box {remove_box_id}, boxstate: {camera0_id2boxstate[remove_box_id]}"
                 )
-                camera0_id2boxstate.pop(remove_box_id, None)
+                camera0_id2boxstate.pop(remove_box_id)
             else:
                 logger.warning(f"box {remove_box_id} not found in camera0_id2boxstate.")
 
@@ -1328,26 +1330,26 @@ class Receive:
         # 因为重设了靶标，所以需要重新初始化标准靶标
         RingsLocationConfig.setattr("camera0_standard_results", None)
 
-        # 重设上次的结果(用于发送新的消息)
-        camera0_last_cycle_results = None
+        # 重设检测的结果(用于发送新的消息)
+        camera0_cycle_results = {}
         # 需要发送靶标校正响应消息
         need_send_target_correction_msg = True
 
         logger.success("target correction success")
 
     @staticmethod
-    def receive_remove_target_msg(received_msg: dict | None = None):
+    def receive_delete_target_msg(received_msg: dict | None = None):
         """删除靶标消息"""
-        global need_send_remove_target_msg
-        global camera0_last_cycle_results
+        global need_send_delete_target_msg
+        global camera0_cycle_results
         # {
-        #     "cmd": "removetarget",
+        #     "cmd": "deletetarget",
         #     "msgid": "bb6f3eeb2",
         #     "body": {
         #         "remove_box_ids": ["L1_SJ_3", "L1_SJ_4"]
         #     }
         # }
-        logger.info("remove target")
+        logger.info("delete target")
         # camera0_id2boxstate: {
         #     i: {
         #         "ratio": ratio,
@@ -1376,10 +1378,10 @@ class Receive:
                 camera0_id2boxstate is not None
                 and remove_box_id in camera0_id2boxstate.keys()
             ):
-                camera0_id2boxstate.pop(remove_box_id, None)
                 logger.info(
                     f"remove box {remove_box_id}, boxstate: {camera0_id2boxstate[remove_box_id]}"
                 )
+                camera0_id2boxstate.pop(remove_box_id)
             else:
                 logger.warning(
                     f"box {remove_box_id} not found in camera0_id2boxstate or camera0_id2boxstate is None."
@@ -1389,11 +1391,11 @@ class Receive:
                 camera0_standard_results is not None
                 and remove_box_id in camera0_standard_results.keys()
             ):
-                # 因为重设了靶标，所以需要删除部分初始化标准靶标
-                camera0_standard_results.pop(remove_box_id, None)
                 logger.info(
                     f"remove box {remove_box_id}, camera0_standard_results: {camera0_standard_results[remove_box_id]}"
                 )
+                # 因为重设了靶标，所以需要删除部分初始化标准靶标
+                camera0_standard_results.pop(remove_box_id)
             else:
                 logger.warning(
                     f"box {remove_box_id} not found in camera0_standard_results or camera0_standard_results is None."
@@ -1425,20 +1427,20 @@ class Receive:
                     f"reference target {reference_target_id} is removed, reset camera0_reference_target_id2offset."
                 )
 
-        # 重设上次的结果(用于发送新的消息)
-        camera0_last_cycle_results = None
+        # 重设检测的结果(用于发送新的消息)
+        camera0_cycle_results = {}
         # 需要发送删除靶标响应消息
-        need_send_remove_target_msg = True
+        need_send_delete_target_msg = True
 
-        logger.success("remove target success")
+        logger.success("delete target success")
 
     @staticmethod
-    def receive_add_target_msg(received_msg: dict | None = None):
+    def receive_set_target_msg(received_msg: dict | None = None):
         """添加靶标消息"""
-        global need_send_add_target_msg
-        global camera0_last_cycle_results
+        global need_send_set_target_msg
+        global camera0_cycle_results
         # {
-        #     "cmd": "addtarget",
+        #     "cmd": "settarget",
         #     "msgid": "bb6f3eeb2",
         #     "body": {
         #         "add_boxes":{
@@ -1447,7 +1449,7 @@ class Receive:
         #         }
         #     }
         # }
-        logger.info("add target")
+        logger.info("set target")
         # camera0_id2boxstate: {
         #     i: {
         #         "ratio": ratio,
@@ -1519,12 +1521,12 @@ class Receive:
             "camera0_standard_results", camera0_standard_results
         )
 
-        # 重设上次的结果(用于发送新的消息)
-        camera0_last_cycle_results = None
+        # 重设检测的结果(用于发送新的消息)
+        camera0_cycle_results = {}
         # 需要发送添加靶标响应消息
-        need_send_add_target_msg = True
+        need_send_set_target_msg = True
 
-        logger.success("add target success")
+        logger.success("set target success")
 
     @staticmethod
     def receive_set_reference_target_msg(received_msg: dict | None = None):
@@ -1821,12 +1823,12 @@ class Send:
             Send.send_target_correction_msg()
 
         # 发送删除靶标响应消息
-        if need_send_remove_target_msg:
-            Send.send_remove_target_msg()
+        if need_send_delete_target_msg:
+            Send.send_delete_target_msg()
 
         # 发送添加靶标响应消息
-        if need_send_add_target_msg:
-            Send.send_add_target_msg()
+        if need_send_set_target_msg:
+            Send.send_set_target_msg()
 
         # 设备状态查询响应消息
         if need_send_get_status_msg:
@@ -1897,9 +1899,9 @@ class Send:
 
         logger.info("send device deploying msg")
 
-        if camera0_last_cycle_results is None:
+        if not camera0_cycle_results:
             logger.warning(
-                "camera0_last_cycle_results is None, can't send device deploying msg, wait for next cycle."
+                "camera0_cycle_results is empty, can't send device deploying msg, wait for next cycle."
             )
             return
 
@@ -1913,7 +1915,7 @@ class Send:
             image_path = None
             get_picture_timeout_process()
 
-        _data = Send.get_xyz(camera0_last_cycle_results)
+        _data = Send.get_xyz(camera0_cycle_results)
 
         send_msg = {
             "cmd": "devicedeploying",
@@ -1948,13 +1950,13 @@ class Send:
 
         logger.info("send target correction msg")
 
-        if camera0_last_cycle_results is None:
+        if not camera0_cycle_results:
             logger.warning(
-                "camera0_last_cycle_results is None, can't send target correction msg, wait for next cycle."
+                "camera0_cycle_results is empty, can't send target correction msg, wait for next cycle."
             )
             return
 
-        _data = Send.get_xyz(camera0_last_cycle_results)
+        _data = Send.get_xyz(camera0_cycle_results)
 
         # 靶标校正响应消息
         send_msg = {
@@ -1978,38 +1980,38 @@ class Send:
         logger.success("target correction success")
 
     @staticmethod
-    def send_remove_target_msg():
+    def send_delete_target_msg():
         """发送删除靶标响应消息"""
-        global need_send_remove_target_msg
+        global need_send_delete_target_msg
 
-        logger.info("send remove target msg")
+        logger.info("send delete target msg")
 
-        if camera0_last_cycle_results is None:
+        if not camera0_cycle_results:
             logger.warning(
-                "camera0_last_cycle_results is None, can't send remove target msg, wait for next cycle."
+                "camera0_cycle_results is mepty, can't send delete target msg, wait for next cycle."
             )
             return
 
         try:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
-            image_path = save_dir / "remove_target.jpg"
+            image_path = save_dir / "delete_target.jpg"
             save_image(image0, image_path)
-            logger.info(f"save `remove target` success, save image to {image_path}")
+            logger.info(f"save `delete target` success, save image to {image_path}")
         except queue.Empty:
             image_path = None
             get_picture_timeout_process()
 
-        _data = Send.get_xyz(camera0_last_cycle_results)
+        _data = Send.get_xyz(camera0_cycle_results)
 
         # 删除靶标响应消息
         send_msg = {
-            "cmd": "removetarget",
+            "cmd": "deletetarget",
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),
                 "at": get_now_time(),
-                "msg": "remove target succeed",
+                "msg": "delete target succeed",
                 "data": _data,
                 # "data": {
                 #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
@@ -2019,49 +2021,49 @@ class Send:
                 "path": str(image_path)
                 if image_path is not None
                 else "",  # 图片本地路径
-                "img": "remove_target.jpg"
+                "img": "delete_target.jpg"
                 if image_path is not None
                 else "",  # 文件名称
             },
             "msgid": "bb6f3eeb2",
         }
         mqtt_send_queue.put(send_msg)
-        need_send_remove_target_msg = False
-        logger.success("send remove target msg success")
+        need_send_delete_target_msg = False
+        logger.success("send delete target msg success")
 
     @staticmethod
-    def send_add_target_msg():
+    def send_set_target_msg():
         """发送添加靶标响应消息"""
-        global need_send_add_target_msg
+        global need_send_set_target_msg
 
-        logger.info("send add target msg")
+        logger.info("send set target msg")
 
-        if camera0_last_cycle_results is None:
+        if not camera0_cycle_results:
             logger.warning(
-                "camera0_last_cycle_results is None, can't send add target msg, wait for next cycle."
+                "camera0_cycle_results is empty, can't send set target msg, wait for next cycle."
             )
             return
 
         try:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
-            image_path = save_dir / "add_target.jpg"
+            image_path = save_dir / "set_target.jpg"
             save_image(image0, image_path)
-            logger.info(f"save `add target` success, save image to {image_path}")
+            logger.info(f"save `set target` success, save image to {image_path}")
         except queue.Empty:
             image_path = None
             get_picture_timeout_process()
 
-        _data = Send.get_xyz(camera0_last_cycle_results)
+        _data = Send.get_xyz(camera0_cycle_results)
 
         # 添加靶标响应消息
         send_msg = {
-            "cmd": "addtarget",
+            "cmd": "settarget",
             "body": {
                 "code": 200,
                 "did": MQTTConfig.getattr("did"),
                 "at": get_now_time(),
-                "msg": "add target succeed",
+                "msg": "set target succeed",
                 "data": _data,
                 # "data": {
                 #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
@@ -2071,13 +2073,13 @@ class Send:
                 "path": str(image_path)
                 if image_path is not None
                 else "",  # 图片本地路径
-                "img": "add_target.jpg" if image_path is not None else "",  # 文件名称
+                "img": "set_target.jpg" if image_path is not None else "",  # 文件名称
             },
             "msgid": "bb6f3eeb2",
         }
         mqtt_send_queue.put(send_msg)
-        need_send_add_target_msg = False
-        logger.success("send add target msg success")
+        need_send_set_target_msg = False
+        logger.success("send set target msg success")
 
     @staticmethod
     def send_getstatus_msg():
@@ -2085,7 +2087,7 @@ class Send:
         global need_send_get_status_msg
 
         logger.info("send getstatus msg")
-        # camera0_last_cycle_results: {
+        # camera0_cycle_results: {
         #     "0": {
         #         "image_timestamp": "image--20240927-105451.193949--0",
         #         "box": [1808, 1034, 1906, 1132],
@@ -2110,13 +2112,10 @@ class Send:
             "camera0_standard_results"
         )
         box_sensor_state = {}
-        if (
-            camera0_standard_results is not None
-            and camera0_last_cycle_results is not None
-        ):
+        if camera0_standard_results and camera0_cycle_results:
             for k in camera0_standard_results.keys():
-                if k in camera0_last_cycle_results.keys():
-                    v = camera0_last_cycle_results[k]
+                if k in camera0_cycle_results.keys():
+                    v = camera0_cycle_results[k]
                     if v["box"] is not None and v["center"] is not None:
                         box_sensor_state[f"L1_SJ_{k+1}"] = 0
                     else:
@@ -2125,7 +2124,7 @@ class Send:
                     box_sensor_state[f"L1_SJ_{k+1}"] = -2
         else:
             logger.warning(
-                "camera0_last_cycle_results or camera0_standard_results is None, wait for next cycle"
+                "camera0_cycle_results or camera0_standard_results is None, wait for next cycle"
             )
             return
 

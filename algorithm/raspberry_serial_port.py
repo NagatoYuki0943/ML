@@ -123,8 +123,7 @@ class RaspberrySerialPort:
 
         # 合并参数为字典
         result['times'] = time
-        camera = "1" if self.port == "/dev/ttyAMA1" else "2"
-        result['camera'] = camera
+        result['camera'] = "1"
 
         # 转为JSON串
         return result

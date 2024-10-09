@@ -52,23 +52,24 @@ def mqtt_send(
             time.sleep(1)
         body = message.get("body", {})
         cmd = message.get("cmd")
-        if body:
-            try:
-                if "img" in body:
-                    timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "").replace(" ", "")
-                    ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
-                    ftp.upload_file(body['path'], body['img'], ftpurl)
-                    message['body'].pop('path')
-                    message['body']['ftpurl'] = ftpurl
-                elif "config" in body:
-                    timestamp = body['at'].replace("T", "").replace("Z", "").replace("-", "").replace(":", "")
-                    ftpurl = f"{FTPConfig.getattr('config_base_url')}/{cmd}/{timestamp}"
-                    ftp.upload_file(body['path'], body['config'], ftpurl)
-                    message['body'].pop('path')
-                    message['body']['ftpurl'] = ftpurl
-            except Exception as e:
-                message['body']['code'] = 400
-                message['body']['msg'] = f"{cmd} uploads faild: {e}"
+        try:
+            if "img" in body:
+                timestamp = body['at'].replace("-", "").replace(":", "").replace(" ", "")
+                ftpurl = f"{FTPConfig.getattr('image_base_url')}/{cmd}/{timestamp}"
+                ftp.upload_file(body['path'], body['img'], ftpurl)
+                message['body'].pop('path')
+                message['body']['ftpurl'] = ftpurl
+            elif "config" in body:
+                timestamp = body['at'].replace(" ", "").replace("-", "").replace(":", "")
+                ftpurl = f"{FTPConfig.getattr('config_base_url')}/{cmd}/{timestamp}"
+                ftp.upload_file(body['path'], body['config'], ftpurl)
+                message['body'].pop('path')
+                message['body']['ftpurl'] = ftpurl
+        except Exception as e:
+            message['body']['code'] = 400
+            message['body']['msg'] = f"{cmd} uploads faild: {e}"
+            message['body'].pop('path')
+            message['body']['ftpurl'] = ftpurl
         topic, payload = client.merge_message(message)
         client.publish(topic, payload)
 

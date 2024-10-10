@@ -1647,6 +1647,7 @@ class Send:
         # }
         data = {
             f"L1_SJ_{k+1}": {
+                "box": v["box"],
                 "X": v["center"][0],
                 "Y": v["center"][1],
                 "Z": v["distance"],
@@ -1692,9 +1693,9 @@ class Send:
                 "sw_version": "230704180",  # 版本号
                 "data": _data,
                 # "data": { # 靶标初始位置
-                #     "L1_SJ_1": {"X": 19.01, "Y": 18.31, "Z":10.8},
-                #     "L1_SJ_2": {"X": 4.09, "Y": 8.92, "Z":6.7},
-                #     "L1_SJ_3": {"X": 2.02, "Y": 5.09, "Z":14.6}
+                #     "L1_SJ_1": {"box": [x1, y1, x2, y2], "X": 19.01, "Y": 18.31, "Z": 10.8},
+                #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
+                #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
                 "path": [
                     str(image_path) if image_path is not None else ""
@@ -1731,10 +1732,10 @@ class Send:
                 "at": get_now_time(),
                 "msg": "correction succeed",
                 "data": _data,
-                # "data": {
-                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
-                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
-                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
+                # "data": { # 靶标初始位置
+                #     "L1_SJ_1": {"box": [x1, y1, x2, y2], "X": 19.01, "Y": 18.31, "Z": 10.8},
+                #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
+                #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
             },
             "msgid": "bb6f3eeb2",
@@ -1777,10 +1778,10 @@ class Send:
                 "at": get_now_time(),
                 "msg": "delete target succeed",
                 "data": _data,
-                # "data": {
-                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
-                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
-                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
+                # "data": { # 靶标初始位置
+                #     "L1_SJ_1": {"box": [x1, y1, x2, y2], "X": 19.01, "Y": 18.31, "Z": 10.8},
+                #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
+                #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
                 "path": str(image_path)
                 if image_path is not None
@@ -1829,10 +1830,10 @@ class Send:
                 "at": get_now_time(),
                 "msg": "set target succeed",
                 "data": _data,
-                # "data": {
-                #     "L1_SJ_1": {"X": 19.01, "Y":18.31, "Z":10.8},
-                #     "L1_SJ_2": {"X": 4.09, "Y":8.92, "Z":6.7},
-                #     "L1_SJ_3": {"X": 2.02, "Y":5.09, "Z":14.6}
+                # "data": { # 靶标初始位置
+                #     "L1_SJ_1": {"box": [x1, y1, x2, y2], "X": 19.01, "Y": 18.31, "Z": 10.8},
+                #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
+                #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
                 "path": str(image_path)
                 if image_path is not None

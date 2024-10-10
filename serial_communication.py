@@ -2,8 +2,15 @@ from queue import Queue
 import time
 from algorithm import RaspberrySerialPort
 from queue import Queue
-from datetime import datetime
 from loguru import logger
+from config import SerialCommConfig
+
+logger.add(
+    str(SerialCommConfig.getattr("temperature_data_save_path")),
+    rotation="00:00", 
+    filter=lambda record:record["extra"].get("name") == "temperature"
+)
+temperature_data_logger = logger.bind(name="temperature")
 
 # 接收线程
 def serial_receive(
@@ -17,6 +24,7 @@ def serial_receive(
             ser.message_reception()
             temperature_data = ser.subcontracting()
             if temperature_data is not None:
+                temperature_data_logger.info(temperature_data)
                 queue.put(temperature_data)
         time.sleep(0.1)
 
@@ -29,9 +37,15 @@ def serial_send(
 ):
     while True:
         command_data = queue.get()
+        temperature_data_logger.info(command_data)
         # 根据camera判断使用哪个串口
         if 'camera' in command_data:
-            ser = serial_ports[0] if command_data['camera'] == "1" else serial_ports[1]
+            if len(serial_ports) == 2:
+                ser = serial_ports[0] if command_data['camera'] == "0" else serial_ports[1]
+            else:
+                if command_data['camera'] == "1":
+                    continue
+                ser = serial_ports[0]
             command_message = ser.process_command(command_data)
             ser.message_sending(command_message)
         else:

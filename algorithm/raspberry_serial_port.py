@@ -3,19 +3,17 @@ import re
 from datetime import datetime
 import json
 from threading import Lock
-import os
 from loguru import logger
+from config import SerialCommConfig
 
 
 class RaspberrySerialPort:
     def __init__(
         self,
-        temperature_data_save_path: str = "/log/temperature_data.json",
         port: str = "/dev/ttyAMA2",
         baudrate: int = 115200,
         timeout: float = 0.0,
         BUFFER_SIZE: int = 2048,
-        LOG_SIZE: int = 1_000_000,
     ):
         """
         Args:
@@ -31,8 +29,6 @@ class RaspberrySerialPort:
         self.timeout = timeout
         self.buffer = ""
         self.BUFFER_SIZE = BUFFER_SIZE
-        self.temperature_data_save_path = temperature_data_save_path
-        self.LOG_SIZE = LOG_SIZE
         self.lock = Lock()
 
         # 预编译表达式
@@ -102,7 +98,7 @@ class RaspberrySerialPort:
             message (str): 一条完整的串口消息.
         """
         # 获取当前时间，表示此消息获取的时间
-        time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         result = {}
 
         cmd_match = self.cmd_pattern.search(message)
@@ -123,7 +119,7 @@ class RaspberrySerialPort:
 
         # 合并参数为字典
         result['times'] = time
-        result['camera'] = "1"
+        result['camera'] = "0" if self.port == SerialCommConfig.getattr("camera0_ser_port") else "1"
 
         # 转为JSON串
         return result
@@ -151,25 +147,4 @@ class RaspberrySerialPort:
         command_message = f"$cmd={cmd}&param{param_str}&msgid={msgid}"
         time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         command_data['times'] = time
-        self.save_temperature_data(command_data)
         return command_message
-    
-    def save_temperature_data(self, data):
-        """记录温度数据
-        
-        Args:
-            data (dict): 需要记录的数据
-        """
-        self.check_file_size()
-        with open(self.temperature_data_save_path, "a") as file:
-            json.dump(data, file)
-            file.write("\n")
-    
-    def check_file_size(self):
-        """检查温度数据记录文件大小"""
-        if os.path.exists(self.temperature_data_save_path):
-            if os.path.getsize(self.temperature_data_save_path) > self.LOG_SIZE:
-                with open(self.temperature_data_save_path, "w") as file:
-                    file.truncate(0)
-            else:
-                return

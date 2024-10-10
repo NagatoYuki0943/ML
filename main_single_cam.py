@@ -36,8 +36,7 @@ from adjust_camera import (
     adjust_exposure_full_res_for_loop,
     adjust_exposure_low_res_for_loop,  # 调整分辨率需要一段时间才能获取调整后的图片分辨率
 )
-from rings_location import rings_location
-from transform_result import transform_result
+from location_utils import rings_location, calc_move_distance
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import (
@@ -695,7 +694,7 @@ def main() -> None:
 
                             # 计算距离
                             camera0_distance_result, camera0_over_distance_ids = (
-                                transform_result(
+                                calc_move_distance(
                                     camera0_standard_results,
                                     camera0_cycle_results,
                                     camera0_reference_target_id2offset,

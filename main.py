@@ -105,16 +105,16 @@ def main() -> None:
     logger.info("开始初始化串口")
     serial_objects = []
 
-    for port in SerialCommConfig.getattr("ports"):
-        object = RaspberrySerialPort(
-            SerialCommConfig.getattr("temperature_data_save_path"),
-            port,
-            SerialCommConfig.getattr("baudrate"),
-            SerialCommConfig.getattr("timeout"),
-            SerialCommConfig.getattr("BUFFER_SIZE"),
-            SerialCommConfig.getattr("LOG_SIZE"),
-        )
-        serial_objects.append(object)
+    for port in [SerialCommConfig.getattr("camera0_ser_port"), SerialCommConfig.getattr("camera1_ser_port")]:
+        if port:
+            object = RaspberrySerialPort(
+                SerialCommConfig.getattr("temperature_data_save_path"),
+                port,
+                SerialCommConfig.getattr("baudrate"),
+                SerialCommConfig.getattr("timeout"),
+                SerialCommConfig.getattr("BUFFER_SIZE"),
+            )
+            serial_objects.append(object)
 
     serial_send_thread = ThreadWrapper(
         target_func=serial_send,

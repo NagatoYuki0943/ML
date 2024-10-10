@@ -17,12 +17,10 @@ class RaspberrySerialPort:
     ):
         """
         Args:
-            temperature_data_save_path: 温度数据记录文件路径. Defaults to "/log/temperature_data.json".
             port (str): 端口号. Defaults to "/dev/ttyAMA2".
             baudrate (int): 波特率. Defaults to 115200.
             timeout (float): 阻塞时间. Defaults to 0.0.
             BUFFER_SIZE(int): 消息缓冲区大小. Defaults to 2KB.
-            LOG_SIZE(int): 温度数据日志大小. Defaults to 1MB.
         """
         self.port = port
         self.baudrate = baudrate

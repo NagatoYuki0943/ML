@@ -220,14 +220,14 @@ class SerialCommConfig(BaseConfig):
     """串口通讯模块配置"""
 
     # 串口配置
-    ports: list[str] = "/dev/ttyAMA1", "/dev/ttyAMA4"
+    camera0_ser_port: str = "/dev/ttyAMA1"
+    camera1_ser_port: str = None
     baudrate: int = 115200
     BUFFER_SIZE: int = 2048
     timeout: float = 0
     log_dir: Path = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
-    temperature_data_save_path = log_dir / "temperature_data.json"
-    LOG_SIZE: int = 10_000_000  # 温度数据记录文件大小为10MB
+    temperature_data_save_path = log_dir / "temperature_data_{time}.log"
 
 
 @dataclass

@@ -36,7 +36,7 @@ from adjust_camera import (
     adjust_exposure_full_res_for_loop,
     adjust_exposure_low_res_for_loop,  # 调整分辨率需要一段时间才能获取调整后的图片分辨率
 )
-from location_utils import rings_location, calc_move_distance
+from location_utils import rings_location, init_standard_results, calc_move_distance
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import (
@@ -600,62 +600,24 @@ def main() -> None:
                         ):
                             # ---------- camera0_standard_results ---------- #
                             logger.info("try to init camera0_standard_results")
-                            camera0_cycle_centers = {
-                                k: result["center"]
-                                for k, result in camera0_cycle_results.items()
-                            }
-                            if len(camera0_cycle_centers) == 0:
-                                logger.warning(
-                                    "no box found in camera0_cycle_centers, can't init camera0_standard_results."
-                                )
-                            elif any(v is None for v in camera0_cycle_centers.values()):
-                                logger.warning(
-                                    "some center not found in camera0_cycle_centers, can't init camera0_standard_results."
-                                )
-                            else:
-                                if camera0_standard_results is None:
-                                    # 标准靶标为 None, 则初始化为 camera0_cycle_results
-                                    camera0_standard_results = camera0_cycle_results
-                                    logger.info(
-                                        f"init camera0_standard_results: {camera0_standard_results}"
-                                    )
-                                else:
-                                    # 标准靶标已经初始化，则更新
-                                    for n_k in camera0_cycle_results.keys():
-                                        if n_k not in camera0_standard_results.keys():
-                                            camera0_standard_results[n_k] = (
-                                                camera0_cycle_results[n_k]
-                                            )
+                            camera0_reference_target_id2offset: (
+                                dict[int, tuple[float, float]] | None
+                            ) = RingsLocationConfig.getattr(
+                                "camera0_reference_target_id2offset"
+                            )
 
-                                    # 更新参考靶标的标准位置
-                                    camera0_reference_target_id2offset: (
-                                        dict[int, tuple[float, float]] | None
-                                    ) = RingsLocationConfig.getattr(
-                                        "camera0_reference_target_id2offset"
-                                    )
-                                    if camera0_reference_target_id2offset is not None:
-                                        ref_id: int = list(
-                                            camera0_reference_target_id2offset.keys()
-                                        )[0]
-                                        if (
-                                            ref_id in camera0_standard_results.keys()
-                                            and ref_id in camera0_cycle_results.keys()
-                                        ):
-                                            camera0_standard_results[ref_id] = (
-                                                camera0_cycle_results[ref_id]
-                                            )
-                                            logger.info(
-                                                f"update reference target {ref_id}"
-                                            )
+                            # 初始化标准靶标
+                            camera0_standard_results = init_standard_results(
+                                camera0_cycle_results,
+                                camera0_standard_results,
+                                camera0_reference_target_id2offset,
+                            )
 
-                                    logger.info(
-                                        f"update camera0_standard_results: {camera0_standard_results}"
-                                    )
-
+                            if camera0_standard_results is not None:
                                 RingsLocationConfig.setattr(
                                     "camera0_standard_results", camera0_standard_results
                                 )
-
+                                # 发送初始坐标数据结果
                                 # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                                 logger.success("send init data message.")
                                 send_msg_data = {
@@ -686,6 +648,7 @@ def main() -> None:
                             logger.info(
                                 "try to compare camera0_standard_results and camera0_cycle_results"
                             )
+
                             camera0_reference_target_id2offset: (
                                 dict[int, tuple[float, float]] | None
                             ) = RingsLocationConfig.getattr(

@@ -257,7 +257,7 @@ def main() -> None:
 
     # ------------------------------ 找到目标 ------------------------------ #
     logger.info("find target start")
-    # -------------------- 取图 -------------------- #
+    # -------------------- camera0 -------------------- #
     try:
         _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
         logger.info(
@@ -326,10 +326,11 @@ def main() -> None:
         logger.success("find target end")
     except queue.Empty:
         get_picture_timeout_process()
+    # -------------------- camera0 -------------------- #
+    # ------------------------------ 找到目标 ------------------------------ #
 
     # 保存运行时配置
     save_config_to_yaml(config_path=runtime_config_path)
-    # ------------------------------ 找到目标 ------------------------------ #
 
     # -------------------- 初始化周期内变量 -------------------- #
     # 主循环
@@ -451,14 +452,16 @@ def main() -> None:
                     # -------------------- 畸变矫正 -------------------- #
 
                     # -------------------- 小区域模板匹配 -------------------- #
+                    # -------------------- camera0 -------------------- #
                     _, camera0_got_target_number = find_around_target(
                         rectified_image0, 0
                     )
                     if camera0_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
                         logger.warning(
-                            "find_around_target find no target found in the image0"
+                            "image0 find_around_target failed, can't find any target"
                         )
+                    # -------------------- camera0 -------------------- #
                     # -------------------- 小区域模板匹配 -------------------- #
 
                     # -------------------- 调整 box 曝光 -------------------- #
@@ -564,17 +567,17 @@ def main() -> None:
                         logger.info(
                             f"cycle_loop_count: {cycle_loop_count}, {exposure_time = }, {camera0_id2boxstate = }"
                         )
-                        for j, camera0_boxestate in camera0_id2boxstate.items():
-                            _box: list | None = camera0_boxestate["box"]
+                        for box_id, camera0_boxestate in camera0_id2boxstate.items():
+                            camera0_box: list | None = camera0_boxestate["box"]
                             try:
                                 # box 可能为 None, 使用 try except 处理
-                                x1, y1, x2, y2 = _box
+                                x1, y1, x2, y2 = camera0_box
                                 target = rectified_image0[y1:y2, x1:x2]
 
-                                logger.info(f"box {j} rings location start")
+                                logger.info(f"box {box_id} rings location start")
                                 result = adaptive_threshold_rings_location(
                                     target,
-                                    f"camera0--image--{image0_timestamp}--{j}",
+                                    f"camera0--image--{image0_timestamp}--{box_id}",
                                     iters,
                                     order,
                                     rings_nums,
@@ -591,15 +594,15 @@ def main() -> None:
                                 result["metadata"] = image0_metadata
                                 # 保存到文件
                                 save_to_jsonl(result, camera_result_save_path)
-                                logger.success(f"box {j} rings location success")
+                                logger.success(f"box {box_id} rings location success")
 
                                 center = [
-                                    float(result["center_x_mean"] + _box[0]),
-                                    float(result["center_y_mean"] + _box[1]),
+                                    float(result["center_x_mean"] + camera0_box[0]),
+                                    float(result["center_y_mean"] + camera0_box[1]),
                                 ]
                                 if np.any(np.isnan(center)):
                                     center = None
-                                    logger.warning(f"box {j} center is nan")
+                                    logger.warning(f"box {box_id} center is nan")
 
                                 radii: list[float] = [
                                     float(radius) for radius in result["radii"]
@@ -620,8 +623,8 @@ def main() -> None:
                                     )
 
                                 camera0_cycle_result = {
-                                    "image_timestamp": f"camera0--image--{image0_timestamp}--{j}",
-                                    "box": _box,
+                                    "image_timestamp": f"camera0--image--{image0_timestamp}--{box_id}",
+                                    "box": camera0_box,
                                     "center": center,
                                     "radii": radii,
                                     "distance": distance,
@@ -629,13 +632,13 @@ def main() -> None:
                                     "offset": [0, 0],
                                 }
                                 logger.info(f"{camera0_cycle_result = }")
-                                camera0_cycle_results[j] = camera0_cycle_result
+                                camera0_cycle_results[box_id] = camera0_cycle_result
                             except Exception as e:
                                 logger.error(e)
-                                logger.error(f"box {j} rings location failed")
+                                logger.error(f"box {box_id} rings location failed")
                                 camera0_cycle_result = {
-                                    "image_timestamp": f"camera0--image--{image0_timestamp}--{j}",
-                                    "box": _box,
+                                    "image_timestamp": f"camera0--image--{image0_timestamp}--{box_id}",
+                                    "box": camera0_box,
                                     "center": None,  # 丢失目标, 置为 None
                                     "radii": None,
                                     "distance": None,
@@ -643,7 +646,7 @@ def main() -> None:
                                     "offset": [0, 0],
                                 }
                                 logger.info(f"{camera0_cycle_result = }")
-                                camera0_cycle_results[j] = camera0_cycle_result
+                                camera0_cycle_results[box_id] = camera0_cycle_result
                     # -------------------- single box location -------------------- #
 
                     # ------------------------- 检测目标 ------------------------- #
@@ -673,11 +676,13 @@ def main() -> None:
                         camera0_standard_results: dict | None = (
                             RingsLocationConfig.getattr("camera0_standard_results")
                         )
+
+                        # 初始化标准结果
                         if (
                             camera0_standard_results is None
                             or len(camera0_standard_results) != target_number
                         ):
-                            # 初始化 camera0_standard_results
+                            # ---------- camera0_standard_results ---------- #
                             logger.info("try to init camera0_standard_results")
                             camera0_cycle_centers = {
                                 k: result["center"]
@@ -758,8 +763,10 @@ def main() -> None:
                                     "data": send_msg_data,
                                 }
                                 mqtt_send_queue.put(send_msg)
+
+                        # 比较标准靶标和新的靶标
                         else:
-                            # 比较标准靶标和新的靶标
+                            # ---------- camera0_standard_results ---------- #
                             logger.info(
                                 "try to compare camera0_standard_results and camera0_cycle_results"
                             )

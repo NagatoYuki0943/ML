@@ -10,12 +10,10 @@ import os
 
 from algorithm import (
     ThreadWrapper,
-    adaptive_threshold_rings_location,
     StereoCalibration,
     RaspberryMQTT,
     RaspberrySerialPort,
     sort_boxes_center,
-    pixel_num2object_distance,
     pixel_num2object_size,
 )
 from config import (
@@ -32,13 +30,13 @@ from config import (
     load_config_from_yaml,
     save_config_to_yaml,
 )
-
 from camera_engine import camera_engine
 from find_target import find_target, find_around_target, find_lost_target
 from adjust_camera import (
     adjust_exposure_full_res_for_loop,
     adjust_exposure_low_res_for_loop,  # 调整分辨率需要一段时间才能获取调整后的图片分辨率
 )
+from rings_location import rings_location
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import (
@@ -536,23 +534,6 @@ def main() -> None:
                     # -------------------- 获取图片 -------------------- #
 
                     # ------------------------- 检测目标 ------------------------- #
-                    # 获取检测参数
-                    gradient_threshold_percent: float = RingsLocationConfig.getattr(
-                        "gradient_threshold_percent"
-                    )
-                    iters: int = RingsLocationConfig.getattr("iters")
-                    order: int = RingsLocationConfig.getattr("order")
-                    rings_nums: int = RingsLocationConfig.getattr("rings_nums")
-                    min_group_size: int = RingsLocationConfig.getattr("min_group_size")
-                    sigmas: int = RingsLocationConfig.getattr("sigmas")
-                    draw_scale: int = RingsLocationConfig.getattr("draw_scale")
-                    save_grads: bool = RingsLocationConfig.getattr("save_grads")
-                    save_detect_images: bool = RingsLocationConfig.getattr(
-                        "save_detect_images"
-                    )
-                    save_detect_results: bool = RingsLocationConfig.getattr(
-                        "save_detect_results"
-                    )
 
                     # -------------------- 畸变矫正 -------------------- #
                     rectified_image0 = image0
@@ -568,85 +549,20 @@ def main() -> None:
                             f"cycle_loop_count: {cycle_loop_count}, {exposure_time = }, {camera0_id2boxstate = }"
                         )
                         for box_id, camera0_boxestate in camera0_id2boxstate.items():
-                            camera0_box: list | None = camera0_boxestate["box"]
-                            try:
-                                # box 可能为 None, 使用 try except 处理
-                                x1, y1, x2, y2 = camera0_box
-                                target = rectified_image0[y1:y2, x1:x2]
-
-                                logger.info(f"box {box_id} rings location start")
-                                result = adaptive_threshold_rings_location(
-                                    target,
-                                    f"camera0--image--{image0_timestamp}--{box_id}",
-                                    iters,
-                                    order,
-                                    rings_nums,
-                                    min_group_size,
-                                    sigmas,
-                                    location_save_dir,
-                                    draw_scale,
-                                    save_grads,
-                                    save_detect_images,
-                                    save_detect_results,
-                                    gradient_threshold_percent,
-                                )
-                                logger.success(f"{result = }")
-                                result["metadata"] = image0_metadata
-                                # 保存到文件
-                                save_to_jsonl(result, camera_result_save_path)
-                                logger.success(f"box {box_id} rings location success")
-
-                                center = [
-                                    float(result["center_x_mean"] + camera0_box[0]),
-                                    float(result["center_y_mean"] + camera0_box[1]),
-                                ]
-                                if np.any(np.isnan(center)):
-                                    center = None
-                                    logger.warning(f"box {box_id} center is nan")
-
-                                radii: list[float] = [
-                                    float(radius) for radius in result["radii"]
-                                ]
-                                if np.any(np.isnan(radii)):
-                                    radii = None
-
-                                # 根据最大圆环直径计算距离
-                                distance: float = 0
-                                if radii is not None:
-                                    distance = pixel_num2object_distance(
-                                        radii[-1] * 2,  # 半径转为直径
-                                        CameraConfig.getattr("pixel_size"),
-                                        CameraConfig.getattr("focus"),
-                                        MatchTemplateConfig.getattr(
-                                            "template_circles_size"
-                                        )[0],
-                                    )
-
-                                camera0_cycle_result = {
-                                    "image_timestamp": f"camera0--image--{image0_timestamp}--{box_id}",
-                                    "box": camera0_box,
-                                    "center": center,
-                                    "radii": radii,
-                                    "distance": distance,
-                                    "exposure_time": exposure_time,
-                                    "offset": [0, 0],
-                                }
-                                logger.info(f"{camera0_cycle_result = }")
-                                camera0_cycle_results[box_id] = camera0_cycle_result
-                            except Exception as e:
-                                logger.error(e)
-                                logger.error(f"box {box_id} rings location failed")
-                                camera0_cycle_result = {
-                                    "image_timestamp": f"camera0--image--{image0_timestamp}--{box_id}",
-                                    "box": camera0_box,
-                                    "center": None,  # 丢失目标, 置为 None
-                                    "radii": None,
-                                    "distance": None,
-                                    "exposure_time": exposure_time,
-                                    "offset": [0, 0],
-                                }
-                                logger.info(f"{camera0_cycle_result = }")
-                                camera0_cycle_results[box_id] = camera0_cycle_result
+                            # -------------------- camera0 -------------------- #
+                            logger.info("camera0 box location start")
+                            rings_location_result = rings_location(
+                                rectified_image0,
+                                box_id,
+                                camera0_boxestate,
+                                image0_timestamp,
+                                image0_metadata,
+                            )
+                            camera0_cycle_results[box_id] = rings_location_result
+                            logger.info(
+                                f"camera0 box location result: {rings_location_result}"
+                            )
+                            # -------------------- camera0 -------------------- #
                     # -------------------- single box location -------------------- #
 
                     # ------------------------- 检测目标 ------------------------- #
@@ -663,7 +579,7 @@ def main() -> None:
                     if cycle_loop_count >= total_cycle_loop_count - 1:
                         # ------------------------- 整理检测结果 ------------------------- #
                         logger.info("last cycle, try to compare and save results")
-                        logger.info(f"{camera0_cycle_results = }")
+                        logger.success(f"{camera0_cycle_results = }")
                         # 保存到文件
                         save_to_jsonl(
                             {"camera0": camera0_cycle_results}, history_save_path
@@ -694,7 +610,7 @@ def main() -> None:
                                 )
                             elif any(v is None for v in camera0_cycle_centers.values()):
                                 logger.warning(
-                                    "some box not found in camera0_cycle_centers, can't init camera0_standard_results."
+                                    "some center not found in camera0_cycle_centers, can't init camera0_standard_results."
                                 )
                             else:
                                 if camera0_standard_results is None:

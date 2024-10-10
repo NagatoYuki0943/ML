@@ -178,7 +178,7 @@ class MatchTemplateConfig(BaseConfig):
     target_number: int = 0  # 默认靶标数量,初始化时为找到的靶标数量
     iou_threshold: float = 0.5  # iou 阈值
     use_threshold_match: bool = True  # 是否使用阈值匹配
-    threshold_match_threshold: float = 0.6  # 阈值匹配阈值
+    threshold_match_threshold: float = 0.7  # 阈值匹配阈值
     threshold_iou_threshold: float = 0.5  # 阈值匹配 iou 阈值
     camera0_got_target_number: int = 0  # 找到的靶标数量
     camera1_got_target_number: int = 0  # 找到的靶标数量

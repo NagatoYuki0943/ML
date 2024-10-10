@@ -37,6 +37,7 @@ from adjust_camera import (
     adjust_exposure_low_res_for_loop,  # 调整分辨率需要一段时间才能获取调整后的图片分辨率
 )
 from rings_location import rings_location
+from transform_result import transform_result
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import (
@@ -686,179 +687,20 @@ def main() -> None:
                             logger.info(
                                 "try to compare camera0_standard_results and camera0_cycle_results"
                             )
-                            x_move_threshold = RingsLocationConfig.getattr(
-                                "x_move_threshold"
-                            )
-                            y_move_threshold = RingsLocationConfig.getattr(
-                                "y_move_threshold"
-                            )
-                            camera0_standard_result_centers = {
-                                k: result["center"]
-                                for k, result in camera0_standard_results.items()
-                            }
-                            camera0_standard_result_offsets = {
-                                k: result["offset"]
-                                for k, result in camera0_standard_results.items()
-                            }
-                            camera0_standard_result_distance = {
-                                k: result["distance"]
-                                for k, result in camera0_standard_results.items()
-                            }
-                            camera0_cycle_centers = {
-                                k: result["center"]
-                                for k, result in camera0_cycle_results.items()
-                            }
-                            logger.info(
-                                f"camera0_standard_result_centers: {camera0_standard_result_centers}"
-                            )
-                            logger.info(
-                                f"camera0_standard_result_offsets: {camera0_standard_result_offsets}"
-                            )
-                            logger.info(
-                                f"camera0_standard_result_distance: {camera0_standard_result_distance}"
-                            )
-                            logger.info(
-                                f"camera0_cycle_centers: {camera0_cycle_centers}"
-                            )
-
-                            # 计算移动距离
-                            camera0_distance_result = {}
-                            for res_k in camera0_standard_results.keys():
-                                if (
-                                    res_k in camera0_cycle_centers.keys()
-                                    and camera0_cycle_centers[res_k] is not None
-                                    and camera0_standard_result_distance[res_k]
-                                    is not None
-                                ):
-                                    # 移动距离 = 当前位置 - 标准位置 - 补偿值
-                                    pixel_distance_x: float = (
-                                        camera0_cycle_centers[res_k][0]
-                                        - camera0_standard_result_centers[res_k][0]
-                                        - camera0_standard_result_offsets[res_k][0]
-                                    )
-                                    real_distance_x: float = pixel_num2object_size(
-                                        pixel_distance_x,
-                                        camera0_standard_result_distance[res_k],
-                                        CameraConfig.getattr("pixel_size"),
-                                        CameraConfig.getattr("focus"),
-                                    )
-                                    # y 轴方向相反
-                                    pixel_distance_y: float = -(
-                                        camera0_cycle_centers[res_k][1]
-                                        - camera0_standard_result_centers[res_k][1]
-                                        - camera0_standard_result_offsets[res_k][1]
-                                    )
-                                    real_distance_y: float = pixel_num2object_size(
-                                        pixel_distance_y,
-                                        camera0_standard_result_distance[res_k],
-                                        CameraConfig.getattr("pixel_size"),
-                                        CameraConfig.getattr("focus"),
-                                    )
-                                    logger.info(
-                                        f"camera0 box {res_k} move {pixel_distance_x = } pixel, {real_distance_x = } mm, distance = {camera0_standard_result_distance[res_k]} mm"
-                                    )
-                                    logger.info(
-                                        f"camera0 box {res_k} move {pixel_distance_y = } pixel, {real_distance_y = } mm, distance = {camera0_standard_result_distance[res_k]} mm"
-                                    )
-                                    camera0_distance_result[res_k] = (
-                                        real_distance_x,
-                                        real_distance_y,
-                                    )
-                                else:
-                                    # box没找到将移动距离设置为 一个很大的数
-                                    camera0_distance_result[res_k] = (
-                                        defalut_error_distance,
-                                        defalut_error_distance,
-                                    )
-                                    logger.error(
-                                        f"box {res_k} not found in cycle_centers."
-                                    )
-
-                            # 使用参考靶标校准其他靶标
-                            # TODO: 参考靶标进行滤波处理
                             camera0_reference_target_id2offset: (
                                 dict[int, tuple[float, float]] | None
                             ) = RingsLocationConfig.getattr(
                                 "camera0_reference_target_id2offset"
                             )
-                            if camera0_reference_target_id2offset is not None:
-                                ref_id: int = int(
-                                    list(camera0_reference_target_id2offset.keys())[0]
-                                )
-                                if ref_id in camera0_distance_result.keys():
-                                    # 找到参考靶标
-                                    ref_distance_x, ref_distance_y = (
-                                        camera0_distance_result[ref_id]
-                                    )
-                                    if (
-                                        abs(ref_distance_x) >= defalut_error_distance
-                                        or abs(ref_distance_y) >= defalut_error_distance
-                                    ):
-                                        # 参考靶标出错
-                                        logger.warning(
-                                            f"camera0 reference box {ref_id} detect failed, can't calibrate other targets."
-                                        )
-                                    else:
-                                        # 参考靶标正常
-                                        RingsLocationConfig.setattr(
-                                            "camera0_reference_target_id2offset",
-                                            {ref_id: [ref_distance_x, ref_distance_y]},
-                                        )
-                                        logger.info(
-                                            f"camera0 use reference box {ref_id} to calibrate other targets."
-                                        )
-                                        for idx, (
-                                            distance_x,
-                                            distance_y,
-                                        ) in camera0_distance_result.items():
-                                            if idx != ref_id:
-                                                new_distance_x = (
-                                                    distance_x - ref_distance_x
-                                                )
-                                                new_distance_y = (
-                                                    distance_y - ref_distance_y
-                                                )
-                                                camera0_distance_result[idx] = (
-                                                    new_distance_x,
-                                                    new_distance_y,
-                                                )
-                                                logger.info(
-                                                    f"camera0 box {idx} after reference, move {new_distance_x = } mm, {new_distance_y = } mm"
-                                                )
-                                else:
-                                    logger.warning(
-                                        f"camera0 reference box {ref_id} not found in camera0_distance_result, can't calibrate other targets."
-                                    )
-                            else:
-                                logger.warning(
-                                    "camera0 no reference box set, can't calibrate other targets."
-                                )
 
-                            # 超出距离的 box idx
-                            camera0_over_distance_ids = set()
-                            for idx, (
-                                distance_x,
-                                distance_y,
-                            ) in camera0_distance_result.items():
-                                if abs(distance_x) > x_move_threshold:
-                                    camera0_over_distance_ids.add(idx)
-                                    logger.warning(
-                                        f"camera0 box {idx} x move distance {distance_x} mm is over threshold {x_move_threshold} mm."
-                                    )
-                                else:
-                                    logger.info(
-                                        f"camera0 box {idx} x move distance {distance_x} mm is under threshold {x_move_threshold} mm."
-                                    )
-
-                                if abs(distance_y) > y_move_threshold:
-                                    camera0_over_distance_ids.add(idx)
-                                    logger.warning(
-                                        f"camera0 box {idx} y move distance {distance_y} mm is over threshold {y_move_threshold} mm."
-                                    )
-                                else:
-                                    logger.info(
-                                        f"camera0 box {idx} y move distance {distance_y} mm is under threshold {y_move_threshold} mm."
-                                    )
+                            # 计算距离
+                            camera0_distance_result, camera0_over_distance_ids = (
+                                transform_result(
+                                    camera0_standard_results,
+                                    camera0_cycle_results,
+                                    camera0_reference_target_id2offset,
+                                )
+                            )
 
                             logger.info(
                                 f"camera0_distance_result: {camera0_distance_result}"
@@ -885,7 +727,7 @@ def main() -> None:
                             if len(camera0_over_distance_ids) > 0:
                                 # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
                                 logger.warning(
-                                    f"box {camera0_over_distance_ids} move distance is over threshold {x_move_threshold} mm, {y_move_threshold = } mm."
+                                    f"box {camera0_over_distance_ids} move distance is over threshold."
                                 )
 
                                 # 保存位移的图片

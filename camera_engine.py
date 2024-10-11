@@ -3,6 +3,7 @@ from datetime import datetime
 from queue import Queue
 from loguru import logger
 import cv2
+from pathlib import Path
 
 from algorithm import RaspberryCameras
 from config import MainConfig, CameraConfig
@@ -18,7 +19,7 @@ def camera_engine(
 ):
     # 启动相机函数
     def start_camera_engine():
-        log_file_path = (
+        log_file_path: Path = (
             MainConfig.getattr("log_dir")
             / f"camera_{camera_index}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
         )
@@ -73,7 +74,7 @@ def camera_engine(
             # logger.info(f"camera {camera_index} capture {timestamp} image")
 
             # 3.判断是否返回图片
-            return_image_time_interval = CameraConfig.getattr(
+            return_image_time_interval: int = CameraConfig.getattr(
                 "return_image_time_interval"
             )
             return_current_time = time.time()
@@ -86,7 +87,7 @@ def camera_engine(
             )
             # 曝光在设定的时间范围内就返回
             if _return_current_time_period > _return_before_time_period:
-                _ExposureTime = metadata["ExposureTime"]
+                _ExposureTime: int = metadata["ExposureTime"]
                 # 默认 exposure_time 为 None,要手动设定
                 if exposure_time is None:
                     exposure_time = _ExposureTime
@@ -114,7 +115,7 @@ def camera_engine(
                         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
                     # 是否有滤光板
-                    has_filter_plate = CameraConfig.getattr("has_filter_plate")
+                    has_filter_plate: bool = CameraConfig.getattr("has_filter_plate")
                     if not has_filter_plate:
                         image = enhance_contrast_clahe(image)
 
@@ -128,7 +129,7 @@ def camera_engine(
             # sleep
             captime_time_end = time.time()
 
-            capture_time_interval = CameraConfig.getattr("capture_time_interval")
+            capture_time_interval: int = CameraConfig.getattr("capture_time_interval")
             sleep_time = max(
                 0,
                 capture_time_interval / 1000 - (captime_time_end - captime_time_begin),

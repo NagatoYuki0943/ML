@@ -104,26 +104,26 @@ logger.success("初始化畸变矫正完成")
 # logger.info("开始初始化串口")
 # serial_objects = []
 
-# for port in SerialCommConfig.getattr('ports'):
-#     object = RaspberrySerialPort(
-#         SerialCommConfig.getattr('temperature_data_save_path'),
-#         port,
-#         SerialCommConfig.getattr('baudrate'),
-#         SerialCommConfig.getattr('timeout'),
-#         SerialCommConfig.getattr('BUFFER_SIZE'),
-#         SerialCommConfig.getattr('LOG_SIZE'),
-#     )
-#     serial_objects.append(object)
+# for port in [SerialCommConfig.getattr("camera0_ser_port"), SerialCommConfig.getattr("camera1_ser_port")]:
+#     if port:
+#         object = RaspberrySerialPort(
+#             SerialCommConfig.getattr("temperature_data_save_path"),
+#             port,
+#             SerialCommConfig.getattr("baudrate"),
+#             SerialCommConfig.getattr("timeout"),
+#             SerialCommConfig.getattr("BUFFER_SIZE"),
+#         )
+#         serial_objects.append(object)
 
 # serial_send_thread = ThreadWrapper(
-#     target_func = serial_send,
-#     serial_ports = serial_objects,
+#     target_func=serial_send,
+#     serial_ports=serial_objects,
 # )
 # serial_receive_thread = Thread(
-#     target = serial_receive,
+#     target=serial_receive,
 #     kwargs={
-#         'serial_ports': serial_objects,
-#         'queue': main_queue,
+#         "serial_ports": serial_objects,
+#         "queue": main_queue,
 #     },
 # )
 # serial_send_queue = serial_send_thread.queue

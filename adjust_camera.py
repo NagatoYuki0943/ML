@@ -249,7 +249,8 @@ def adjust_exposure_full_res_for_loop(
 
                 # 可以
                 if direction == 0:
-                    exposure2id2boxstate[new_exposure_time].update(current_id2boxstate)
+                    # current_id2boxstate is None
+                    exposure2id2boxstate[new_exposure_time] = current_id2boxstate
                     logger.success(
                         f"full picture exposure time {new_exposure_time} us is ok"
                     )
@@ -569,7 +570,8 @@ def adjust_exposure_low_res_for_loop(
 
                 # 可以
                 if direction == 0:
-                    exposure2id2boxstate[new_exposure_time].update(current_id2boxstate)
+                    # current_id2boxstate is None
+                    exposure2id2boxstate[new_exposure_time] = current_id2boxstate
                     logger.success(
                         f"full picture exposure time {new_exposure_time} us is ok"
                     )

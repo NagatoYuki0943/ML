@@ -130,6 +130,7 @@ def adjust_exposure_full_res_for_loop(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
     cut_boxes_in_one_image: bool = False,
+    camera_index: int = 0,
 ) -> tuple[dict[int, dict | None], bool, bool]:
     """使用循环实现快速调节曝光，全程使用高分辨率拍摄
 
@@ -145,6 +146,7 @@ def adjust_exposure_full_res_for_loop(
                 ...
             }
         cut_boxes_in_one_image (bool, optional): 是否将box切割到一张图片, 而不是分别调整每个box. Defaults to False.
+        camera_index (int, optional): 相机索引. Defaults to 0.
 
     Returns:
         tuple[dict[int, dict | None], bool, bool]: 曝光对应不同的box状态 和 需要更暗 和 需要更亮
@@ -185,7 +187,11 @@ def adjust_exposure_full_res_for_loop(
     )
 
     # 使用栈来模拟递归
-    stack = [(deepcopy(id2boxstate), CameraConfig.getattr("exposure_time"))]
+    if camera_index == 0:
+        exposure_time = CameraConfig.getattr("camera0_exposure_time")
+    else:
+        exposure_time = CameraConfig.getattr("camera1_exposure_time")
+    stack = [(deepcopy(id2boxstate), exposure_time)]
 
     # 是否需要闪光灯
     need_darker = False
@@ -197,7 +203,10 @@ def adjust_exposure_full_res_for_loop(
         logger.info(f"stack size: {len(stack)}, i: {i}")
 
         current_id2boxstate, current_exposure_time = stack.pop()
-        CameraConfig.setattr("exposure_time", current_exposure_time)
+        if camera_index == 0:
+            CameraConfig.setattr("camera0_exposure_time", current_exposure_time)
+        else:
+            CameraConfig.setattr("camera1_exposure_time", current_exposure_time)
 
         # 需要更暗
         if current_exposure_time < exposure_time_range[0]:
@@ -442,6 +451,7 @@ def adjust_exposure_low_res_for_loop(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
     cut_boxes_in_one_image: bool = False,
+    camera_index: int = 0,
 ) -> tuple[dict[int, dict | None], bool, bool]:
     """使用循环实现快速调节曝光，全程使用低分辨率拍摄
 
@@ -457,6 +467,7 @@ def adjust_exposure_low_res_for_loop(
                 ...
             }
         cut_boxes_in_one_image (bool, optional): 是否将box切割到一张图片, 而不是分别调整每个box. Defaults to False.
+        camera_index (int, optional): 相机索引. Defaults to 0.
 
     Returns:
         tuple[dict[int, dict | None], bool, bool]: 曝光对应不同的box状态 和 需要更暗 和 需要更亮
@@ -506,7 +517,11 @@ def adjust_exposure_low_res_for_loop(
     clear_queue(camera_queue)
 
     # 使用栈来模拟递归
-    stack = [(deepcopy(id2boxstate), CameraConfig.getattr("exposure_time"))]
+    if camera_index == 0:
+        exposure_time = CameraConfig.getattr("camera0_exposure_time")
+    else:
+        exposure_time = CameraConfig.getattr("camera1_exposure_time")
+    stack = [(deepcopy(id2boxstate), exposure_time)]
 
     # 是否需要闪光灯
     need_darker = False
@@ -518,7 +533,10 @@ def adjust_exposure_low_res_for_loop(
         logger.info(f"stack size: {len(stack)}, i: {i}")
 
         current_id2boxstate, current_exposure_time = stack.pop()
-        CameraConfig.setattr("exposure_time", current_exposure_time)
+        if camera_index == 0:
+            CameraConfig.setattr("camera0_exposure_time", current_exposure_time)
+        else:
+            CameraConfig.setattr("camera1_exposure_time", current_exposure_time)
 
         # 需要更暗
         if current_exposure_time < exposure_time_range[0]:

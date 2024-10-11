@@ -70,9 +70,11 @@ class CameraConfig(BaseConfig):
     pixel_size: float = 1.55  # 像素大小 um
     focus: float = 8  # 焦距 mm
     low_res_ratio: float = 0.5  # 相机拍摄低分辨率比率
-    exposure_time: int | None = 40000  # 曝光时间 us
+    camera0_exposure_time: int | None = 40000  # 曝光时间 us
+    camera1_exposure_time: int | None = 40000  # 曝光时间 us
     exposure_time_tolerance_percent: float = 0.01  # 曝光时间容差百分比 +/-0.01
-    analogue_gain: float | None = None  # 模拟增益
+    camera0_analogue_gain: float | None = None  # 模拟增益
+    camera1_analogue_gain: float | None = None  # 模拟增益
     capture_time_interval: int = 1000  # 相机拍照间隔 ms
     return_image_time_interval: int = 3000  # 返回图片的检测 ms
     capture_mode: Literal["preview", "low", "full"] = "full"  # 相机拍照模式

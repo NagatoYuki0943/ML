@@ -506,7 +506,7 @@ def main() -> None:
                     # 设置下一轮的曝光值
                     if len(cycle_exposure_times):
                         exposure_time = cycle_exposure_times[cycle_loop_count]
-                        CameraConfig.setattr("exposure_time", exposure_time)
+                        CameraConfig.setattr("camera0_exposure_time", exposure_time)
                     # -------------------- 设定循环 -------------------- #
 
                     # 周期设置
@@ -851,7 +851,7 @@ def main() -> None:
                     else:
                         # 不是结束周期，设置下一轮的曝光值
                         exposure_time = cycle_exposure_times[cycle_loop_count]
-                        CameraConfig.setattr("exposure_time", exposure_time)
+                        CameraConfig.setattr("camera0_exposure_time", exposure_time)
 
         # 检测周期外
         if cycle_loop_count == -1:

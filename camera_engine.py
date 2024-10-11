@@ -48,8 +48,13 @@ def camera_engine(
                 raspberry_cameras.switch_mode(camera_index, capture_mode)
 
             # 2.拍照
-            # 曝光时间
-            exposure_time: int | None = CameraConfig.getattr("exposure_time")
+            # 曝光时间, 增益
+            if camera_index == 0:
+                exposure_time: int | None = CameraConfig.getattr("camera0_exposure_time")
+                analogue_gain: float | None = CameraConfig.getattr("camera0_analogue_gain")
+            else:
+                exposure_time: int | None = CameraConfig.getattr("camera1_exposure_time")
+                analogue_gain: float | None = CameraConfig.getattr("camera0_analogue_gain")
             # 曝光时间宽容度
             exposure_time_tolerance_percent: float = CameraConfig.getattr(
                 "exposure_time_tolerance_percent"
@@ -58,8 +63,6 @@ def camera_engine(
                 exposure_time_tolerance = (
                     exposure_time * exposure_time_tolerance_percent
                 )
-            # 增益
-            analogue_gain: float | None = CameraConfig.getattr("analogue_gain")
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S.%f")
             image, metadata = raspberry_cameras.capture(
                 camera_index,
@@ -90,7 +93,10 @@ def camera_engine(
                     exposure_time_tolerance = (
                         exposure_time * exposure_time_tolerance_percent
                     )
-                    CameraConfig.setattr("exposure_time", exposure_time)
+                    if camera_index == 0:
+                        CameraConfig.setattr("camera0_exposure_time", exposure_time)
+                    else:
+                        CameraConfig.setattr("camera1_exposure_time", exposure_time)
                 if (
                     _ExposureTime >= exposure_time - exposure_time_tolerance
                     and _ExposureTime <= exposure_time + exposure_time_tolerance

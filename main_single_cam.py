@@ -539,7 +539,7 @@ def main() -> None:
                     rectified_image0 = image0
                     # -------------------- 畸变矫正 -------------------- #
 
-                    # -------------------- single box location -------------------- #
+                    # -------------------- box location -------------------- #
                     if len(cycle_exposure_times):
                         exposure_time = cycle_exposure_times[cycle_loop_count]
                         camera0_id2boxstate = exposure2camera0_id2boxstate[
@@ -551,19 +551,19 @@ def main() -> None:
                         for box_id, camera0_boxestate in camera0_id2boxstate.items():
                             # -------------------- camera0 -------------------- #
                             logger.info("camera0 box location start")
-                            rings_location_result = rings_location(
+                            camera0_rings_location_result = rings_location(
                                 rectified_image0,
                                 box_id,
                                 camera0_boxestate,
                                 image0_timestamp,
                                 image0_metadata,
                             )
-                            camera0_cycle_results[box_id] = rings_location_result
+                            camera0_cycle_results[box_id] = camera0_rings_location_result
                             logger.info(
-                                f"camera0 box location result: {rings_location_result}"
+                                f"camera0 ring location result: {camera0_rings_location_result}"
                             )
                             # -------------------- camera0 -------------------- #
-                    # -------------------- single box location -------------------- #
+                    # -------------------- box location -------------------- #
 
                     # ------------------------- 检测目标 ------------------------- #
 
@@ -598,7 +598,6 @@ def main() -> None:
                             camera0_standard_results is None
                             or len(camera0_standard_results) != target_number
                         ):
-                            # ---------- camera0_standard_results ---------- #
                             logger.info("try to init camera0_standard_results")
                             camera0_reference_target_id2offset: (
                                 dict[int, tuple[float, float]] | None
@@ -644,7 +643,7 @@ def main() -> None:
 
                         # 比较标准靶标和新的靶标
                         else:
-                            # ---------- camera0_standard_results ---------- #
+                            # ---------- camera0 compare results ---------- #
                             logger.info(
                                 "try to compare camera0_standard_results and camera0_cycle_results"
                             )
@@ -732,6 +731,7 @@ def main() -> None:
                                     "data": send_msg_data,
                                 }
                                 mqtt_send_queue.put(send_msg)
+                            # ---------- camera0 compare results ---------- #
 
                         # ------------------------- 整理检测结果 ------------------------- #
 
@@ -741,7 +741,7 @@ def main() -> None:
                             "camera0_got_target_number"
                         )
 
-                        # 丢失目标
+                        # ---------- camera0 lost box ---------- #
                         if (
                             target_number > camera0_got_target_number
                             or target_number == 0
@@ -828,6 +828,7 @@ def main() -> None:
 
                             except queue.Empty:
                                 get_picture_timeout_process()
+                            # ---------- camera0 lost box ---------- #
 
                         # 目标数量正常
                         else:

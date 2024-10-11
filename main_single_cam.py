@@ -230,6 +230,7 @@ def main() -> None:
     global camera0_cycle_results
 
     # ------------------------------ 调整曝光 ------------------------------ #
+    # -------------------- camera0 -------------------- #
     try:
         _, image0, image0_metadata = camera0_queue.get(timeout=get_picture_timeout)
         image_path = save_dir / "image0_default.jpg"
@@ -238,12 +239,12 @@ def main() -> None:
     except queue.Empty:
         get_picture_timeout_process()
 
-    logger.info("ajust exposure 1 start")
+    logger.info("camera0 ajust exposure start")
     camera0_id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
         "camera0_id2boxstate"
     )
     adjust_exposure_full_res(camera0_queue, camera0_id2boxstate, True, 0)
-    logger.success("ajust exposure 1 end")
+    logger.success("camera0 ajust exposure end")
     try:
         _, image0, image0_metadata = camera0_queue.get(timeout=get_picture_timeout)
         image_path = save_dir / "image0_adjust_exposure.jpg"
@@ -251,6 +252,7 @@ def main() -> None:
         logger.info(f"save `image0 adjust exposure` image to {image_path}")
     except queue.Empty:
         get_picture_timeout_process()
+    # -------------------- camera0 -------------------- #
     # ------------------------------ 调整曝光 ------------------------------ #
 
     # ------------------------------ 找到目标 ------------------------------ #
@@ -321,10 +323,11 @@ def main() -> None:
         logger.success("image0 find target success")
         # -------------------- 模板匹配 -------------------- #
 
-        logger.success("find target end")
     except queue.Empty:
         get_picture_timeout_process()
     # -------------------- camera0 -------------------- #
+
+    logger.success("find target end")
     # ------------------------------ 找到目标 ------------------------------ #
 
     # 保存运行时配置
@@ -371,7 +374,8 @@ def main() -> None:
                 # 周期结果重置
                 camera0_cycle_results = {}
 
-                # -------------------- 调整全图曝光 -------------------- #
+                # ------------------------- 调整全图曝光 ------------------------- #
+                # --------------- camera0 --------------- #
                 logger.info("full image0 ajust exposure start")
 
                 # 每次使用补光灯调整曝光的总次数
@@ -395,7 +399,7 @@ def main() -> None:
                         0,
                     )
 
-                    # -------------------- 补光灯 -------------------- #
+                    # ---------- 补光灯 ---------- #
                     if need_darker or need_lighter:
                         use_flash = True
                         if need_darker:
@@ -424,9 +428,7 @@ def main() -> None:
                                 # 增加补光灯亮度
                                 adjust_led_level_param["level"] += 1
                     else:
-                        logger.success(
-                            "no need adjust flash, exit adjust exposure"
-                        )
+                        logger.success("no need adjust flash, exit adjust exposure")
                         break
 
                     adjust_with_falsh_total_time += 1
@@ -435,37 +437,36 @@ def main() -> None:
                             f"adjust exposure failed in {adjust_with_flash_total_times} times, use last result"
                         )
                         break
-
-                # -------------------- 补光灯 -------------------- #
+                    # ---------- 补光灯 ---------- #
                 logger.info("full image0 ajust exposure end")
-                # -------------------- 调整全图曝光 -------------------- #
+                # --------------- camera0 --------------- #
+                # ------------------------- 调整全图曝光 ------------------------- #
 
-                # 忽略多余的图片
-                drop_excessive_queue_items(camera0_queue)
+                # ------------------------- 小区域模板匹配 + 调整 box 曝光 ------------------------- #
 
                 try:
+                    # -------------------- camera0 -------------------- #
+                    drop_excessive_queue_items(camera0_queue)
                     _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
 
-                    # -------------------- 畸变矫正 -------------------- #
+                    # --------------- 畸变矫正 --------------- #
                     rectified_image0 = image0
-                    # -------------------- 畸变矫正 -------------------- #
+                    # --------------- 畸变矫正 --------------- #
 
-                    # -------------------- 小区域模板匹配 -------------------- #
-                    # -------------------- camera0 -------------------- #
+                    # --------------- 小区域模板匹配 --------------- #
                     _, camera0_got_target_number = find_around_target(
                         rectified_image0, 0
                     )
                     if camera0_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
                         logger.warning(
-                            "image0 find_around_target failed, can't find any target"
+                            "camera0 find_around_target failed, can't find any target"
                         )
-                    # -------------------- camera0 -------------------- #
-                    # -------------------- 小区域模板匹配 -------------------- #
+                    # --------------- 小区域模板匹配 --------------- #
 
-                    # -------------------- 调整 box 曝光 -------------------- #
-                    logger.info("boxes ajust exposure start")
-                    # --------------- camera0 box --------------- #
+                    # --------------- 调整 box 曝光 --------------- #
+                    logger.info("camera0 boxes ajust exposure start")
+
                     # camera0_id2boxstate example: {
                     #     0: {'ratio': 0.8184615384615387, 'score': 0.92686927318573, 'box': [1509, 967, 1828, 1286]}},
                     #     1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}
@@ -478,20 +479,15 @@ def main() -> None:
                     #     62000: {1: {'ratio': 1.2861538461538469, 'score': 0.8924368023872375, 'box': [1926, 1875, 2427, 2376]}}
                     # }
                     # camera0_id2boxstate 为 None 时，理解为没有任何 box，调整曝光时设定为 {}
-                    exposure2camera0_id2boxstate, _, _ = (
-                        adjust_exposure_full_res(
-                            camera0_queue,
-                            camera0_id2boxstate
-                            if camera0_id2boxstate is not None
-                            else {},
-                            False,
-                            0,
-                        )
+                    exposure2camera0_id2boxstate, _, _ = adjust_exposure_full_res(
+                        camera0_queue,
+                        camera0_id2boxstate if camera0_id2boxstate is not None else {},
+                        False,
+                        0,
                     )
                     logger.info(f"{exposure2camera0_id2boxstate = }")
-                    # --------------- camera0 box --------------- #
 
-                    # 相机0曝光时间列表
+                    # camera0 曝光时间列表
                     camera0_cycle_exposure_times = list(
                         exposure2camera0_id2boxstate.keys()
                     )
@@ -499,20 +495,19 @@ def main() -> None:
                     camera0_cycle_exposure_times = [
                         (0, t) for t in camera0_cycle_exposure_times
                     ]
+                    logger.info("camera0 boxes ajust exposure end")
+                    # --------------- 调整 box 曝光 --------------- #
+                    # -------------------- camera0 -------------------- #
 
+                    # -------------------- 设定循环参数 -------------------- #
                     # 所有相机循环曝光时间
                     cycle_exposure_times = camera0_cycle_exposure_times
                     logger.info(f"{cycle_exposure_times = }")
 
-                    logger.info("boxes ajust exposure end")
-                    # -------------------- 调整 box 曝光 -------------------- #
-
-                    # -------------------- 设定循环 -------------------- #
                     # 总的循环轮数为 1 + 曝光次数
+                    cycle_exposure_times_len = len(cycle_exposure_times)
                     total_cycle_loop_count = (
-                        1 + len(cycle_exposure_times)
-                        if len(cycle_exposure_times)
-                        else 2
+                        1 + cycle_exposure_times_len if cycle_exposure_times_len else 2
                     )
                     logger.success(
                         f"During this cycle, there will be {total_cycle_loop_count} iters."
@@ -530,17 +525,17 @@ def main() -> None:
                             CameraConfig.setattr("camera0_exposure_time", exposure_time)
                         else:
                             CameraConfig.setattr("camera1_exposure_time", exposure_time)
-                    # -------------------- 设定循环 -------------------- #
+                    # -------------------- 设定循环参数 -------------------- #
 
                     # 周期设置
                     cycle_before_time = cycle_current_time
 
                 except queue.Empty:
                     get_picture_timeout_process()
+                # ------------------------- 小区域模板匹配 + 调整 box 曝光 ------------------------- #
 
             # 每个周期的其余循环
             else:
-                # -------------------- 获取图片 -------------------- #
                 logger.info(f"The {cycle_loop_count + 1} iter within the cycle.")
 
                 if len(cycle_exposure_times):
@@ -552,7 +547,6 @@ def main() -> None:
                             # 忽略多余的图片
                             drop_excessive_queue_items(camera0_queue)
 
-                            # -------------------- camera0 -------------------- #
                             # 获取照片
                             image0_timestamp, image0, image0_metadata = (
                                 camera0_queue.get(timeout=get_picture_timeout)
@@ -565,6 +559,7 @@ def main() -> None:
                             rectified_image0 = image0
                             # -------------------- 畸变矫正 -------------------- #
 
+                            # -------------------- 检测 -------------------- #
                             camera0_id2boxstate = exposure2camera0_id2boxstate[
                                 exposure_time
                             ]
@@ -589,7 +584,7 @@ def main() -> None:
                                 logger.info(
                                     f"camera0 ring location result: {camera0_rings_location_result}"
                                 )
-                            # -------------------- camera0 -------------------- #
+                            # -------------------- 检测 -------------------- #
 
                             # 没有发生错误, 周期内循环计数加1
                             cycle_loop_count += 1
@@ -616,15 +611,16 @@ def main() -> None:
                     send_msg_data = {}
 
                     target_number = MatchTemplateConfig.getattr("target_number")
+
                     camera0_standard_results: dict | None = RingsLocationConfig.getattr(
                         "camera0_standard_results"
                     )
-
                     # 初始化标准结果
                     if (
                         camera0_standard_results is None
                         or len(camera0_standard_results) != target_number
                     ):
+                        # -------------------- camera0 init result -------------------- #
                         logger.info("try to init camera0_standard_results")
                         camera0_reference_target_id2offset: (
                             dict[int, tuple[float, float]] | None
@@ -638,7 +634,9 @@ def main() -> None:
                             camera0_standard_results,
                             camera0_reference_target_id2offset,
                         )
+                        # -------------------- camera0 init result -------------------- #
 
+                        # -------------------- send result -------------------- #
                         if camera0_standard_results is not None:
                             RingsLocationConfig.setattr(
                                 "camera0_standard_results", camera0_standard_results
@@ -667,10 +665,11 @@ def main() -> None:
                                 "data": send_msg_data,
                             }
                             mqtt_send_queue.put(send_msg)
+                        # -------------------- send result -------------------- #
 
                     # 比较标准靶标和新的靶标
                     else:
-                        # ---------- camera0 compare results ---------- #
+                        # -------------------- camera0 compare results -------------------- #
                         logger.info(
                             "try to compare camera0_standard_results and camera0_cycle_results"
                         )
@@ -695,13 +694,17 @@ def main() -> None:
                             "camera0_reference_target_id2offset",
                             camera0_reference_target_id2offset,
                         )
-
                         logger.info(
                             f"camera0_distance_result: {camera0_distance_result}"
                         )
                         logger.info(
                             f"camera0_over_distance_ids: {camera0_over_distance_ids}"
                         )
+                        # -------------------- camera0 compare results -------------------- #
+
+                        # -------------------- send msg -------------------- #
+                        distance_result = camera0_distance_result
+
                         send_msg_data = {
                             "L3_WK_1": 20,  # 温度传感器
                             "L3_WK_2": 20,
@@ -714,7 +717,7 @@ def main() -> None:
                         }
                         _send_msg_data = {
                             f"L1_SJ_{k+1}": {"X": v[0], "Y": v[1]}
-                            for k, v in camera0_distance_result.items()
+                            for k, v in distance_result.items()
                         }
                         send_msg_data.update(_send_msg_data)
                         logger.info(f"send_msg_data: {send_msg_data}")
@@ -756,17 +759,17 @@ def main() -> None:
                                 "data": send_msg_data,
                             }
                             mqtt_send_queue.put(send_msg)
-                        # ---------- camera0 compare results ---------- #
+                        # -------------------- send msg -------------------- #
 
                     # ------------------------- 整理检测结果 ------------------------- #
 
                     # ------------------------- 检查是否丢失目标 ------------------------- #
                     target_number = MatchTemplateConfig.getattr("target_number")
+
+                    # -------------------- camera0 lost box -------------------- #
                     camera0_got_target_number = MatchTemplateConfig.getattr(
                         "camera0_got_target_number"
                     )
-
-                    # ---------- camera0 lost box ---------- #
                     if target_number > camera0_got_target_number or target_number == 0:
                         logger.warning(
                             f"The target number {target_number} is not enough, got {camera0_got_target_number} targets, start to find lost target."
@@ -844,13 +847,13 @@ def main() -> None:
 
                         except queue.Empty:
                             get_picture_timeout_process()
-                        # ---------- camera0 lost box ---------- #
 
                     # 目标数量正常
                     else:
                         logger.success(
                             f"camera0 target number {target_number} is enough, got {camera0_got_target_number} targets."
                         )
+                    # -------------------- camera0 lost box -------------------- #
                     # ------------------------- 检查是否丢失目标 ------------------------- #
 
                     # ------------------------- 结束周期 ------------------------- #

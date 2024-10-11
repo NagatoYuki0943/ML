@@ -655,12 +655,19 @@ def main() -> None:
                             )
 
                             # 计算距离
-                            camera0_distance_result, camera0_over_distance_ids = (
-                                calc_move_distance(
-                                    camera0_standard_results,
-                                    camera0_cycle_results,
-                                    camera0_reference_target_id2offset,
-                                )
+                            (
+                                camera0_distance_result,
+                                camera0_over_distance_ids,
+                                camera0_reference_target_id2offset,
+                            ) = calc_move_distance(
+                                camera0_standard_results,
+                                camera0_cycle_results,
+                                camera0_reference_target_id2offset,
+                            )
+                            # 更新参考靶标偏移
+                            RingsLocationConfig.setattr(
+                                "camera0_reference_target_id2offset",
+                                camera0_reference_target_id2offset,
                             )
 
                             logger.info(

@@ -157,7 +157,7 @@ def calc_move_distance(
     standard_results: dict,
     cycle_results: dict,
     reference_target_id2offset: dict[int, tuple[float, float]] | None,
-) -> tuple[dict, set]:
+) -> tuple[dict, set, dict[int, tuple[float, float]] | None]:
     """计算移动距离"""
     defalut_error_distance: float = MainConfig.getattr("defalut_error_distance")
 
@@ -244,10 +244,8 @@ def calc_move_distance(
                 )
             else:
                 # 参考靶标正常
-                RingsLocationConfig.setattr(
-                    "reference_target_id2offset",
-                    {ref_id: [ref_distance_x, ref_distance_y]},
-                )
+                # 更新参考靶标的偏移值
+                reference_target_id2offset = {ref_id: [ref_distance_x, ref_distance_y]}
                 logger.info(f"use reference box {ref_id} to calibrate other targets.")
                 for idx, (
                     distance_x,
@@ -296,4 +294,4 @@ def calc_move_distance(
                 f"box {idx} y move distance {distance_y} mm is under threshold {y_move_threshold} mm."
             )
 
-    return distance_result, over_distance_ids
+    return distance_result, over_distance_ids, reference_target_id2offset

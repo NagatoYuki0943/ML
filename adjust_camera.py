@@ -126,7 +126,7 @@ def adjust_exposure_by_mean_cuts(
         return exposure_time, 0
 
 
-def adjust_exposure_full_res_for_loop(
+def adjust_exposure_full_res(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
     cut_boxes_in_one_image: bool = False,
@@ -447,7 +447,7 @@ def adjust_exposure_full_res_for_loop(
     return _exposure2id2boxstate, need_darker, need_lighter
 
 
-def adjust_exposure_low_res_for_loop(
+def adjust_exposure_low_res(
     camera_queue: queue.Queue,
     id2boxstate: dict | None = None,
     cut_boxes_in_one_image: bool = False,

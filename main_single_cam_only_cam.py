@@ -33,8 +33,8 @@ from config import (
 from camera_engine import camera_engine
 from find_target import find_target, find_around_target, find_lost_target
 from adjust_camera import (
-    adjust_exposure_full_res_for_loop,
-    adjust_exposure_low_res_for_loop,  # 调整分辨率需要一段时间才能获取调整后的图片分辨率
+    adjust_exposure_full_res,
+    adjust_exposure_low_res,  # 调整分辨率需要一段时间才能获取调整后的图片分辨率
 )
 from location_utils import rings_location, init_standard_results, calc_move_distance
 from serial_communication import serial_receive, serial_send
@@ -242,7 +242,7 @@ def main() -> None:
     camera0_id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
         "camera0_id2boxstate"
     )
-    adjust_exposure_full_res_for_loop(camera0_queue, camera0_id2boxstate, True)
+    adjust_exposure_full_res(camera0_queue, camera0_id2boxstate, True, 0)
     logger.success("ajust exposure 1 end")
     try:
         _, image0, image0_metadata = camera0_queue.get(timeout=get_picture_timeout)
@@ -388,10 +388,11 @@ def main() -> None:
                     camera0_id2boxstate: dict[int, dict] | None = (
                         MatchTemplateConfig.getattr("camera0_id2boxstate")
                     )
-                    _, need_darker, need_lighter = adjust_exposure_full_res_for_loop(
+                    _, need_darker, need_lighter = adjust_exposure_full_res(
                         camera0_queue,
                         camera0_id2boxstate,
                         True,
+                        0,
                     )
 
                     # -------------------- 补光灯 -------------------- #
@@ -424,14 +425,14 @@ def main() -> None:
                                 adjust_led_level_param["level"] += 1
                     else:
                         logger.success(
-                            "no need adjust flash, exit adjust_exposure_full_res_for_loop"
+                            "no need adjust flash, exit adjust exposure"
                         )
                         break
 
                     adjust_with_falsh_total_time += 1
                     if adjust_with_falsh_total_time >= adjust_with_flash_total_times:
                         logger.warning(
-                            f"adjust_exposure_full_res_for_loop failed in {adjust_with_flash_total_times} times, use last result"
+                            f"adjust exposure failed in {adjust_with_flash_total_times} times, use last result"
                         )
                         break
 
@@ -478,11 +479,13 @@ def main() -> None:
                     # }
                     # camera0_id2boxstate 为 None 时，理解为没有任何 box，调整曝光时设定为 {}
                     exposure2camera0_id2boxstate, _, _ = (
-                        adjust_exposure_full_res_for_loop(
+                        adjust_exposure_full_res(
                             camera0_queue,
                             camera0_id2boxstate
                             if camera0_id2boxstate is not None
                             else {},
+                            False,
+                            0,
                         )
                     )
                     logger.info(f"{exposure2camera0_id2boxstate = }")

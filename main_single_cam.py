@@ -300,7 +300,7 @@ def main() -> None:
             camera0_id2boxstate, camera0_got_target_number = find_around_target(
                 rectified_image0, CAMERA_INDEX
             )
-        logger.info(f"image0 find target camera0_id2boxstate: \n{camera0_id2boxstate}")
+        logger.info(f"image0 find target camera0_id2boxstate: {camera0_id2boxstate}")
         logger.info(f"image0 find target number: {camera0_got_target_number}")
 
         if camera0_id2boxstate is not None:
@@ -674,9 +674,7 @@ def main() -> None:
                     # 比较标准靶标和新的靶标
                     else:
                         # -------------------- camera0 compare results -------------------- #
-                        logger.info(
-                            "try to compare camera0_standard_results and camera0_cycle_results"
-                        )
+                        logger.info("try to compare camera0 result")
                         camera0_reference_target_id2offset: (
                             dict[int, tuple[float, float]] | None
                         ) = RingsLocationConfig.getattr(
@@ -776,7 +774,7 @@ def main() -> None:
                     )
                     if target_number > camera0_got_target_number or target_number == 0:
                         logger.warning(
-                            f"The target number {target_number} is not enough, got {camera0_got_target_number} targets, start to find lost target."
+                            f"camera0 target number {target_number} is not enough, got {camera0_got_target_number} targets, start to find lost target."
                         )
 
                         # 忽略多余的图片

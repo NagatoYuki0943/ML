@@ -79,8 +79,9 @@ class CameraConfig(BaseConfig):
     return_image_time_interval: int = 3000  # 返回图片的检测 ms
     capture_mode: Literal["preview", "low", "full"] = "full"  # 相机拍照模式
     queue_maxsize: int = 5  # 相机拍照队列最大长度
-    camera_left_index: int = 1  # 左侧相机 index
-    camera_right_index: int = 0  # 右侧相机 index
+    main_camera_index: int = 0  # 主相机 index
+    camera_left_index: int = 0  # 左侧相机 index
+    camera_right_index: int = 1  # 右侧相机 index
     output_format: Literal["rgb", "gray"] = "gray"  # 输出格式
     has_filter_plate: bool = True  # 是否有滤镜板
 
@@ -90,7 +91,7 @@ class AdjustCameraConfig(BaseConfig):
     """调整相机配置"""
 
     lock = Lock()
-    mean_light_suitable_range: tuple[float, float] = (70, 160)  # (100, 160)
+    mean_light_suitable_range: tuple[float, float] = (60, 160)  # (100, 160)
     suitable_ignore_ratio: float = 0.1  # 忽略 mean_light_suitable_range 最低和最高范围的百分比 [0, 100] -> [10, 90]
     exposure_time_range: tuple[int, int] = (114, 1_000_000)  # 曝光时间范围 us
     adjust_exposure_time_base_step: int = 100  # 曝光调整基础步长 us

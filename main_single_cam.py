@@ -74,10 +74,11 @@ image0_metadata: dict
 
 # -------------------- 初始化相机 -------------------- #
 logger.info("开始初始化相机")
+CAMERA_INDEX = 0
 camera0_thread = ThreadWrapper(
     target_func=camera_engine,
     queue_maxsize=CameraConfig.getattr("queue_maxsize"),
-    camera_index=0,
+    camera_index=CAMERA_INDEX,
 )
 camera0_thread.start()
 camera0_queue = camera0_thread.queue
@@ -243,7 +244,7 @@ def main() -> None:
     camera0_id2boxstate: dict[int, dict] | None = MatchTemplateConfig.getattr(
         "camera0_id2boxstate"
     )
-    adjust_exposure_full_res(camera0_queue, camera0_id2boxstate, True, 0)
+    adjust_exposure_full_res(camera0_queue, camera0_id2boxstate, True, CAMERA_INDEX)
     logger.success("camera0 ajust exposure end")
     try:
         _, image0, image0_metadata = camera0_queue.get(timeout=get_picture_timeout)
@@ -254,6 +255,9 @@ def main() -> None:
         get_picture_timeout_process()
     # -------------------- camera0 -------------------- #
     # ------------------------------ 调整曝光 ------------------------------ #
+
+    # 保存运行时配置
+    save_config_to_yaml(config_path=runtime_config_path)
 
     # ------------------------------ 找到目标 ------------------------------ #
     logger.info("find target start")
@@ -289,12 +293,12 @@ def main() -> None:
                 "camera0_id2boxstate is None, use find_target instead of find_around_target"
             )
             camera0_id2boxstate, camera0_got_target_number = find_target(
-                rectified_image0, 0
+                rectified_image0, CAMERA_INDEX
             )
         else:
             logger.success("camera0_id2boxstate is not None, use find_around_target")
             camera0_id2boxstate, camera0_got_target_number = find_around_target(
-                rectified_image0, 0
+                rectified_image0, CAMERA_INDEX
             )
         logger.info(f"image0 find target camera0_id2boxstate: \n{camera0_id2boxstate}")
         logger.info(f"image0 find target number: {camera0_got_target_number}")
@@ -396,7 +400,7 @@ def main() -> None:
                         camera0_queue,
                         camera0_id2boxstate,
                         True,
-                        0,
+                        CAMERA_INDEX,
                     )
 
                     # ---------- 补光灯 ---------- #
@@ -455,7 +459,7 @@ def main() -> None:
 
                     # --------------- 小区域模板匹配 --------------- #
                     _, camera0_got_target_number = find_around_target(
-                        rectified_image0, 0
+                        rectified_image0, CAMERA_INDEX
                     )
                     if camera0_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
@@ -483,7 +487,7 @@ def main() -> None:
                         camera0_queue,
                         camera0_id2boxstate if camera0_id2boxstate is not None else {},
                         False,
-                        0,
+                        CAMERA_INDEX,
                     )
                     logger.info(f"{exposure2camera0_id2boxstate = }")
 
@@ -789,7 +793,7 @@ def main() -> None:
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
-                            find_lost_target(rectified_image0, 0)
+                            find_lost_target(rectified_image0, CAMERA_INDEX)
                             target_number = MatchTemplateConfig.getattr("target_number")
                             camera0_got_target_number = MatchTemplateConfig.getattr(
                                 "camera0_got_target_number"

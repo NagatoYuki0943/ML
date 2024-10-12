@@ -111,12 +111,12 @@ def adjust_exposure_by_mean_cuts(
 
     if mean_bright < low:
         logger.info(
-            f"current_exposure_time = {exposure_time}, {mean_bright = }, {step = }, direction = 1"
+            f"current_exposure_time = {exposure_time}, {mean_bright = } < {low}, {step = }, direction = 1"
         )
         return exposure_time + step, 1
     elif mean_bright > high:
         logger.info(
-            f"current_exposure_time = {exposure_time}, {mean_bright = }, {step = }, direction = -1"
+            f"current_exposure_time = {exposure_time}, {mean_bright = } > {high}, {step = }, direction = -1"
         )
         return exposure_time + step, -1
     else:
@@ -200,7 +200,7 @@ def adjust_exposure_full_res(
     i = 0
     while stack:
         i += 1
-        logger.info(f"stack size: {len(stack)}, i: {i}")
+        logger.info(f"camera_index: {camera_index} stack size: {len(stack)}, i: {i}")
 
         current_id2boxstate, current_exposure_time = stack.pop()
         if camera_index == 0:
@@ -211,7 +211,7 @@ def adjust_exposure_full_res(
         # 需要更暗
         if current_exposure_time < exposure_time_range[0]:
             logger.warning(
-                f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us"
+                f"camera_index: {camera_index} exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us"
             )
             if current_id2boxstate is None:
                 exposure2id2boxstate[exposure_time_range[0]] = current_id2boxstate
@@ -223,7 +223,7 @@ def adjust_exposure_full_res(
         # 需要更亮
         if current_exposure_time > exposure_time_range[1]:
             logger.warning(
-                f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash"
+                f"camera_index: {camera_index} exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash"
             )
             if current_id2boxstate is None:
                 exposure2id2boxstate[exposure_time_range[1]] = current_id2boxstate
@@ -235,7 +235,7 @@ def adjust_exposure_full_res(
         # 超出次数, 设置为最后一次
         if i > adjust_total_times:
             logger.warning(
-                f"adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us"
+                f"camera_index: {camera_index} adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us"
             )
             if current_id2boxstate is None:
                 exposure2id2boxstate[current_exposure_time] = current_id2boxstate
@@ -251,12 +251,12 @@ def adjust_exposure_full_res(
                 timeout=get_picture_timeout
             )
             logger.info(
-                f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}"
+                f"camera_index: {camera_index} camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}"
             )
 
             if current_id2boxstate is None:
                 # 全图调整
-                logger.info("adjust exposure for full picture")
+                logger.info(f"camera_index: {camera_index} adjust exposure for full picture")
                 new_exposure_time, direction = adjust_exposure_by_mean(
                     image,
                     image_metadata["ExposureTime"],
@@ -270,7 +270,7 @@ def adjust_exposure_full_res(
                     # current_id2boxstate is None
                     exposure2id2boxstate[new_exposure_time] = current_id2boxstate
                     logger.success(
-                        f"full picture exposure time {new_exposure_time} us is ok"
+                        f"camera_index: {camera_index} full picture exposure time {new_exposure_time} us is ok"
                     )
                 # 需要调整
                 else:
@@ -279,7 +279,7 @@ def adjust_exposure_full_res(
 
             elif cut_boxes_in_one_image:
                 # 全图调整, 一次性切割全部 box
-                logger.info("adjust exposure for full picture with cut boxes")
+                logger.info(f"camera_index: {camera_index} adjust exposure for full picture with cut boxes")
                 # 获取 boxes
                 boxes = [
                     boxstate["box"]
@@ -299,7 +299,7 @@ def adjust_exposure_full_res(
                 if direction == 0:
                     exposure2id2boxstate[new_exposure_time].update(current_id2boxstate)
                     logger.success(
-                        f"full picture exposure time {new_exposure_time} us is ok"
+                        f"camera_index: {camera_index} full picture exposure time {new_exposure_time} us is ok"
                     )
                 # 需要调整
                 else:
@@ -308,7 +308,7 @@ def adjust_exposure_full_res(
 
             else:
                 # 每个 box 单独调整
-                logger.info("adjust exposure for every box")
+                logger.info(f"camera_index: {camera_index} adjust exposure for every box")
                 # directions 和 new_exposure_times 的 key 对应 boxid
                 directions = {}
                 new_exposure_times = {}
@@ -317,7 +317,7 @@ def adjust_exposure_full_res(
                     box = boxstate["box"]
                     # 空box不处理
                     if box is None:
-                        logger.warning(f"boxid {box_id}, box is None, ignore")
+                        logger.warning(f"camera_index: {camera_index} {box_id = }, box is None, ignore")
                         none_box_ids.append(box_id)
                         continue
                     target_image = image[box[1] : box[3], box[0] : box[2]]
@@ -333,7 +333,7 @@ def adjust_exposure_full_res(
                     directions[box_id] = direction
                     new_exposure_times[box_id] = new_exposure_time
                     logger.info(
-                        f"boxid = {box_id}, {box = }, {new_exposure_time = }, {direction = }"
+                        f"camera_index: {camera_index} {box_id = }, {box = }, {new_exposure_time = }, {direction = }"
                     )
 
                 logger.info(f"{directions = }")
@@ -347,7 +347,7 @@ def adjust_exposure_full_res(
                         none_id2boxstate[none_box_id] = none_boxstate
                     exposure2id2boxstate[current_exposure_time].update(none_id2boxstate)
                     logger.warning(
-                        f"ignore {none_box_ids} box, use current exposure time"
+                        f"camera_index: {camera_index} ignore {none_box_ids} box, use current exposure time"
                     )
 
                 # 没有 box 需要调整
@@ -355,13 +355,13 @@ def adjust_exposure_full_res(
                     exposure2id2boxstate[current_exposure_time].update(
                         current_id2boxstate
                     )
-                    logger.warning("no box can adjust, use current exposure time")
+                    logger.warning(f"camera_index: {camera_index} no box can adjust, use current exposure time")
                 # 所有 box 都合适
                 elif all(direction == 0 for direction in directions.values()):
                     new_exposure_time = list(new_exposure_times.values())[0]
                     exposure2id2boxstate[new_exposure_time].update(current_id2boxstate)
                     logger.success(
-                        f"id2boxstate: {current_id2boxstate}, exposure time {new_exposure_time} us is ok"
+                        f"camera_index: {camera_index} id2boxstate: {current_id2boxstate}, exposure time {new_exposure_time} us is ok"
                     )
                 # box 需要分组
                 else:
@@ -397,7 +397,7 @@ def adjust_exposure_full_res(
                         # 放入栈中, 继续调整
                         stack.append((id2boxstate_low, exposure_time_low))
                         logger.success(
-                            f"id2boxstate: {id2boxstate_low}, exposure time need lower, adjust to {exposure_time_low} us"
+                            f"camera_index: {camera_index} id2boxstate: {id2boxstate_low}, exposure time need lower, adjust to {exposure_time_low} us"
                         )
 
                     if directions_ok_keys.size > 0:
@@ -410,7 +410,7 @@ def adjust_exposure_full_res(
                         # 放入最终结果
                         exposure2id2boxstate[exposure_time_ok].update(id2boxstate_ok)
                         logger.success(
-                            f"id2boxstate: {id2boxstate_ok}, exposure time {exposure_time_ok} us is ok"
+                            f"camera_index: {camera_index} id2boxstate: {id2boxstate_ok}, exposure time {exposure_time_ok} us is ok"
                         )
 
                     if directions_high_keys.size > 0:
@@ -423,7 +423,7 @@ def adjust_exposure_full_res(
                         # 放入栈中, 继续调整
                         stack.append((id2boxstate_high, exposure_time_high))
                         logger.success(
-                            f"id2boxstate: {id2boxstate_high}, exposure time need heighter, adjust to {exposure_time_high} us"
+                            f"camera_index: {camera_index} id2boxstate: {id2boxstate_high}, exposure time need heighter, adjust to {exposure_time_high} us"
                         )
 
         except queue.Empty:
@@ -539,7 +539,7 @@ def adjust_exposure_low_res(
     i = 0
     while stack:
         i += 1
-        logger.info(f"stack size: {len(stack)}, i: {i}")
+        logger.info(f"camera_index: {camera_index} stack size: {len(stack)}, i: {i}")
 
         current_id2boxstate, current_exposure_time = stack.pop()
         if camera_index == 0:
@@ -550,7 +550,7 @@ def adjust_exposure_low_res(
         # 需要更暗
         if current_exposure_time < exposure_time_range[0]:
             logger.warning(
-                f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us"
+                f"camera_index: {camera_index} exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us"
             )
             if current_id2boxstate is None:
                 exposure2id2boxstate[exposure_time_range[0]] = current_id2boxstate
@@ -562,7 +562,7 @@ def adjust_exposure_low_res(
         # 需要更亮
         if current_exposure_time > exposure_time_range[1]:
             logger.warning(
-                f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash"
+                f"camera_index: {camera_index} exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash"
             )
             if current_id2boxstate is None:
                 exposure2id2boxstate[exposure_time_range[1]] = current_id2boxstate
@@ -574,7 +574,7 @@ def adjust_exposure_low_res(
         # 超出次数, 设置为最后一次
         if i > adjust_total_times:
             logger.warning(
-                f"adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us"
+                f"camera_index: {camera_index} adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us"
             )
             if current_id2boxstate is None:
                 exposure2id2boxstate[current_exposure_time] = current_id2boxstate
@@ -590,12 +590,12 @@ def adjust_exposure_low_res(
                 timeout=get_picture_timeout
             )
             logger.info(
-                f"camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}"
+                f"camera_index: {camera_index} camera get image: {image_timestamp}, ExposureTime = {image_metadata['ExposureTime']}, AnalogueGain = {image_metadata['AnalogueGain']}, shape = {image.shape}"
             )
 
             if current_id2boxstate is None:
                 # 全图调整
-                logger.info("adjust exposure for full picture")
+                logger.info(f"camera_index: {camera_index} adjust exposure for full picture")
                 new_exposure_time, direction = adjust_exposure_by_mean(
                     image,
                     image_metadata["ExposureTime"],
@@ -609,7 +609,7 @@ def adjust_exposure_low_res(
                     # current_id2boxstate is None
                     exposure2id2boxstate[new_exposure_time] = current_id2boxstate
                     logger.success(
-                        f"full picture exposure time {new_exposure_time} us is ok"
+                        f"camera_index: {camera_index} full picture exposure time {new_exposure_time} us is ok"
                     )
                 # 需要调整
                 else:
@@ -618,7 +618,7 @@ def adjust_exposure_low_res(
 
             elif cut_boxes_in_one_image:
                 # 全图调整, 一次性切割全部 box
-                logger.info("adjust exposure for full picture with cut boxes")
+                logger.info(f"camera_index: {camera_index} adjust exposure for full picture with cut boxes")
                 # 获取 boxes
                 boxes = [
                     boxstate["box"]
@@ -640,7 +640,7 @@ def adjust_exposure_low_res(
                 if direction == 0:
                     exposure2id2boxstate[new_exposure_time].update(current_id2boxstate)
                     logger.success(
-                        f"full picture exposure time {new_exposure_time} us is ok"
+                        f"camera_index: {camera_index} full picture exposure time {new_exposure_time} us is ok"
                     )
                 # 需要调整
                 else:
@@ -649,7 +649,7 @@ def adjust_exposure_low_res(
 
             else:
                 # 每个 box 单独调整
-                logger.info("adjust exposure for every box")
+                logger.info(f"camera_index: {camera_index} adjust exposure for every box")
                 # directions 和 new_exposure_times 的 key 对应 boxid
                 directions = {}
                 new_exposure_times = {}
@@ -658,7 +658,7 @@ def adjust_exposure_low_res(
                     box = boxstate["box"]
                     # 空box不处理
                     if box is None:
-                        logger.warning(f"boxid {box_id}, box is None, ignore")
+                        logger.warning(f"camera_index: {camera_index} {box_id = }, box is None, ignore")
                         none_box_ids.append(box_id)
                         continue
                     # 调整 box 大小
@@ -676,7 +676,7 @@ def adjust_exposure_low_res(
                     directions[box_id] = direction
                     new_exposure_times[box_id] = new_exposure_time
                     logger.info(
-                        f"boxid = {box_id}, {box = }, {new_exposure_time = }, {direction = }"
+                        f"camera_index: {camera_index} {box_id = }, {box = }, {new_exposure_time = }, {direction = }"
                     )
 
                 logger.info(f"{new_exposure_times = }")
@@ -689,7 +689,7 @@ def adjust_exposure_low_res(
                         none_id2boxstate[none_box_id] = none_boxstate
                     exposure2id2boxstate[current_exposure_time].update(none_id2boxstate)
                     logger.warning(
-                        f"ignore {none_box_ids} box, use current exposure time"
+                        f"camera_index: {camera_index} ignore {none_box_ids} box, use current exposure time"
                     )
 
                 # 没有 box 需要调整
@@ -697,13 +697,13 @@ def adjust_exposure_low_res(
                     exposure2id2boxstate[current_exposure_time].update(
                         current_id2boxstate
                     )
-                    logger.warning("no box can adjust, use current exposure time")
+                    logger.warning(f"camera_index: {camera_index} no box can adjust, use current exposure time")
                 # 所有 box 都合适
                 elif all(direction == 0 for direction in directions.values()):
                     new_exposure_time = list(new_exposure_times.values())[0]
                     exposure2id2boxstate[new_exposure_time].update(current_id2boxstate)
                     logger.success(
-                        f"id2boxstate: {current_id2boxstate}, exposure time {new_exposure_time} us is ok"
+                        f"camera_index: {camera_index} id2boxstate: {current_id2boxstate}, exposure time {new_exposure_time} us is ok"
                     )
                 # box 需要分组
                 else:
@@ -739,7 +739,7 @@ def adjust_exposure_low_res(
                         # 放入栈中, 继续调整
                         stack.append((id2boxstate_low, exposure_time_low))
                         logger.success(
-                            f"id2boxstate: {id2boxstate_low}, exposure time need lower, adjust to {exposure_time_low} us"
+                            f"camera_index: {camera_index} id2boxstate: {id2boxstate_low}, exposure time need lower, adjust to {exposure_time_low} us"
                         )
 
                     if directions_ok_keys.size > 0:
@@ -752,7 +752,7 @@ def adjust_exposure_low_res(
                         # 放入最终结果
                         exposure2id2boxstate[exposure_time_ok].update(id2boxstate_ok)
                         logger.success(
-                            f"id2boxstate: {id2boxstate_ok}, exposure time {exposure_time_ok} us is ok"
+                            f"camera_index: {camera_index} id2boxstate: {id2boxstate_ok}, exposure time {exposure_time_ok} us is ok"
                         )
 
                     if directions_high_keys.size > 0:
@@ -765,7 +765,7 @@ def adjust_exposure_low_res(
                         # 放入栈中, 继续调整
                         stack.append((id2boxstate_high, exposure_time_high))
                         logger.success(
-                            f"id2boxstate: {id2boxstate_high}, exposure time need heighter, adjust to {exposure_time_high} us"
+                            f"camera_index: {camera_index} id2boxstate: {id2boxstate_high}, exposure time need heighter, adjust to {exposure_time_high} us"
                         )
 
         except queue.Empty:

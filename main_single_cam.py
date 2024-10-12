@@ -663,6 +663,7 @@ def main() -> None:
                                 for k in camera0_standard_results.keys()
                             }
                             send_msg_data.update(_send_msg_data)
+                            logger.info(f"send_msg_data: {send_msg_data}")
                             send_msg = {
                                 "cmd": "update",
                                 "did": MQTTConfig.getattr("did"),
@@ -705,7 +706,6 @@ def main() -> None:
                         # -------------------- camera0 compare results -------------------- #
 
                         # -------------------- send msg -------------------- #
-                        distance_result = camera0_distance_result
 
                         send_msg_data = {
                             "L3_WK_1": 20,  # 温度传感器
@@ -719,7 +719,7 @@ def main() -> None:
                         }
                         _send_msg_data = {
                             f"L1_SJ_{k+1}": {"X": v[0], "Y": v[1]}
-                            for k, v in distance_result.items()
+                            for k, v in camera0_distance_result.items()
                         }
                         send_msg_data.update(_send_msg_data)
                         logger.info(f"send_msg_data: {send_msg_data}")

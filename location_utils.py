@@ -118,7 +118,7 @@ def rings_location(
 def init_standard_results(
     cycle_results: dict,
     standard_results: dict | None,
-    reference_target_id2offset: dict[int, tuple[float, float]] | None,
+    reference_target_id2offset: dict[int, tuple[float, float]] | None = None,
 ) -> dict | None:
     """更新标准结果"""
     cycle_centers = {k: result["center"] for k, result in cycle_results.items()}
@@ -156,7 +156,7 @@ def init_standard_results(
 def calc_move_distance(
     standard_results: dict,
     cycle_results: dict,
-    reference_target_id2offset: dict[int, tuple[float, float]] | None,
+    reference_target_id2offset: dict[int, tuple[float, float]] | None = None,
 ) -> tuple[dict, set, dict[int, tuple[float, float]] | None]:
     """计算移动距离"""
     defalut_error_distance: float = MainConfig.getattr("defalut_error_distance")

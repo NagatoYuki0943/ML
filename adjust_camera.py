@@ -44,12 +44,12 @@ def adjust_exposure_by_mean(
 
     if mean_bright < low:
         logger.info(
-            f"current_exposure_time = {exposure_time}, {mean_bright = }, {step = }, direction = 1"
+            f"current_exposure_time = {exposure_time}, {mean_bright = } < {low}, {step = }, direction = 1"
         )
         return exposure_time + step, 1
     elif mean_bright > high:
         logger.info(
-            f"current_exposure_time = {exposure_time}, {mean_bright = }, {step = }, direction = -1"
+            f"current_exposure_time = {exposure_time}, {mean_bright = } > {high}, {step = }, direction = -1"
         )
         return exposure_time + step, -1
     else:

@@ -213,7 +213,10 @@ def adjust_exposure_full_res(
             logger.warning(
                 f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us"
             )
-            exposure2id2boxstate[exposure_time_range[0]].update(current_id2boxstate)
+            if current_id2boxstate is None:
+                exposure2id2boxstate[exposure_time_range[0]] = current_id2boxstate
+            else:
+                exposure2id2boxstate[exposure_time_range[0]].update(current_id2boxstate)
             need_darker = True
             continue
 
@@ -222,7 +225,10 @@ def adjust_exposure_full_res(
             logger.warning(
                 f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash"
             )
-            exposure2id2boxstate[exposure_time_range[1]].update(current_id2boxstate)
+            if current_id2boxstate is None:
+                exposure2id2boxstate[exposure_time_range[1]] = current_id2boxstate
+            else:
+                exposure2id2boxstate[exposure_time_range[1]].update(current_id2boxstate)
             need_lighter = True
             continue
 
@@ -231,7 +237,10 @@ def adjust_exposure_full_res(
             logger.warning(
                 f"adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us"
             )
-            exposure2id2boxstate[current_exposure_time].update(current_id2boxstate)
+            if current_id2boxstate is None:
+                exposure2id2boxstate[current_exposure_time] = current_id2boxstate
+            else:
+                exposure2id2boxstate[current_exposure_time].update(current_id2boxstate)
             continue
 
         # 忽略多于图像
@@ -543,7 +552,10 @@ def adjust_exposure_low_res(
             logger.warning(
                 f"exposure time: {current_exposure_time} us lower out of range, set exposure time to {exposure_time_range[0]} us"
             )
-            exposure2id2boxstate[exposure_time_range[0]].update(current_id2boxstate)
+            if current_id2boxstate is None:
+                exposure2id2boxstate[exposure_time_range[0]] = current_id2boxstate
+            else:
+                exposure2id2boxstate[exposure_time_range[0]].update(current_id2boxstate)
             need_darker = True
             continue
 
@@ -552,7 +564,10 @@ def adjust_exposure_low_res(
             logger.warning(
                 f"exposure time: {current_exposure_time} us higher out of range, set exposure time to {exposure_time_range[1]} us, and need flash"
             )
-            exposure2id2boxstate[exposure_time_range[1]].update(current_id2boxstate)
+            if current_id2boxstate is None:
+                exposure2id2boxstate[exposure_time_range[1]] = current_id2boxstate
+            else:
+                exposure2id2boxstate[exposure_time_range[1]].update(current_id2boxstate)
             need_lighter = True
             continue
 
@@ -561,7 +576,10 @@ def adjust_exposure_low_res(
             logger.warning(
                 f"adjust exposure times: {i}, final failed, set exposure time to {current_exposure_time} us"
             )
-            exposure2id2boxstate[current_exposure_time].update(current_id2boxstate)
+            if current_id2boxstate is None:
+                exposure2id2boxstate[current_exposure_time] = current_id2boxstate
+            else:
+                exposure2id2boxstate[current_exposure_time].update(current_id2boxstate)
             continue
 
         # 忽略多于图像

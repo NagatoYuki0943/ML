@@ -134,7 +134,7 @@ def camera_engine(
                 0,
                 capture_time_interval / 1000 - (captime_time_end - captime_time_begin),
             )
-            logger.info(f"camera {camera_index} {sleep_time = } s")
+            # logger.debug(f"camera {camera_index} {sleep_time = } s")
             time.sleep(sleep_time)
 
         except Exception as e:

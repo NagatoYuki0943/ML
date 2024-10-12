@@ -287,9 +287,9 @@ class RaspberryCameras:
         array: np.ndarray = request.make_array("main")
         metadata = request.get_metadata()  # this is the metadata for this image
         request.release()
-        logger.info(
-            f"{timestamp} ExposureTime = {metadata['ExposureTime']}, AnalogueGain = {metadata['AnalogueGain']}"
-        )
+        # logger.info(
+        #     f"{timestamp} ExposureTime = {metadata['ExposureTime']}, AnalogueGain = {metadata['AnalogueGain']}"
+        # )
 
         return array, metadata
 

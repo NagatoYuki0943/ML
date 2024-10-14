@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -227,6 +228,8 @@ need_send_get_status_msg = False
 received_temp_control_msg = True
 # 温度是否平稳
 is_temp_stable = False
+# 是否需要发送进入工作状态消息
+need_send_in_working_state_msg = False
 
 logger.info("init global variables end")
 # -------------------- 初始化全局变量 -------------------- #
@@ -846,14 +849,18 @@ def main() -> None:
                     # 防止值不存在
                     send_msg_data = {}
 
-                    target_number = MatchTemplateConfig.getattr("target_number")
+                    target_number: int = MatchTemplateConfig.getattr("target_number")
 
                     main_camera_index: int = CameraConfig.getattr("main_camera_index")
+                    camera_left_index: int = CameraConfig.getattr("camera_left_index")
                     camera0_standard_results: dict | None = RingsLocationConfig.getattr(
                         "camera0_standard_results"
                     )
                     camera1_standard_results: dict | None = RingsLocationConfig.getattr(
                         "camera1_standard_results"
+                    )
+                    z_move_threshold: float = RingsLocationConfig.getattr(
+                        "z_move_threshold"
                     )
                     # 初始化标准结果
                     if (
@@ -927,14 +934,18 @@ def main() -> None:
                                 for k in camera0_standard_results.keys()
                             }
                             src_data = {
-                                "left_cam": camera0_send_msg_data,
-                                "right_cam": camera1_send_msg_data,
+                                "left_cam": camera0_send_msg_data
+                                if camera_left_index == 0
+                                else camera1_send_msg_data,
+                                "right_cam": camera1_send_msg_data
+                                if camera_left_index == 0
+                                else camera0_send_msg_data,
                             }
 
                             _send_msg_data = (
-                                camera0_send_msg_data
+                                deepcopy(camera0_send_msg_data)
                                 if main_camera_index == 0
-                                else camera1_send_msg_data
+                                else deepcopy(camera1_send_msg_data)
                             )
                             # add z axis
                             _send_msg_data = {
@@ -947,6 +958,7 @@ def main() -> None:
                             send_msg = {
                                 "cmd": "update",
                                 "did": MQTTConfig.getattr("did"),
+                                "at": get_now_time(),
                                 "data": send_msg_data,
                             }
                             # mqtt_send_queue.put(send_msg)
@@ -1037,33 +1049,75 @@ def main() -> None:
                             for k, v in camera1_distance_result.items()
                         }
                         src_data = {
-                            "left_cam": camera0_send_msg_data,
-                            "right_cam": camera1_send_msg_data,
+                            "left_cam": camera0_send_msg_data
+                            if camera_left_index == 0
+                            else camera1_send_msg_data,
+                            "right_cam": camera1_send_msg_data
+                            if camera_left_index == 0
+                            else camera0_send_msg_data,
                         }
 
                         _send_msg_data = (
-                            camera0_send_msg_data
+                            deepcopy(camera0_send_msg_data)
                             if main_camera_index == 0
-                            else camera1_send_msg_data
+                            else deepcopy(camera1_send_msg_data)
                         )
-                        # TODO: 求 Z 轴的变化
+                        # TODO: 求 Z 轴的变化, 临时使用主相机的检测距离计算
+                        if main_camera_index == 0:
+                            temp_standard_results = camera0_standard_results
+                            temp_cycle_results = camera0_cycle_results
+                        else:
+                            temp_standard_results = camera1_standard_results
+                            temp_cycle_results = camera1_cycle_results
+                        z_move = {
+                            f"L1_SJ_{k+1}": temp_cycle_results[k]["distance"]
+                            - temp_standard_results[k]["distance"]
+                            if (
+                                temp_cycle_results[k]["distance"] is not None
+                                and temp_standard_results[k]["distance"] is not None
+                            )
+                            else defalut_error_distance
+                            for k in temp_standard_results.keys()
+                        }
+                        logger.info(f"z_move: {z_move}")
+                        # 计算 z 轴是否超出阈值
+                        z_over_distance_ids = []
+                        for k, v in z_move.items():
+                            if abs(v) > z_move_threshold:
+                                z_over_distance_ids.append(int(k.split("_")[-1]) - 1)
+                                logger.warning(
+                                    f"box {k} z move distance is over threshold {z_move_threshold}."
+                                )
+
                         _send_msg_data = {
-                            k: {**v, "Z": 0} for k, v in _send_msg_data.items()
+                            k: {**v, "Z": z_move[k]} for k, v in _send_msg_data.items()
                         }
                         _send_msg_data["src_data"] = src_data
                         send_msg_data.update(_send_msg_data)
                         logger.info(f"send_msg_data: {send_msg_data}")
-                        if len(camera0_over_distance_ids) > 0:
+
+                        # 超出阈值id
+                        over_distance_ids = (
+                            deepcopy(camera0_over_distance_ids)
+                            if main_camera_index == 0
+                            else deepcopy(camera1_over_distance_ids)
+                        )
+                        # 添加 z 轴超出阈值 id
+                        for z_over_distance_id in z_over_distance_ids:
+                            over_distance_ids.add(z_over_distance_id)
+                        if len(over_distance_ids) > 0:
                             # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
                             logger.warning(
-                                f"box {camera0_over_distance_ids} move distance is over threshold."
+                                f"box {over_distance_ids} move distance is over threshold."
                             )
 
                             # 保存位移的图片
-                            image_path = save_dir / "target_displacement.jpg"
-                            save_image(image0, image_path)
+                            image_path0 = save_dir / "target_displacement0.jpg"
+                            image_path1 = save_dir / "target_displacement1.jpg"
+                            save_image(image0, image_path0)
+                            save_image(image1, image_path1)
                             logger.info(
-                                f"save `target displacement` image to {image_path}"
+                                f"save `target displacement` image to {image_path0}, {image_path1}"
                             )
                             # 位移告警消息
                             send_msg = {
@@ -1073,21 +1127,28 @@ def main() -> None:
                                     "type": "displacement",
                                     "at": get_now_time(),
                                     "number": [
-                                        i + 1 for i in camera0_over_distance_ids
+                                        i + 1 for i in over_distance_ids
                                     ],  # 表示异常的靶标编号
                                     "data": send_msg_data,
-                                    "path": [str(image_path)],  # 图片本地路径
-                                    "img": ["target_displacement.jpg"],  # 文件名称
+                                    "path": [
+                                        str(image_path0),
+                                        str(image_path1),
+                                    ],  # 图片本地路径
+                                    "img": [
+                                        "target_displacement0.jpg",
+                                        "target_displacement1.jpg",
+                                    ],  # 文件名称
                                 },
                             }
                             # mqtt_send_queue.put(send_msg)
                         else:
                             # ✅️✅️✅️ 所有 box 移动距离都小于阈值 ✅️✅️✅️
                             logger.success("All box move distance is under threshold.")
-                            # 正常数据消息
+                            # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                             send_msg = {
                                 "cmd": "update",
                                 "did": MQTTConfig.getattr("did"),
+                                "at": get_now_time(),
                                 "data": send_msg_data,
                             }
                             # mqtt_send_queue.put(send_msg)
@@ -1099,7 +1160,7 @@ def main() -> None:
                     target_number = MatchTemplateConfig.getattr("target_number")
 
                     # -------------------- camera0 lost box -------------------- #
-                    camera0_got_target_number = MatchTemplateConfig.getattr(
+                    camera0_got_target_number: int = MatchTemplateConfig.getattr(
                         "camera0_got_target_number"
                     )
                     if target_number > camera0_got_target_number or target_number == 0:
@@ -1152,7 +1213,7 @@ def main() -> None:
                                 )
 
                                 # 保存丢失的图片
-                                image_path = save_dir / "target_loss.jpg"
+                                image_path = save_dir / "target_loss0.jpg"
                                 save_image(image0, image_path)
                                 logger.info(f"save `target loss` image to {image_path}")
                                 # 目标丢失告警消息
@@ -1167,7 +1228,7 @@ def main() -> None:
                                         ],  # 异常的靶标编号
                                         "data": send_msg_data,
                                         "path": [str(image_path)],  # 图片本地路径
-                                        "img": ["target_loss.jpg"],  # 文件名称
+                                        "img": ["target_loss0.jpg"],  # 文件名称
                                     },
                                 }
                                 # mqtt_send_queue.put(send_msg)
@@ -1241,7 +1302,7 @@ def main() -> None:
                                 )
 
                                 # 保存丢失的图片
-                                image_path = save_dir / "target_loss.jpg"
+                                image_path = save_dir / "target_loss1.jpg"
                                 save_image(image1, image_path)
                                 logger.info(f"save `target loss` image to {image_path}")
                                 # 目标丢失告警消息
@@ -1256,7 +1317,7 @@ def main() -> None:
                                         ],  # 异常的靶标编号
                                         "data": send_msg_data,
                                         "path": [str(image_path)],  # 图片本地路径
-                                        "img": ["target_loss.jpg"],  # 文件名称
+                                        "img": ["target_loss1.jpg"],  # 文件名称
                                     },
                                 }
                                 # mqtt_send_queue.put(send_msg)
@@ -1339,19 +1400,19 @@ class Receive:
         if cmd == "devicedeploying":
             Receive.receive_device_deploying_msg(received_msg)
 
-        # 靶标校正消息
-        elif cmd == "targetcorrection":
-            Receive.receive_target_correction_msg(received_msg)
+        # # 靶标校正消息
+        # elif cmd == "targetcorrection":
+        #     Receive.receive_target_correction_msg(received_msg)
 
-        elif cmd == "deletetarget":
-            Receive.receive_delete_target_msg(received_msg)
+        # elif cmd == "deletetarget":
+        #     Receive.receive_delete_target_msg(received_msg)
 
-        elif cmd == "settarget":
-            Receive.receive_set_target_msg(received_msg)
+        # elif cmd == "settarget":
+        #     Receive.receive_set_target_msg(received_msg)
 
-        # 参考靶标设定消息
-        elif cmd == "setreferencetarget":
-            Receive.receive_set_reference_target_msg(received_msg)
+        # # 参考靶标设定消息
+        # elif cmd == "setreferencetarget":
+        #     Receive.receive_set_reference_target_msg(received_msg)
 
         # 设备状态查询消息
         elif cmd == "getstatus":
@@ -1401,7 +1462,7 @@ class Receive:
         #     "msgid":"bb6f3eeb2",
         # }
         global need_send_device_deploying_msg
-        global camera0_cycle_results
+        global camera0_cycle_results, camera1_cycle_results
 
         logger.info("device deploying, reset config and init target")
         # 设备部署，重置配置和初始靶标
@@ -1409,6 +1470,7 @@ class Receive:
         RingsLocationConfig.setattr("camera0_standard_results", None)
         # 重设检测的结果(用于发送新的消息)
         camera0_cycle_results = {}
+        camera1_cycle_results = {}
         # 需要发送部署相应消息
         need_send_device_deploying_msg = True
         logger.success(
@@ -1782,13 +1844,18 @@ class Receive:
         # }
         try:
             image0_timestamp, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
+            image1_timestamp, image1, _ = camera1_queue.get(timeout=get_picture_timeout)
             logger.info(
-                f"`upload image` get image success, image_timestamp: {image0_timestamp}"
+                f"`upload image` get image success, image_timestamp: {image0_timestamp}, {image1_timestamp}"
             )
             # 保存图片
-            image_path = save_dir / "upload_image.jpg"
-            save_image(image0, image_path)
-            logger.info(f"save `upload image` success, save image to {image_path}")
+            image_path0 = save_dir / "upload_image0.jpg"
+            image_path1 = save_dir / "upload_image1.jpg"
+            save_image(image0, image_path0)
+            save_image(image1, image_path1)
+            logger.info(
+                f"save `upload image` success, save image to {image_path0}, {image_path1}"
+            )
 
             # 现场图像查询响应消息
             send_msg = {
@@ -1798,13 +1865,15 @@ class Receive:
                     "did": MQTTConfig.getattr("did"),
                     "at": get_now_time(),
                     "msg": "upload succeed",
-                    "path": [str(image_path)],  # 图片本地路径
-                    "img": ["upload_image.jpg"],  # 文件名称
+                    "path": [str(image_path0), str(image_path1)],  # 图片本地路径
+                    "img": ["upload_image0.jpg", "upload_image1.jpg"],  # 文件名称
                 },
                 "msgid": "bb6f3eeb2",
             }
             # mqtt_send_queue.put(send_msg)
-            logger.success(f"upload image send msg success, image_path: {image_path}")
+            logger.success(
+                f"upload image send msg success, image_path: {image_path0}, {image_path1}"
+            )
         except queue.Empty:
             logger.warning("upload image send msg failed")
             # 现场图像查询响应消息
@@ -1881,6 +1950,7 @@ class Receive:
     def receive_stop_adjust_temp_data(received_msg: dict | None = None):
         """温控停止消息"""
         global is_temp_stable
+        global need_send_in_working_state_msg
         # {
         #     "cmd": "stopadjusttemp",
         #     "camera": "2",
@@ -1893,6 +1963,7 @@ class Receive:
         # }
         logger.success("received stop adjust temp data")
         is_temp_stable = True
+        need_send_in_working_state_msg = True
 
     @staticmethod
     def receive_reboot_msg(received_msg: dict | None = None):
@@ -2013,7 +2084,7 @@ class Send:
 
         # 设备进入工作状态消息
         # 温度正常
-        if is_temp_stable:
+        if need_send_in_working_state_msg:
             Send.send_in_working_state_msg()
 
         # 温度异常告警消息
@@ -2077,23 +2148,49 @@ class Send:
 
         logger.info("send device deploying msg")
 
-        if not camera0_cycle_results:
+        if not camera0_cycle_results or not camera1_cycle_results:
             logger.warning(
-                "camera0_cycle_results is empty, can't send device deploying msg, wait for next cycle."
+                "camera0_cycle_results or camera1_cycle_results is empty, can't send device deploying msg, wait for next cycle."
             )
             return
 
         try:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
-            image_path = save_dir / "deploy.jpg"
-            save_image(image0, image_path)
-            logger.info(f"save `deploying image` success, save image to {image_path}")
+            _, image1, _ = camera1_queue.get(timeout=get_picture_timeout)
+            image_path0 = save_dir / "deploy0.jpg"
+            image_path1 = save_dir / "deploy1.jpg"
+            save_image(image0, image_path0)
+            save_image(image1, image_path1)
+            logger.info(
+                f"save `deploying image` success, save image to {image_path0}, {image_path1}"
+            )
+            path = [str(image_path0), str(image_path1)]
+            img = ["deploy0.jpg", "deploy1.jpg"]
         except queue.Empty:
-            image_path = None
+            path = []
+            img = []
             get_picture_timeout_process()
 
-        _data = Send.get_xyz(camera0_cycle_results)
+        main_camera_index: int = CameraConfig.getattr("main_camera_index")
+        camera_left_index: int = CameraConfig.getattr("camera_left_index")
+        camera0_data = Send.get_xyz(camera0_cycle_results)
+        camera1_data = Send.get_xyz(camera1_cycle_results)
+        # TODO: 求 Z 轴距离
+        _data = (
+            deepcopy(camera0_data) if main_camera_index == 0 else deepcopy(camera1_data)
+        )
+        # 移除 camera0_data 和 camera1_data 中的 z 轴数据
+        for v in camera0_data.values():
+            v.pop("Z", None)
+        for v in camera1_data.values():
+            v.pop("Z", None)
+
+        src_data = {
+            "left_cam": camera0_data if camera_left_index == 0 else camera1_data,
+            "right_cam": camera1_data if camera_left_index == 0 else camera0_data,
+        }
+        _data["src_data"] = src_data
 
         send_msg = {
             "cmd": "devicedeploying",
@@ -2105,15 +2202,22 @@ class Send:
                 "at": get_now_time(),
                 "sw_version": "230704180",  # 版本号
                 "data": _data,
-                # "data": { # 靶标初始位置
-                #     "L1_SJ_1": {"box": [x1, y1, x2, y2], "X": 19.01, "Y": 18.31, "Z": 10.8},
-                #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
-                #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
-                # },
-                "path": [
-                    str(image_path) if image_path is not None else ""
-                ],  # 图片本地路径
-                "img": ["deploy.jpg" if image_path is not None else ""],  # 文件名称
+                # "data": {                              # 靶标初始位置
+                #     "L1_SJ_1": {"box": [x1, y1, x2, y2], "X": 9.01, "Y": 8.01, "Z": 2.51},
+                #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 4.01},
+                #     "src_data": {
+                #         "left_cam": {
+                #             "L1_SJ_1": {"box": [x1, y1, x2, y2], "X": 9.01, "Y": 8.01},
+                #             "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92},
+                #         },
+                #         "right_cam": {
+                #             "L1_SJ_1": {"box": [x1, y1, x2, y2], "X": 9.01, "Y": 8.01},
+                #             "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92},
+                #         }
+                #     }
+                # }
+                "path": path,  # 图片本地路径
+                "img": img,  # 文件名称
             },
             "msgid": "bb6f3eeb2",
         }
@@ -2176,8 +2280,11 @@ class Send:
             image_path = save_dir / "delete_target.jpg"
             save_image(image0, image_path)
             logger.info(f"save `delete target` success, save image to {image_path}")
+            path = str(image_path)
+            img = "delete_target.jpg"
         except queue.Empty:
-            image_path = None
+            path = ""
+            img = ""
             get_picture_timeout_process()
 
         _data = Send.get_xyz(camera0_cycle_results)
@@ -2196,12 +2303,8 @@ class Send:
                 #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
                 #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
-                "path": str(image_path)
-                if image_path is not None
-                else "",  # 图片本地路径
-                "img": "delete_target.jpg"
-                if image_path is not None
-                else "",  # 文件名称
+                "path": path,  # 图片本地路径
+                "img": img,  # 文件名称
             },
             "msgid": "bb6f3eeb2",
         }
@@ -2228,8 +2331,11 @@ class Send:
             image_path = save_dir / "set_target.jpg"
             save_image(image0, image_path)
             logger.info(f"save `set target` success, save image to {image_path}")
+            path = str(image_path)
+            img = "set_target.jpg"
         except queue.Empty:
-            image_path = None
+            path = ""
+            img = ""
             get_picture_timeout_process()
 
         _data = Send.get_xyz(camera0_cycle_results)
@@ -2248,10 +2354,8 @@ class Send:
                 #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
                 #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
-                "path": str(image_path)
-                if image_path is not None
-                else "",  # 图片本地路径
-                "img": "set_target.jpg" if image_path is not None else "",  # 文件名称
+                "path": path,  # 图片本地路径
+                "img": img,  # 文件名称
             },
             "msgid": "bb6f3eeb2",
         }
@@ -2289,6 +2393,9 @@ class Send:
         camera0_standard_results: dict | None = RingsLocationConfig.getattr(
             "camera0_standard_results"
         )
+        camera1_standard_results: dict | None = RingsLocationConfig.getattr(
+            "camera1_standard_results"
+        )
         box_sensor_state = {}
         if camera0_standard_results and camera0_cycle_results:
             for k in camera0_standard_results.keys():
@@ -2303,6 +2410,22 @@ class Send:
         else:
             logger.warning(
                 "camera0_cycle_results or camera0_standard_results is None, wait for next cycle"
+            )
+            return
+
+        if camera1_standard_results and camera1_cycle_results:
+            for k in camera1_standard_results.keys():
+                if k in camera1_cycle_results.keys():
+                    v = camera1_cycle_results[k]
+                    if v["box"] is not None and v["center"] is not None:
+                        box_sensor_state[f"L1_SJ_{k+1}"] = 0
+                    else:
+                        box_sensor_state[f"L1_SJ_{k+1}"] = -2
+                else:
+                    box_sensor_state[f"L1_SJ_{k+1}"] = -2
+        else:
+            logger.warning(
+                "camera1_cycle_results or camera1_standard_results is None, wait for next cycle"
             )
             return
 
@@ -2337,6 +2460,7 @@ class Send:
 
     @staticmethod
     def send_in_working_state_msg():
+        global need_send_in_working_state_msg
         """设备进入工作状态响应消息"""
         send_msg = {
             "cmd": "devicestate",
@@ -2350,6 +2474,7 @@ class Send:
         }
         # mqtt_send_queue.put(send_msg)
         logger.success("send working state msg")
+        need_send_in_working_state_msg = False
 
     @staticmethod
     def send_temperature_alarm_msg():

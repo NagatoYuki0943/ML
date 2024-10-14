@@ -1670,8 +1670,11 @@ class Send:
             image_path = save_dir / "deploy.jpg"
             save_image(image0, image_path)
             logger.info(f"save `deploying image` success, save image to {image_path}")
+            path = [str(image_path)]
+            img = ["deploy.jpg"]
         except queue.Empty:
-            image_path = None
+            path = []
+            img = []
             get_picture_timeout_process()
 
         _data = Send.get_xyz(camera0_cycle_results)
@@ -1691,10 +1694,8 @@ class Send:
                 #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
                 #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
-                "path": [
-                    str(image_path) if image_path is not None else ""
-                ],  # 图片本地路径
-                "img": ["deploy.jpg" if image_path is not None else ""],  # 文件名称
+                "path": path,  # 图片本地路径
+                "img": img,  # 文件名称
             },
             "msgid": "bb6f3eeb2",
         }
@@ -1757,8 +1758,11 @@ class Send:
             image_path = save_dir / "delete_target.jpg"
             save_image(image0, image_path)
             logger.info(f"save `delete target` success, save image to {image_path}")
+            path = str(image_path)
+            img = "delete_target.jpg"
         except queue.Empty:
-            image_path = None
+            path = ""
+            img = ""
             get_picture_timeout_process()
 
         _data = Send.get_xyz(camera0_cycle_results)
@@ -1777,12 +1781,8 @@ class Send:
                 #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
                 #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
-                "path": str(image_path)
-                if image_path is not None
-                else "",  # 图片本地路径
-                "img": "delete_target.jpg"
-                if image_path is not None
-                else "",  # 文件名称
+                "path": path,  # 图片本地路径
+                "img": img,  # 文件名称
             },
             "msgid": "bb6f3eeb2",
         }
@@ -1809,8 +1809,11 @@ class Send:
             image_path = save_dir / "set_target.jpg"
             save_image(image0, image_path)
             logger.info(f"save `set target` success, save image to {image_path}")
+            path = str(image_path)
+            img = "set_target.jpg"
         except queue.Empty:
-            image_path = None
+            path = ""
+            img = ""
             get_picture_timeout_process()
 
         _data = Send.get_xyz(camera0_cycle_results)
@@ -1829,10 +1832,8 @@ class Send:
                 #     "L1_SJ_2": {"box": [x1, y1, x2, y2], "X": 4.09, "Y": 8.92, "Z": 6.7},
                 #     "L1_SJ_3": {"box": [x1, y1, x2, y2], "X": 2.02, "Y": 5.09, "Z": 14.6}
                 # },
-                "path": str(image_path)
-                if image_path is not None
-                else "",  # 图片本地路径
-                "img": "set_target.jpg" if image_path is not None else "",  # 文件名称
+                "path": path,  # 图片本地路径
+                "img": img,  # 文件名称
             },
             "msgid": "bb6f3eeb2",
         }

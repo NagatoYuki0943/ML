@@ -219,6 +219,8 @@ need_send_get_status_msg = False
 received_temp_control_msg = True
 # 温度是否平稳
 is_temp_stable = False
+# 是否需要发送进入工作状态消息
+need_send_in_working_state_msg = False
 
 logger.info("init global variables end")
 # -------------------- 初始化全局变量 -------------------- #
@@ -614,7 +616,7 @@ def main() -> None:
                     # 防止值不存在
                     send_msg_data = {}
 
-                    target_number = MatchTemplateConfig.getattr("target_number")
+                    target_number: int = MatchTemplateConfig.getattr("target_number")
 
                     camera0_standard_results: dict | None = RingsLocationConfig.getattr(
                         "camera0_standard_results"
@@ -793,7 +795,7 @@ def main() -> None:
                             # -------------------- 模板匹配 -------------------- #
                             find_lost_target(rectified_image0, CAMERA_INDEX)
                             target_number = MatchTemplateConfig.getattr("target_number")
-                            camera0_got_target_number = MatchTemplateConfig.getattr(
+                            camera0_got_target_number: int = MatchTemplateConfig.getattr(
                                 "camera0_got_target_number"
                             )
                             # -------------------- 模板匹配 -------------------- #
@@ -1462,6 +1464,7 @@ class Receive:
     def receive_stop_adjust_temp_data(received_msg: dict | None = None):
         """温控停止消息"""
         global is_temp_stable
+        global need_send_in_working_state_msg
         # {
         #     "cmd": "stopadjusttemp",
         #     "camera": "2",
@@ -1474,6 +1477,7 @@ class Receive:
         # }
         logger.success("received stop adjust temp data")
         is_temp_stable = True
+        need_send_in_working_state_msg = True
 
     @staticmethod
     def receive_reboot_msg(received_msg: dict | None = None):
@@ -1594,7 +1598,7 @@ class Send:
 
         # 设备进入工作状态消息
         # 温度正常
-        if is_temp_stable:
+        if need_send_in_working_state_msg:
             Send.send_in_working_state_msg()
 
         # 温度异常告警消息
@@ -1919,6 +1923,7 @@ class Send:
 
     @staticmethod
     def send_in_working_state_msg():
+        global need_send_in_working_state_msg
         """设备进入工作状态响应消息"""
         send_msg = {
             "cmd": "devicestate",
@@ -1932,6 +1937,7 @@ class Send:
         }
         mqtt_send_queue.put(send_msg)
         logger.success("send working state msg")
+        need_send_in_working_state_msg = False
 
     @staticmethod
     def send_temperature_alarm_msg():

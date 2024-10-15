@@ -219,6 +219,13 @@ class RingsLocationConfig(BaseConfig):
 
 
 @dataclass
+class TemperatureConfig(BaseConfig):
+    """临时配置"""
+    lock = Lock()
+    target_temperature: float = 45.0
+
+
+@dataclass
 class SerialCommConfig(BaseConfig):
     """串口通讯模块配置"""
 
@@ -270,6 +277,7 @@ ALL_CONFIGS = [
     StereoCalibrationConfig,
     MatchTemplateConfig,
     RingsLocationConfig,
+    TemperatureConfig,
     SerialCommConfig,
     MQTTConfig,
     FTPConfig,

@@ -23,6 +23,7 @@ from config import (
     CameraConfig,
     RingsLocationConfig,
     AdjustCameraConfig,
+    TemperatureConfig,
     MQTTConfig,
     SerialCommConfig,
     ALL_CONFIGS,
@@ -215,6 +216,8 @@ need_send_delete_target_msg = False
 need_send_set_target_msg = False
 # 是否需要发送获取状态信息
 need_send_get_status_msg = False
+# 温度传感器返回的温度
+temperature_data = None
 # 是否收到温控回复命令
 received_temp_control_msg = True
 # 温度是否平稳
@@ -231,6 +234,11 @@ logger.success("init end")
 
 def main() -> None:
     global camera0_cycle_results
+
+    # -------------------- 控温 -------------------- #
+    target_temperature: float = TemperatureConfig.getattr("target_temperature")
+    Send.send_temperature_control_msg(target_temperature, CAMERA_INDEX)
+    # -------------------- 控温 -------------------- #
 
     # ------------------------------ 调整曝光 ------------------------------ #
     # -------------------- camera0 -------------------- #
@@ -795,8 +803,8 @@ def main() -> None:
                             # -------------------- 模板匹配 -------------------- #
                             find_lost_target(rectified_image0, CAMERA_INDEX)
                             target_number = MatchTemplateConfig.getattr("target_number")
-                            camera0_got_target_number: int = MatchTemplateConfig.getattr(
-                                "camera0_got_target_number"
+                            camera0_got_target_number: int = (
+                                MatchTemplateConfig.getattr("camera0_got_target_number")
                             )
                             # -------------------- 模板匹配 -------------------- #
 
@@ -1418,12 +1426,14 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success("received askadjusttempdata response")
+        logger.success(f"received askadjusttempdata response: {received_msg}")
         received_temp_control_msg = True
 
     @staticmethod
     def receive_temp_data_msg(received_msg: dict | None = None):
         """日常温度数据"""
+
+        global temperature_data
         # {
         #     "cmd": "sendtempdata",
         #     "camera": "2",
@@ -1440,7 +1450,8 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success("received temp data")
+        temperature_data: dict = received_msg.get("param", {})
+        logger.success(f"received temp data: {temperature_data}")
 
     @staticmethod
     def receive_adjust_temp_data_msg(received_msg: dict | None = None):
@@ -1457,7 +1468,8 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success("received adjust temp data")
+        logger.success(f"received adjust temp data: {received_msg}")
+        Send.send_temperature_change_msg(received_msg.get("param", {}))
 
     @staticmethod
     def receive_stop_adjust_temp_data(received_msg: dict | None = None):
@@ -1474,7 +1486,7 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success("received stop adjust temp data")
+        logger.success(f"received stop adjust temp data: {received_msg}")
         is_temp_stable = True
         need_send_in_working_state_msg = True
 
@@ -1512,9 +1524,21 @@ class Receive:
         #     "msgid": "bb6f3eeb2"
         # }
         try:
+            # 旧的温度
+            old_target_temperature: float = TemperatureConfig.getattr(
+                "target_temperature"
+            )
+
             new_config_path = Path(received_msg["body"]["path"])
             # 载入配置文件
             load_config_from_yaml(config_path=new_config_path)
+
+            # 新的温度
+            new_target_temperature: float = TemperatureConfig.getattr(
+                "target_temperature"
+            )
+            if old_target_temperature != new_target_temperature:
+                Send.send_temperature_control_msg(new_target_temperature, CAMERA_INDEX)
 
             # 更新配置文件响应消息
             send_msg = {
@@ -1979,9 +2003,14 @@ class Send:
         logger.warning("send device error msg")
 
     @staticmethod
-    def send_temperature_change_msg():
-        """设备温控变化消息"""
-        global is_temp_stable
+    def send_temperature_change_msg(data: dict):
+        """温控变化消息"""
+        # data: {
+        #     "parctical_t": 10,
+        #     "control_t": 10,
+        #     "control_way": "warm/cold",
+        #     "pwm_data": 10
+        # }
         send_msg = {
             "cmd": "devicestate",
             "body": {
@@ -1989,25 +2018,39 @@ class Send:
                 "type": "temperature_control",
                 "at": get_now_time(),
                 "data": {
-                    "L3_WK_1": 20,  # 内仓实际温度
-                    "control_t": 30,  # 目标温度
-                    "control_way": "warm/cold",
-                    "pwm_data": 10,
+                    "L3_WK_1": data.get("parctical_t", 0),  # 内仓实际温度
+                    "control_t": data.get("control_t", 0),  # 目标温度
+                    "control_way": data.get("control_t", "warm"),
+                    "pwm_data": data.get("pwm_data", 10),
                 },
             },
         }
         # mqtt_send_queue.put(send_msg)
         logger.success("send temperature change msg")
-        is_temp_stable = False
 
     @staticmethod
-    def send_temperature_control_msg():
+    def send_temperature_control_msg(
+        temperature: int = 25,
+        camera: int = 0,
+    ):
+        """温度控制命令"""
         global received_temp_control_msg
         global is_temp_stable
 
-        """温度控制命令"""
         logger.info("send temperature control msg")
-        send_msg = {"cmd": "adjusttempdata", "param": {"control_t": 10}, "msgid": 1}
+        # {
+        #     "cmd":"adjusttempdata",
+        #     "param":{
+        #         "control_t":10，
+        #         "camera":"2"
+        #     },
+        #     "msgid":1
+        # }
+        send_msg = {
+            "cmd": "adjusttempdata",
+            "param": {"control_t": temperature, "camera": f"{camera}"},
+            "msgid": 1,
+        }
         # serial_send_queue.put(send_msg)
         logger.success("send temperature control msg success")
         received_temp_control_msg = False
@@ -2015,8 +2058,16 @@ class Send:
 
     @staticmethod
     def send_adjust_led_level_msg(adjust_led_level_param: dict):
+        """补光灯控制命令"""
         logger.info("send adjust led level msg")
-        # 补光灯控制命令
+        # {
+        #     "cmd":"adjustLEDlevel",
+        #     "param":{
+        #         "level":10,
+        #         "times":1
+        #     },
+        #     "msgid":1
+        # }
         send_msg = {
             "cmd": "adjustLEDlevel",
             "param": adjust_led_level_param,

@@ -1467,7 +1467,6 @@ class Receive:
         logger.info("device deploying, reset config and init target")
         # 设备部署，重置配置和初始靶标
         load_config_from_yaml(config_path=original_config_path)
-        RingsLocationConfig.setattr("camera0_standard_results", None)
         # 重设检测的结果(用于发送新的消息)
         camera0_cycle_results = {}
         camera1_cycle_results = {}
@@ -2191,6 +2190,7 @@ class Send:
             "right_cam": camera1_data if camera_left_index == 0 else camera0_data,
         }
         _data["src_data"] = src_data
+        logger.info(f"send device deploying data: {_data}")
 
         send_msg = {
             "cmd": "devicedeploying",

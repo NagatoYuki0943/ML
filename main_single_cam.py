@@ -989,7 +989,6 @@ class Receive:
         logger.info("device deploying, reset config and init target")
         # 设备部署，重置配置和初始靶标
         load_config_from_yaml(config_path=original_config_path)
-        RingsLocationConfig.setattr("camera0_standard_results", None)
         # 重设检测的结果(用于发送新的消息)
         camera0_cycle_results = {}
         # 需要发送部署相应消息
@@ -1682,6 +1681,7 @@ class Send:
             get_picture_timeout_process()
 
         _data = Send.get_xyz(camera0_cycle_results)
+        logger.info(f"send device deploying data: {_data}")
 
         send_msg = {
             "cmd": "devicedeploying",

@@ -956,7 +956,7 @@ def main() -> None:
                             send_msg_data.update(_send_msg_data)
                             logger.info(f"send_msg_data: {send_msg_data}")
                             send_msg = {
-                                "cmd": "update",
+                                "cmd": "visiondp",
                                 "did": MQTTConfig.getattr("did"),
                                 "at": get_now_time(),
                                 "data": send_msg_data,
@@ -1146,7 +1146,7 @@ def main() -> None:
                             logger.success("All box move distance is under threshold.")
                             # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                             send_msg = {
-                                "cmd": "update",
+                                "cmd": "visiondp",
                                 "did": MQTTConfig.getattr("did"),
                                 "at": get_now_time(),
                                 "data": send_msg_data,

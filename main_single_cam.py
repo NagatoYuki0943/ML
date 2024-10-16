@@ -109,7 +109,6 @@ logger.success("初始化畸变矫正完成")
 # for port in [SerialCommConfig.getattr("camera0_ser_port"), SerialCommConfig.getattr("camera1_ser_port")]:
 #     if port:
 #         object = RaspberrySerialPort(
-#             SerialCommConfig.getattr("temperature_data_save_path"),
 #             port,
 #             SerialCommConfig.getattr("baudrate"),
 #             SerialCommConfig.getattr("timeout"),

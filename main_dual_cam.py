@@ -501,6 +501,8 @@ def main() -> None:
                 # --------------- camera0 --------------- #
                 logger.info("full image0 ajust exposure start")
 
+                # 最大 led level
+                led_level: int = AdjustCameraConfig.getattr("led_level")
                 # 每次使用补光灯调整曝光的总次数
                 adjust_with_flash_total_times: int = AdjustCameraConfig.getattr(
                     "adjust_with_flash_total_times"
@@ -542,7 +544,7 @@ def main() -> None:
                                 adjust_led_level_param["level"] -= 1
                         else:
                             # 已经是最高的补光灯
-                            if adjust_led_level_param["level"] >= 10:
+                            if adjust_led_level_param["level"] >= led_level:
                                 logger.warning(
                                     "already is the highest flash, can't adjust flash"
                                 )

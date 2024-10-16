@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -655,16 +656,7 @@ def main() -> None:
                             # 发送初始坐标数据结果
                             # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                             logger.success("send init data message.")
-                            send_msg_data = {
-                                "L3_WK_1": 20,  # 温度传感器
-                                "L3_WK_2": 20,
-                                "L3_WK_3": 20,
-                                "L3_WK_4": 20,
-                                "L3_WK_5": 20,
-                                "L3_WK_6": 20,
-                                "L3_WK_7": 20,
-                                "L3_WK_8": 20,
-                            }
+                            send_msg_data = deepcopy(temperature_data)
                             _send_msg_data = {
                                 f"L1_SJ_{k+1}": {"X": 0, "Y": 0}
                                 for k in camera0_standard_results.keys()
@@ -714,16 +706,7 @@ def main() -> None:
 
                         # -------------------- send msg -------------------- #
 
-                        send_msg_data = {
-                            "L3_WK_1": 20,  # 温度传感器
-                            "L3_WK_2": 20,
-                            "L3_WK_3": 20,
-                            "L3_WK_4": 20,
-                            "L3_WK_5": 20,
-                            "L3_WK_6": 20,
-                            "L3_WK_7": 20,
-                            "L3_WK_8": 20,
-                        }
+                        send_msg_data = deepcopy(temperature_data)
                         _send_msg_data = {
                             f"L1_SJ_{k+1}": {"X": v[0], "Y": v[1]}
                             for k, v in camera0_distance_result.items()
@@ -1447,8 +1430,21 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        temperature_data= received_msg.get("param", {})
-        logger.success(f"received temp data: {temperature_data}")
+        _temperature_data = received_msg.get("param", {})
+        logger.success(f"received temp data: {_temperature_data}")
+        # temperature_data: {
+        #     'L3_WK_1': 10,
+        #     'L3_WK_2': 10,
+        #     'L3_WK_3': 10,
+        #     'L3_WK_4': 257,
+        #     'L3_WK_5': 257,
+        #     'L3_WK_6': 257
+        # }
+        temperature_data = {
+            k[:-2].replace("sensor", "L3_WK_"): v
+            for k, v in _temperature_data.items()
+            if k.startswith("sensor")
+        }
 
     @staticmethod
     def receive_adjust_temp_data_msg(received_msg: dict | None = None):
@@ -1886,13 +1882,17 @@ class Send:
         #     },
         #     ...
         # }
+
+        # sensor_state = {
+        #     "L3_WK_1": 0,  # 0表示无错误，-1供电异常，
+        #     "L3_WK_2": 0,  # -2传感器数据异常，-3采样间隔内没有采集到数据
+        #     "L3_WK_3": 0,
+        #     "L3_WK_4": 0,
+        #     "L3_WK_5": 0,
+        #     "L3_WK_6": -1,
+        # }
         sensor_state = {
-            "L3_WK_1": 0,  # 0表示无错误，-1供电异常，
-            "L3_WK_2": 0,  # -2传感器数据异常，-3采样间隔内没有采集到数据
-            "L3_WK_3": 0,
-            "L3_WK_4": 0,
-            "L3_WK_5": 0,
-            "L3_WK_6": -1,
+            k: 0 for k, v in temperature_data.items()
         }
 
         camera0_standard_results: dict | None = RingsLocationConfig.getattr(
@@ -1917,7 +1917,6 @@ class Send:
 
         sensor_state.update(box_sensor_state)
 
-        # 设备状态查询响应消息
         send_msg = {
             "cmd": "getstatus",
             "body": {

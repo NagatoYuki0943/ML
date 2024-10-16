@@ -217,7 +217,7 @@ need_send_set_target_msg = False
 # 是否需要发送获取状态信息
 need_send_get_status_msg = False
 # 温度传感器返回的温度
-temperature_data = None
+temperature_data = {}
 # 是否收到温控回复命令
 received_temp_control_msg = True
 # 温度是否平稳
@@ -1448,7 +1448,7 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        temperature_data: dict = received_msg.get("param", {})
+        temperature_data= received_msg.get("param", {})
         logger.success(f"received temp data: {temperature_data}")
 
     @staticmethod

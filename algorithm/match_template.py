@@ -537,7 +537,7 @@ def multi_target_multi_scale_match_template(
     logger.info(f"final_ratios:\n {final_ratios}")
     scores = np.array([result[1] for result in results])
     logger.info(f"scores:\n {scores}")
-    boxes = np.array([result[2] for result in results])
+    boxes = np.array([result[2] for result in results]).reshape(-1, 4)
     logger.info(f"boxes:\n {boxes}")
 
     # iou 过滤

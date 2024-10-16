@@ -31,11 +31,35 @@ def box_iou(box1: list, box2: list) -> float:
     return iou
 
 
+def box_iou_vectorized(boxes: np.ndarray) -> np.ndarray:
+    """Calculate IoU for all pairs of boxes."""
+    boxes = np.array(boxes)
+    x1 = np.maximum(boxes[:, 0], boxes[:, 0][:, np.newaxis])
+    y1 = np.maximum(boxes[:, 1], boxes[:, 1][:, np.newaxis])
+    x2 = np.minimum(boxes[:, 2], boxes[:, 2][:, np.newaxis])
+    y2 = np.minimum(boxes[:, 3], boxes[:, 3][:, np.newaxis])
+
+    intersection = np.maximum(0, x2 - x1) * np.maximum(0, y2 - y1)
+
+    area_box1 = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+    area_box2 = area_box1[:, np.newaxis]
+
+    iou_matrix = intersection / (area_box1 + area_box2 - intersection)
+    # 将矩阵的右上角调整为0, 理论上右上角调整为0, 保留靠前的 box, 而靠前的 box 分数更高
+    iou_matrix = np.tril(iou_matrix, -1)
+    return iou_matrix
+
+
 def test_box_iou():
     print(box_iou([0, 0, 1, 1], [0, 0, 1, 1]))  # 1.0
     print(box_iou([1, 1, 2, 2], [0, 0, 3, 3]))  # 0.1111111111111111
     print(box_iou([0, 0, 4, 4], [0, 0, 2, 2]))  # 0.25
     print(box_iou([0, 0, 1, 1], [1, 1, 2, 2]))  # 0.0
+
+    print(box_iou_vectorized([[0, 0, 1, 1], [0, 0, 1, 1]]))  # 1.0
+    print(box_iou_vectorized([[1, 1, 2, 2], [0, 0, 3, 3]]))  # 0.1111111111111111
+    print(box_iou_vectorized([[0, 0, 4, 4], [0, 0, 2, 2]]))  # 0.25
+    print(box_iou_vectorized([[0, 0, 1, 1], [1, 1, 2, 2]]))  # 0.0
 
 
 def sort_boxes(
@@ -209,6 +233,15 @@ def iou_filter_by_threshold(
     return reserve_index
 
 
+def iou_filter_by_threshold_vectorized(
+    boxes: np.ndarray, iou_threshold: float = 0.5
+) -> np.ndarray:
+    """IoU filtering using vectorization."""
+    iou_matrix = box_iou_vectorized(boxes)
+    keep_indices = np.where(np.all(iou_matrix <= iou_threshold, axis=1))[0]
+    return keep_indices
+
+
 def match_template_max(
     image: np.ndarray,
     template: np.ndarray,
@@ -326,7 +359,7 @@ def match_template_filter_by_threshold(
     # logger.info(f"{boxes.shape = }")
 
     # 根据iou过滤
-    reserve_index = iou_filter_by_threshold(boxes, iou_threshold)
+    reserve_index = iou_filter_by_threshold_vectorized(boxes, iou_threshold)
     reserve_scores = scores[reserve_index]
     reserve_boxes = boxes[reserve_index]
     # logger.info(f"{reserve_boxes.shape = }")
@@ -412,6 +445,7 @@ def multi_scale_match_template(
             )
             score, box = match_result  # 最高得分
             match_results.append((final_ratio, score, box))
+            logger.info(f"{scale = }, {final_ratio = }, match number: 1")
         else:
             # 通过阈值匹配
             match_result = match_template_filter_by_threshold(
@@ -429,6 +463,9 @@ def multi_scale_match_template(
                 [final_ratio] + list(_match_result) for _match_result in match_result
             ]
             match_results.extend(match_result)
+            logger.info(
+                f"{scale = }, {final_ratio = }, match number: {len(match_result)}"
+            )
 
     if match_method == cv2.TM_SQDIFF or match_method == cv2.TM_SQDIFF_NORMED:
         reverse = False
@@ -495,7 +532,7 @@ def multi_target_multi_scale_match_template(
         threshold_iou_threshold,
         mask,
     )
-    # logger.info(f"multi_scale_match_template results: {results}")
+    logger.info(f"multi_scale_match_template results number: {len(results)}")
     final_ratios = np.array([result[0] for result in results])
     logger.info(f"final_ratios:\n {final_ratios}")
     scores = np.array([result[1] for result in results])
@@ -504,7 +541,10 @@ def multi_target_multi_scale_match_template(
     logger.info(f"boxes:\n {boxes}")
 
     # iou 过滤
-    reserve_index = iou_filter_by_threshold(boxes, iou_threshold)
+    reserve_index = iou_filter_by_threshold_vectorized(boxes, iou_threshold)
+    logger.info(
+        f"multi_scale_match_template after iou filter results number: {len(reserve_index)}"
+    )
     reserve_final_ratios = final_ratios[reserve_index]
     reserve_scores = scores[reserve_index]
     reserve_boxes = boxes[reserve_index]

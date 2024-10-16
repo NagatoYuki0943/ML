@@ -1916,22 +1916,23 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        _temperature_data = received_msg.get("param", {})
-        logger.info(f"received temp data: {_temperature_data}")
+        _temperature_data: dict = received_msg.get("param", {})
+        # logger.info(f"received temp data: {_temperature_data}")
         # temperature_data: {
         #     'L3_WK_1': 10,
         #     'L3_WK_2': 10,
         #     'L3_WK_3': 10,
-        #     'L3_WK_4': 257,
-        #     'L3_WK_5': 257,
+        #     'L3_WK_4': 10,
+        #     'L3_WK_5': 10,
         #     'L3_WK_6': 257
+        #     'L3_WK_7': 257
+        #     'L3_WK_8': 257
         # }
         temperature_data = {
-            k[:-2].replace("sensor", "L3_WK_"): v
-            for k, v in _temperature_data.items()
-            if k.startswith("sensor")
+            f"L3_WK_{i+1}": v
+            for i, v in enumerate(_temperature_data.values())
         }
-        logger.info(f"received temp data transform to temperature_data: {temperature_data}")
+        # logger.info(f"received temp data transform to temperature_data: {temperature_data}")
 
     @staticmethod
     def receive_adjust_temp_data_msg(received_msg: dict | None = None):
@@ -1948,7 +1949,7 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.info(f"received adjust temp data: {received_msg}")
+        # logger.info(f"received adjust temp data: {received_msg}")
         Send.send_temperature_change_msg(received_msg.get("param", {}))
 
     @staticmethod
@@ -2548,7 +2549,7 @@ class Send:
         #     "control_way": "warm/cold",
         #     "pwm_data": 10
         # }
-        logger.info(f"send temperature change data: {data}")
+        # logger.info(f"send temperature change data: {data}")
         send_msg = {
             "cmd": "devicestate",
             "body": {

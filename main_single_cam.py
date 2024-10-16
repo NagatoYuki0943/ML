@@ -360,12 +360,10 @@ def main() -> None:
 
     # 是否使用补光灯
     use_flash = False
-    adjust_led_level_param = (
-        {
-            "level": 1,  # need_darker - (达到最低就代表关闭补光灯), need_lighter +
-            "times": 10,  # 亮的时间
-        },
-    )
+    adjust_led_level_param = {
+        "level": 1,  # need_darker - (达到最低就代表关闭补光灯), need_lighter +
+        "times": 10,  # 亮的时间
+    }
     # -------------------- 初始化周期内变量 -------------------- #
 
     while True:
@@ -1486,7 +1484,9 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success(f"received stop adjust temp data: {received_msg}")
+        logger.success(
+            f"received stop adjust temp data: {received_msg.get('param', {})}"
+        )
         is_temp_stable = True
         need_send_in_working_state_msg = True
 
@@ -2011,6 +2011,7 @@ class Send:
         #     "control_way": "warm/cold",
         #     "pwm_data": 10
         # }
+        logger.info(f"send temperature change data: {data}")
         send_msg = {
             "cmd": "devicestate",
             "body": {
@@ -2026,7 +2027,7 @@ class Send:
             },
         }
         mqtt_send_queue.put(send_msg)
-        logger.success("send temperature change msg")
+        logger.success("send temperature change msg success")
 
     @staticmethod
     def send_temperature_control_msg(
@@ -2037,7 +2038,9 @@ class Send:
         global received_temp_control_msg
         global is_temp_stable
 
-        logger.info("send temperature control msg")
+        logger.info(
+            f"send temperature control, temperature: {temperature}, camera: {camera}"
+        )
         # {
         #     "cmd":"adjusttempdata",
         #     "param":{
@@ -2059,7 +2062,7 @@ class Send:
     @staticmethod
     def send_adjust_led_level_msg(adjust_led_level_param: dict):
         """补光灯控制命令"""
-        logger.info("send adjust led level msg")
+        logger.info(f"send adjust led level: {adjust_led_level_param}")
         # {
         #     "cmd":"adjustLEDlevel",
         #     "param":{

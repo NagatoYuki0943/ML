@@ -521,7 +521,7 @@ def main() -> None:
                 while True:
                     # 如果上一次使用了补光灯，那这一次也使用补光灯
                     if use_flash:
-                        Send.send_adjust_led_level_msg(adjust_led_level_param)
+                        Send.send_adjust_led_level_msg_by_time(adjust_led_level_param)
 
                     # 调整曝光
                     camera0_id2boxstate: dict[int, dict] | None = (
@@ -2608,8 +2608,8 @@ class Send:
         is_temp_stable = False
 
     @staticmethod
-    def send_adjust_led_level_msg(adjust_led_level_param: dict):
-        """补光灯控制命令"""
+    def send_adjust_led_level_msg_by_time(adjust_led_level_param: dict):
+        """补光灯控制命令, 指定亮的时间"""
         logger.info(f"send adjust led level: {adjust_led_level_param}")
         # {
         #     "cmd":"adjustLEDlevel",
@@ -2640,7 +2640,10 @@ class Send:
                 #     },
                 #     "msgid": 1
                 # }
-                logger.success("received askadjustLEDlevel response")
+                if received_msg.get("param", {}).get("result", "NOT") == "OK":
+                    logger.success("received askadjustLEDlevel response OK")
+                else:
+                    logger.error("received askadjustLEDlevel response NOT OK")
                 break
             else:
                 Receive.switch(received_msg)

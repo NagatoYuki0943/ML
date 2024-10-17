@@ -102,7 +102,7 @@ class AdjustCameraConfig(BaseConfig):
     adjust_with_flash_total_times: int = (
         10  # 最高调整次数(主循环中调整次数，使用闪光灯)
     )
-    max_led_level: int = 5 # 相机曝光等级
+    max_led_level: int = 5  # 相机曝光等级
 
 
 @dataclass
@@ -217,11 +217,13 @@ class RingsLocationConfig(BaseConfig):
     )
     camera0_standard_results: dict | None = None  # camera0 标准结果
     camera1_standard_results: dict | None = None  # camera1 标准结果
+    ndigits: int = 4  # 保留小数位数
 
 
 @dataclass
 class TemperatureConfig(BaseConfig):
     """临时配置"""
+
     lock = Lock()
     target_temperature: float = 45.0
 

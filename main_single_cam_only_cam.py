@@ -1690,12 +1690,13 @@ class Send:
         #     },
         #     ...
         # }
+        ndigits: int = RingsLocationConfig.getattr("ndigits")
         data = {
             f"L1_SJ_{k+1}": {
                 "box": v["box"],
-                "X": v["center"][0],
-                "Y": v["center"][1],
-                "Z": v["distance"],
+                "X": round(v["center"][0], ndigits),
+                "Y": round(v["center"][1], ndigits),
+                "Z": round(v["distance"], ndigits),
             }
             for k, v in cycle_results.items()
             if v["center"] is not None

@@ -1069,9 +1069,13 @@ def main() -> None:
                         else:
                             temp_standard_results = camera1_standard_results
                             temp_cycle_results = camera1_cycle_results
+                        ndigits: int = RingsLocationConfig.getattr("ndigits")
                         z_move = {
-                            f"L1_SJ_{k+1}": temp_cycle_results[k]["distance"]
-                            - temp_standard_results[k]["distance"]
+                            f"L1_SJ_{k+1}": round(
+                                temp_cycle_results[k]["distance"]
+                                - temp_standard_results[k]["distance"],
+                                ndigits,
+                            )
                             if (
                                 temp_cycle_results[k]["distance"] is not None
                                 and temp_standard_results[k]["distance"] is not None
@@ -2173,12 +2177,13 @@ class Send:
         #     },
         #     ...
         # }
+        ndigits: int = RingsLocationConfig.getattr("ndigits")
         data = {
             f"L1_SJ_{k+1}": {
                 "box": v["box"],
-                "X": v["center"][0],
-                "Y": v["center"][1],
-                "Z": v["distance"],
+                "X": round(v["center"][0], ndigits),
+                "Y": round(v["center"][1], ndigits),
+                "Z": round(v["distance"], ndigits),
             }
             for k, v in cycle_results.items()
             if v["center"] is not None
@@ -2628,7 +2633,9 @@ class Send:
             logger.warning("adjust led level less than 1, set to 1")
         if adjust_led_level_param["level"] > max_led_level:
             adjust_led_level_param["level"] = max_led_level
-            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
+            logger.warning(
+                f"adjust led level greater than {max_led_level}, set to {max_led_level}"
+            )
         # {
         #     "cmd": "adjustLEDlevel",
         #     "param": {
@@ -2676,7 +2683,9 @@ class Send:
             logger.warning("adjust led level less than 1, set to 1")
         if led_level > max_led_level:
             led_level = max_led_level
-            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
+            logger.warning(
+                f"adjust led level greater than {max_led_level}, set to {max_led_level}"
+            )
         # {
         #     "cmd": "openLED",
         #     "param": {
@@ -2722,9 +2731,9 @@ class Send:
         send_msg = {
             "cmd": "closeLED",
             "param": {
-                "reserve": 257, #保留参数，暂时没用，赋值为257
+                "reserve": 257,  # 保留参数，暂时没用，赋值为257
             },
-            "msgid": 1
+            "msgid": 1,
         }
         serial_send_queue.put(send_msg)
         logger.success("send close led level msg success")

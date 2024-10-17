@@ -163,6 +163,8 @@ def calc_move_distance(
 
     x_move_threshold = RingsLocationConfig.getattr("x_move_threshold")
     y_move_threshold = RingsLocationConfig.getattr("y_move_threshold")
+    ndigits: int = RingsLocationConfig.getattr("ndigits")
+
     standard_result_centers = {
         k: result["center"] for k, result in standard_results.items()
     }
@@ -198,6 +200,7 @@ def calc_move_distance(
                 CameraConfig.getattr("pixel_size"),
                 CameraConfig.getattr("focus"),
             )
+            real_distance_x = round(real_distance_x, ndigits)
             # y 轴方向相反
             pixel_distance_y: float = -(
                 cycle_centers[res_k][1]
@@ -210,6 +213,7 @@ def calc_move_distance(
                 CameraConfig.getattr("pixel_size"),
                 CameraConfig.getattr("focus"),
             )
+            real_distance_y = round(real_distance_y, ndigits)
             logger.info(
                 f"box {res_k} move {pixel_distance_x = } pixel, {real_distance_x = } mm, distance = {standard_result_distance[res_k]} mm"
             )
@@ -252,8 +256,8 @@ def calc_move_distance(
                     distance_y,
                 ) in distance_result.items():
                     if idx != ref_id:
-                        new_distance_x = distance_x - ref_distance_x
-                        new_distance_y = distance_y - ref_distance_y
+                        new_distance_x = round(distance_x - ref_distance_x, ndigits)
+                        new_distance_y = round(distance_y - ref_distance_y, ndigits)
                         distance_result[idx] = (
                             new_distance_x,
                             new_distance_y,

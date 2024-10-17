@@ -619,7 +619,13 @@ def main() -> None:
                     logger.info("last cycle, try to compare and save results")
                     logger.success(f"{camera0_cycle_results = }")
                     # 保存到文件
-                    save_to_jsonl({"camera0": camera0_cycle_results}, history_save_path)
+                    save_to_jsonl(
+                        {
+                            "camera0": camera0_cycle_results,
+                            "temperature": temperature_data,
+                        },
+                        history_save_path,
+                    )
 
                     # 防止值不存在
                     send_msg_data = {}
@@ -1445,8 +1451,7 @@ class Receive:
         #     'L3_WK_8': 257
         # }
         temperature_data = {
-            f"L3_WK_{i+1}": v
-            for i, v in enumerate(_temperature_data.values())
+            f"L3_WK_{i+1}": v for i, v in enumerate(_temperature_data.values())
         }
         # logger.info(f"received temp data transform to temperature_data: {temperature_data}")
 
@@ -1895,9 +1900,7 @@ class Send:
         #     "L3_WK_5": 0,
         #     "L3_WK_6": -1,
         # }
-        sensor_state = {
-            k: 0 for k, v in temperature_data.items()
-        }
+        sensor_state = {k: 0 for k, v in temperature_data.items()}
 
         camera0_standard_results: dict | None = RingsLocationConfig.getattr(
             "camera0_standard_results"

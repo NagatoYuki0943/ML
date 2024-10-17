@@ -109,7 +109,10 @@ logger.info("开始初始化串口")
 try:
     serial_objects = []
 
-    for port in [SerialCommConfig.getattr("camera0_ser_port"), SerialCommConfig.getattr("camera1_ser_port")]:
+    for port in [
+        SerialCommConfig.getattr("camera0_ser_port"),
+        SerialCommConfig.getattr("camera1_ser_port"),
+    ]:
         if port:
             object = RaspberrySerialPort(
                 port,
@@ -246,8 +249,8 @@ def main() -> None:
     global camera0_cycle_results
 
     # -------------------- 控温 -------------------- #
-    target_temperature: float = TemperatureConfig.getattr("target_temperature")
-    Send.send_temperature_control_msg(target_temperature, CAMERA_INDEX)
+    # target_temperature: float = TemperatureConfig.getattr("target_temperature")
+    # Send.send_temperature_control_msg(target_temperature, CAMERA_INDEX)
     # -------------------- 控温 -------------------- #
 
     # ------------------------------ 调整曝光 ------------------------------ #
@@ -1464,6 +1467,16 @@ class Receive:
             f"L3_WK_{i+1}": v for i, v in enumerate(_temperature_data.values())
         }
         # logger.info(f"received temp data transform to temperature_data: {temperature_data}")
+
+        # TODO: 临时温度保护措施
+        # 只有 inside_air_t 小于控制的温度时才控温
+        target_temperature: float = TemperatureConfig.getattr("target_temperature")
+        inside_air_t: float = temperature_data.get("inside_air_t", 100)
+        if inside_air_t < target_temperature - 1:
+            logger.success(
+                f"inside air temperature `{inside_air_t}` is lower than target temperature `{target_temperature}`, start adjust temperature."
+            )
+            Send.send_temperature_control_msg(target_temperature, CAMERA_INDEX)
 
     @staticmethod
     def receive_adjust_temp_data_msg(received_msg: dict | None = None):

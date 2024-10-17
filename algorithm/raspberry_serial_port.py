@@ -33,6 +33,7 @@ class RaspberrySerialPort:
         self.cmd_pattern = re.compile(r'\$cmd=([^&]+)')
         self.msgid_pattern = re.compile(r'&msgid=(\d+)')
         self.param_pattern = re.compile(r'&param({.*})')
+        self.param_pattern1 = re.compile(r'&param=({.*})')
 
         # 开启串口
         self.comm = serial.Serial(
@@ -106,6 +107,14 @@ class RaspberrySerialPort:
         param_match = self.param_pattern.search(message)
         if param_match:
             param_json = param_match.group(1)
+            try:
+                result['param'] = json.loads(param_json)
+            except json.JSONDecodeError:
+                result['param'] = param_json
+        
+        param_match1 = self.param_pattern1.search(message)
+        if param_match1:
+            param_json = param_match1.group(1)
             try:
                 result['param'] = json.loads(param_json)
             except json.JSONDecodeError:

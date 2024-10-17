@@ -1453,6 +1453,15 @@ class Receive:
         elif cmd == "getconfigfile":
             Receive.receive_get_config_file_msg(received_msg)
 
+        elif cmd == "askadjustLEDlevel":
+            Receive.receive_ask_adjust_led_level_with_time_msg(received_msg)
+
+        elif cmd == "askopenLED":
+            Receive.receive_ask_open_led_level_msg(received_msg)
+
+        elif cmd == "askcloseLED":
+            Receive.receive_ask_close_led_msg(received_msg)
+
         else:
             logger.warning(f"unknown cmd: {cmd}")
             logger.warning(f"unknown msg: {received_msg}")
@@ -2106,6 +2115,57 @@ class Receive:
             f"get config file success, config_path: {save_dir / 'config_runtime.yaml'}"
         )
 
+    @staticmethod
+    def receive_ask_adjust_led_level_with_time_msg(received_msg: dict | None = None):
+        """温控板回复补光灯控制命令（带开启时间）"""
+
+        # {
+        #     "cmd": "askadjustLEDlevel",
+        #     "times": "2024-09-11T15:45:30",
+        #     "param":{
+        #         "result": "OK/NOT"
+        #     },
+        #     "msgid": 1
+        # }
+        if received_msg.get("param", {}).get("result", "NOT") == "OK":
+            logger.success("received askadjustLEDlevel response OK")
+        else:
+            logger.error("received askadjustLEDlevel response NOT OK")
+
+    @staticmethod
+    def receive_ask_open_led_level_msg(received_msg: dict | None = None):
+        """温控板回复补光灯开启命令"""
+
+        # {
+        #     "cmd": "askopenLED",
+        #     "times": "2024-09-11 15:45:30",
+        #     "param": {
+        #         "result": "OK/NOT"
+        #     },
+        #     "msgid": 1
+        # }
+        if received_msg.get("param", {}).get("result", "NOT") == "OK":
+            logger.success("received askopenLED response OK")
+        else:
+            logger.error("received askopenLED response NOT OK")
+
+    @staticmethod
+    def receive_ask_close_led_msg(received_msg: dict | None = None):
+        """温控板回复补光灯关闭命令"""
+
+        # {
+        #     "cmd": "askcloseLED",
+        #     "times": "2024-09-11 15:45:30",
+        #     "param": {
+        #         "result": "OK/NOT"
+        #     },
+        #     "msgid": 1
+        # }
+        if received_msg.get("param", {}).get("result", "NOT") == "OK":
+            logger.success("received askcloseLED response OK")
+        else:
+            logger.error("received askcloseLED response NOT OK")
+
 
 class Send:
     @staticmethod
@@ -2633,9 +2693,7 @@ class Send:
             logger.warning("adjust led level less than 1, set to 1")
         if adjust_led_level_param["level"] > max_led_level:
             adjust_led_level_param["level"] = max_led_level
-            logger.warning(
-                f"adjust led level greater than {max_led_level}, set to {max_led_level}"
-            )
+            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
         # {
         #     "cmd": "adjustLEDlevel",
         #     "param": {
@@ -2652,27 +2710,6 @@ class Send:
         serial_send_queue.put(send_msg)
         logger.success("send adjust led level with time msg success")
 
-        while True:
-            received_msg: dict = main_queue.get(timeout=10)
-            cmd: str = received_msg.get("cmd")
-            # 温控板回复补光灯控制命令（带开启时间）
-            if cmd == "askadjustLEDlevel":
-                # {
-                #     "cmd": "askadjustLEDlevel",
-                #     "times": "2024-09-11T15:45:30",
-                #     "param":{
-                #         "result": "OK/NOT"
-                #     },
-                #     "msgid": 1
-                # }
-                if received_msg.get("param", {}).get("result", "NOT") == "OK":
-                    logger.success("received askadjustLEDlevel response OK")
-                else:
-                    logger.error("received askadjustLEDlevel response NOT OK")
-                break
-            else:
-                Receive.switch(received_msg)
-
     @staticmethod
     def send_open_led_level_msg(led_level: int = 1):
         """补光灯开启命令"""
@@ -2683,9 +2720,7 @@ class Send:
             logger.warning("adjust led level less than 1, set to 1")
         if led_level > max_led_level:
             led_level = max_led_level
-            logger.warning(
-                f"adjust led level greater than {max_led_level}, set to {max_led_level}"
-            )
+            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
         # {
         #     "cmd": "openLED",
         #     "param": {
@@ -2703,27 +2738,6 @@ class Send:
         serial_send_queue.put(send_msg)
         logger.success("send open led level msg success")
 
-        for _ in range(3):
-            received_msg: dict = main_queue.get(timeout=10)
-            cmd: str = received_msg.get("cmd")
-            # 温控板回复补光灯开启命令
-            if cmd == "askopenLED":
-                # {
-                #     "cmd": "askopenLED",
-                #     "times": "2024-09-11 15:45:30",
-                #     "param": {
-                #         "result": "OK/NOT"
-                #     },
-                #     "msgid": 1
-                # }
-                if received_msg.get("param", {}).get("result", "NOT") == "OK":
-                    logger.success("received askopenLED response OK")
-                else:
-                    logger.error("received askopenLED response NOT OK")
-                break
-            else:
-                Receive.switch(received_msg)
-
     @staticmethod
     def send_close_led_msg():
         """补光灯关闭命令"""
@@ -2731,33 +2745,12 @@ class Send:
         send_msg = {
             "cmd": "closeLED",
             "param": {
-                "reserve": 257,  # 保留参数，暂时没用，赋值为257
+                "reserve": 257, #保留参数，暂时没用，赋值为257
             },
-            "msgid": 1,
+            "msgid": 1
         }
         serial_send_queue.put(send_msg)
         logger.success("send close led level msg success")
-
-        for _ in range(3):
-            received_msg: dict = main_queue.get(timeout=10)
-            cmd: str = received_msg.get("cmd")
-            # 温控板回复补光灯关闭命令
-            if cmd == "askcloseLED":
-                # {
-                #     "cmd": "askcloseLED",
-                #     "times": "2024-09-11 15:45:30",
-                #     "param": {
-                #         "result": "OK/NOT"
-                #     },
-                #     "msgid": 1
-                # }
-                if received_msg.get("param", {}).get("result", "NOT") == "OK":
-                    logger.success("received askcloseLED response OK")
-                else:
-                    logger.error("received askcloseLED response NOT OK")
-                break
-            else:
-                Receive.switch(received_msg)
 
 
 if __name__ == "__main__":

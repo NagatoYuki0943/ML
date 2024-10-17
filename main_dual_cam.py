@@ -239,6 +239,8 @@ need_send_set_target_msg = False
 need_send_get_status_msg = False
 # 温度传感器返回的温度
 temperature_data = {}
+# 是否需要发送温控命令
+need_send_temp_control_msg = True
 # 是否收到温控回复命令
 received_temp_control_msg = True
 # 温度是否平稳
@@ -1916,6 +1918,7 @@ class Receive:
         """日常温度数据"""
 
         global temperature_data
+        global need_send_temp_control_msg
         # {
         #     "cmd": "sendtempdata",
         #     "camera": "2",
@@ -1953,12 +1956,13 @@ class Receive:
         # 只有 inside_air_t 小于控制的温度时才控温
         target_temperature: float = TemperatureConfig.getattr("target_temperature")
         inside_air_t: float = _temperature_data.get("inside_air_t", 100)
-        if inside_air_t < target_temperature - 1:
+        if inside_air_t < target_temperature - 1 and need_send_temp_control_msg:
             logger.success(
                 f"inside air temperature `{inside_air_t}` is lower than target temperature `{target_temperature}`, start adjust temperature."
             )
             Send.send_temperature_control_msg(target_temperature, 0)
             Send.send_temperature_control_msg(target_temperature, 1)
+            need_send_temp_control_msg = False
 
     @staticmethod
     def receive_adjust_temp_data_msg(received_msg: dict | None = None):

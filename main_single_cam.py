@@ -375,10 +375,7 @@ def main() -> None:
 
     # 是否使用补光灯
     use_flash = False
-    adjust_led_level_param = {
-        "level": 1,  # need_darker - (达到最低就代表关闭补光灯), need_lighter +
-        "times": 10,  # 亮的时间
-    }
+    led_level = 1
     # -------------------- 初始化周期内变量 -------------------- #
 
     while True:
@@ -406,7 +403,7 @@ def main() -> None:
                 logger.info("full image0 ajust exposure start")
 
                 # 最大 led level
-                led_level: int = AdjustCameraConfig.getattr("led_level")
+                max_led_level: int = AdjustCameraConfig.getattr("max_led_level")
                 # 每次使用补光灯调整曝光的总次数
                 adjust_with_flash_total_times: int = AdjustCameraConfig.getattr(
                     "adjust_with_flash_total_times"
@@ -415,7 +412,7 @@ def main() -> None:
                 while True:
                     # 如果上一次使用了补光灯，那这一次也使用补光灯
                     if use_flash:
-                        Send.send_adjust_led_level_msg_by_time(adjust_led_level_param)
+                        Send.send_open_led_level_msg(led_level)
 
                     # 调整曝光
                     camera0_id2boxstate: dict[int, dict] | None = (
@@ -433,29 +430,26 @@ def main() -> None:
                         use_flash = True
                         if need_darker:
                             # 已经是最低的补光灯
-                            if adjust_led_level_param["level"] <= 1:
+                            if led_level <= 1:
                                 # 关闭补光灯
                                 use_flash = False
                                 logger.warning(
                                     "already is the lowest flash, close flash"
                                 )
-                                # TODO: 关闭补光灯
-                                raise NotImplementedError(
-                                    "no need flash, close flash not implemented"
-                                )
+                                Send.send_close_led_msg()
                             else:
                                 # 降低补光灯亮度
-                                adjust_led_level_param["level"] -= 1
+                                led_level -= 1
                         else:
                             # 已经是最高的补光灯
-                            if adjust_led_level_param["level"] >= led_level:
+                            if led_level >= max_led_level:
                                 logger.warning(
                                     "already is the highest flash, can't adjust flash"
                                 )
                                 continue
                             else:
                                 # 增加补光灯亮度
-                                adjust_led_level_param["level"] += 1
+                                led_level += 1
                     else:
                         logger.success("no need adjust flash, exit adjust exposure")
                         break
@@ -877,8 +871,7 @@ def main() -> None:
 
                     if use_flash:
                         # 关闭补光灯
-                        # TODO: 关闭补光灯
-                        raise NotImplementedError("close flash")
+                        Send.send_close_led_msg()
 
                     logger.success("The cycle is over.")
                     # ------------------------- 结束周期 ------------------------- #
@@ -2092,16 +2085,23 @@ class Send:
         is_temp_stable = False
 
     @staticmethod
-    def send_adjust_led_level_msg_by_time(adjust_led_level_param: dict):
-        """补光灯控制命令, 指定亮的时间"""
-        logger.info(f"send adjust led level by time: {adjust_led_level_param}")
+    def send_adjust_led_level_with_time_msg(adjust_led_level_param: dict):
+        """补光灯控制命令（带开启时间）"""
+        logger.info(f"send adjust led level with time: {adjust_led_level_param}")
+        max_led_level: int = AdjustCameraConfig.getattr("max_led_level")
+        if adjust_led_level_param["level"] < 1:
+            adjust_led_level_param["level"] = 1
+            logger.warning("adjust led level less than 1, set to 1")
+        if adjust_led_level_param["level"] > max_led_level:
+            adjust_led_level_param["level"] = max_led_level
+            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
         # {
-        #     "cmd":"adjustLEDlevel",
-        #     "param":{
-        #         "level":10,
-        #         "times":1
+        #     "cmd": "adjustLEDlevel",
+        #     "param": {
+        #         "level": 5,
+        #         "times": 1
         #     },
-        #     "msgid":1
+        #     "msgid": 1
         # }
         send_msg = {
             "cmd": "adjustLEDlevel",
@@ -2109,12 +2109,12 @@ class Send:
             "msgid": 1,
         }
         serial_send_queue.put(send_msg)
-        logger.success("send adjust led level msg success")
+        logger.success("send adjust led level with time msg success")
 
         while True:
             received_msg: dict = main_queue.get(timeout=10)
             cmd: str = received_msg.get("cmd")
-            # 温控板回复补光灯调节指令
+            # 温控板回复补光灯控制命令（带开启时间）
             if cmd == "askadjustLEDlevel":
                 # {
                 #     "cmd": "askadjustLEDlevel",
@@ -2128,6 +2128,90 @@ class Send:
                     logger.success("received askadjustLEDlevel response OK")
                 else:
                     logger.error("received askadjustLEDlevel response NOT OK")
+                break
+            else:
+                Receive.switch(received_msg)
+
+    @staticmethod
+    def send_open_led_level_msg(led_level: int = 1):
+        """补光灯开启命令"""
+        logger.info(f"send open led level : {led_level}")
+        max_led_level: int = AdjustCameraConfig.getattr("max_led_level")
+        if led_level < 1:
+            led_level = 1
+            logger.warning("adjust led level less than 1, set to 1")
+        if led_level > max_led_level:
+            led_level = max_led_level
+            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
+        # {
+        #     "cmd": "openLED",
+        #     "param": {
+        #         "level": 5,
+        #     },
+        #     "msgid": 1
+        # }
+        send_msg = {
+            "cmd": "openLED",
+            "param": {
+                "level": led_level,
+            },
+            "msgid": 1,
+        }
+        serial_send_queue.put(send_msg)
+        logger.success("send open led level msg success")
+
+        while True:
+            received_msg: dict = main_queue.get(timeout=10)
+            cmd: str = received_msg.get("cmd")
+            # 温控板回复补光灯开启命令
+            if cmd == "askopenLED":
+                # {
+                #     "cmd": "askopenLED",
+                #     "times": "2024-09-11 15:45:30",
+                #     "param": {
+                #         "result": "OK/NOT"
+                #     },
+                #     "msgid": 1
+                # }
+                if received_msg.get("param", {}).get("result", "NOT") == "OK":
+                    logger.success("received askopenLED response OK")
+                else:
+                    logger.error("received askopenLED response NOT OK")
+                break
+            else:
+                Receive.switch(received_msg)
+
+    @staticmethod
+    def send_close_led_msg():
+        """补光灯关闭命令"""
+        logger.info("send close led msg")
+        send_msg = {
+            "cmd": "closeLED",
+            "param": {
+                "reserve": 257, #保留参数，暂时没用，赋值为257
+            },
+            "msgid": 1
+        }
+        serial_send_queue.put(send_msg)
+        logger.success("send close led level msg success")
+
+        while True:
+            received_msg: dict = main_queue.get(timeout=10)
+            cmd: str = received_msg.get("cmd")
+            # 温控板回复补光灯关闭命令
+            if cmd == "askcloseLED":
+                # {
+                #     "cmd": "askcloseLED",
+                #     "times": "2024-09-11 15:45:30",
+                #     "param": {
+                #         "result": "OK/NOT"
+                #     },
+                #     "msgid": 1
+                # }
+                if received_msg.get("param", {}).get("result", "NOT") == "OK":
+                    logger.success("received askcloseLED response OK")
+                else:
+                    logger.error("received askcloseLED response NOT OK")
                 break
             else:
                 Receive.switch(received_msg)

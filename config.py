@@ -102,7 +102,7 @@ class AdjustCameraConfig(BaseConfig):
     adjust_with_flash_total_times: int = (
         10  # 最高调整次数(主循环中调整次数，使用闪光灯)
     )
-    led_level: int = 5 # 相机曝光等级
+    max_led_level: int = 5 # 相机曝光等级
 
 
 @dataclass

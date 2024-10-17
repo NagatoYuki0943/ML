@@ -1952,7 +1952,7 @@ class Receive:
         # TODO: 临时温度保护措施
         # 只有 inside_air_t 小于控制的温度时才控温
         target_temperature: float = TemperatureConfig.getattr("target_temperature")
-        inside_air_t: float = temperature_data.get("inside_air_t", 100)
+        inside_air_t: float = _temperature_data.get("inside_air_t", 100)
         if inside_air_t < target_temperature - 1:
             logger.success(
                 f"inside air temperature `{inside_air_t}` is lower than target temperature `{target_temperature}`, start adjust temperature."

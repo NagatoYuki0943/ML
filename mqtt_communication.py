@@ -80,7 +80,8 @@ def ftp_object_create():
         FTPConfig.getattr('username'),
         FTPConfig.getattr('password'),
         FTPConfig.getattr('max_retries'),
-        FTPConfig.getattr('delay')
+        FTPConfig.getattr('delay'),
+        FTPConfig.getattr('pasv_mode'),
     )
 
 def message_handler(message, send_queue, ftp, main_queue):

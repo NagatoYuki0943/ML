@@ -11,7 +11,8 @@ class RaspberryFTP:
         username: str = "vision",
         password: str = "GLspepec123",
         max_retries: int = 3,
-        delay: int = 1
+        delay: int = 1,
+        pasv_mode: bool = False
     ):
         """
         Args:
@@ -21,6 +22,7 @@ class RaspberryFTP:
             password (str): 连接FTP服务器密码.
             max_retries (int): 最大重试次数. Defaults to 3.
             delay (int): 重试间隔时间(秒). Defaults to 1.
+            pasv_mode (bool): 使用主动模式连接服务器. Defaults to False.
         """
         self.ip = ip
         self.port = port
@@ -28,14 +30,15 @@ class RaspberryFTP:
         self.password = password
         self.max_retries = max_retries
         self.delay = delay
+        self.pasv_mode = pasv_mode
         self.ftp = ftplib.FTP()
+
 
     def ftp_connect(self):
         try:
-            self.ftp.connect(self.ip, self.port, timeout=1)
+            self.ftp.connect(self.ip, self.port, timeout=5)
             self.ftp.login(self.username, self.password)
-            # 设置为主动模式
-            self.ftp.set_pasv(False)
+            self.ftp.set_pasv(self.pasv_mode)
             logger.info("FTP server connected")
         except Exception as e:
             logger.error(f"FTP server unreachable : {e}")
@@ -76,6 +79,7 @@ class RaspberryFTP:
                 break
             except Exception as e:
                 if attempt < self.max_retries:
+                    logger.warning(e)
                     logger.warning(f"Uploads failed, retrying in {delay_uploads} seconds...(attempt {attempt + 1} / {self.max_retries})")
                     delay_uploads *= 2
                     time.sleep(delay_uploads)

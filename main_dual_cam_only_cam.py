@@ -48,6 +48,7 @@ from utils import (
     save_image,
     get_picture_timeout_process,
 )
+from fake_queue import FakeQueue
 
 
 # 将日志输出到文件
@@ -111,65 +112,74 @@ logger.success("初始化畸变矫正完成")
 # -------------------- 畸变矫正 -------------------- #
 
 # -------------------- 初始化串口 -------------------- #
-# logger.info("开始初始化串口")
-# serial_objects = []
+logger.info("开始初始化串口")
+try:
+    serial_objects = []
 
-# for port in [SerialCommConfig.getattr("camera0_ser_port"), SerialCommConfig.getattr("camera1_ser_port")]:
-#     if port:
-#         object = RaspberrySerialPort(
-#             port,
-#             SerialCommConfig.getattr("baudrate"),
-#             SerialCommConfig.getattr("timeout"),
-#             SerialCommConfig.getattr("BUFFER_SIZE"),
-#         )
-#         serial_objects.append(object)
+    for port in [SerialCommConfig.getattr("camera0_ser_port"), SerialCommConfig.getattr("camera1_ser_port")]:
+        if port:
+            object = RaspberrySerialPort(
+                port,
+                SerialCommConfig.getattr("baudrate"),
+                SerialCommConfig.getattr("timeout"),
+                SerialCommConfig.getattr("BUFFER_SIZE"),
+            )
+            serial_objects.append(object)
 
-# serial_send_thread = ThreadWrapper(
-#     target_func=serial_send,
-#     serial_ports=serial_objects,
-# )
-# serial_receive_thread = Thread(
-#     target=serial_receive,
-#     kwargs={
-#         "serial_ports": serial_objects,
-#         "queue": main_queue,
-#     },
-# )
-# serial_send_queue = serial_send_thread.queue
-# serial_receive_thread.start()
-# serial_send_thread.start()
-# logger.success("初始化串口完成")
+    serial_send_thread = ThreadWrapper(
+        target_func=serial_send,
+        serial_ports=serial_objects,
+    )
+    serial_receive_thread = Thread(
+        target=serial_receive,
+        kwargs={
+            "serial_ports": serial_objects,
+            "queue": main_queue,
+        },
+    )
+    serial_send_queue = serial_send_thread.queue
+    serial_receive_thread.start()
+    serial_send_thread.start()
+    logger.success("初始化串口完成")
+except Exception as e:
+    serial_send_queue = FakeQueue()
+    logger.error(f"初始化串口失败: {e}, use fake queue instead")
 # -------------------- 初始化串口 -------------------- #
 
 # -------------------- 初始化MQTT客户端 -------------------- #
-# logger.info("开始初始化MQTT客户端")
-# mqtt_comm = RaspberryMQTT(
-#     MQTTConfig.getattr("broker"),
-#     MQTTConfig.getattr("port"),
-#     MQTTConfig.getattr("timeout"),
-#     MQTTConfig.getattr("topic"),
-#     MQTTConfig.getattr("username"),
-#     MQTTConfig.getattr("password"),
-#     MQTTConfig.getattr("clientId"),
-#     MQTTConfig.getattr("apikey"),
-# )
-# mqtt_send_thread = ThreadWrapper(
-#     target_func=mqtt_send,
-#     queue_maxsize=MQTTConfig.getattr("send_queue_maxsize"),
-#     client=mqtt_comm,
-# )
-# mqtt_send_queue = mqtt_send_thread.queue
-# mqtt_receive_thread = Thread(
-#     target=mqtt_receive,
-#     kwargs={
-#         "client": mqtt_comm,
-#         "main_queue": main_queue,
-#         "send_queue": mqtt_send_queue,
-#     },
-# )
-# mqtt_receive_thread.start()
-# mqtt_send_thread.start()
-# logger.success("初始化MQTT客户端完成")
+logger.info("开始初始化MQTT客户端")
+use_mqtt = False
+if use_mqtt:
+    mqtt_comm = RaspberryMQTT(
+        MQTTConfig.getattr("broker"),
+        MQTTConfig.getattr("port"),
+        MQTTConfig.getattr("timeout"),
+        MQTTConfig.getattr("topic"),
+        MQTTConfig.getattr("username"),
+        MQTTConfig.getattr("password"),
+        MQTTConfig.getattr("clientId"),
+        MQTTConfig.getattr("apikey"),
+    )
+    mqtt_send_thread = ThreadWrapper(
+        target_func=mqtt_send,
+        queue_maxsize=MQTTConfig.getattr("send_queue_maxsize"),
+        client=mqtt_comm,
+    )
+    mqtt_send_queue = mqtt_send_thread.queue
+    mqtt_receive_thread = Thread(
+        target=mqtt_receive,
+        kwargs={
+            "client": mqtt_comm,
+            "main_queue": main_queue,
+            "send_queue": mqtt_send_queue,
+        },
+    )
+    mqtt_receive_thread.start()
+    mqtt_send_thread.start()
+    logger.success("初始化MQTT客户端完成")
+else:
+    mqtt_send_queue = FakeQueue()
+    logger.warning("使用假的MQTT客户端")
 # -------------------- 初始化MQTT客户端 -------------------- #
 
 # 设备启动消息
@@ -185,7 +195,7 @@ send_msg = {
         "msg": "device starting",
     },
 }
-# mqtt_send_queue.put(send_msg)
+mqtt_send_queue.put(send_msg)
 
 
 # -------------------- 初始化全局变量 -------------------- #
@@ -961,7 +971,7 @@ def main() -> None:
                                 "at": get_now_time(),
                                 "data": send_msg_data,
                             }
-                            # mqtt_send_queue.put(send_msg)
+                            mqtt_send_queue.put(send_msg)
                         # -------------------- send result -------------------- #
 
                     # 比较标准靶标和新的靶标
@@ -1131,7 +1141,7 @@ def main() -> None:
                                     ],  # 文件名称
                                 },
                             }
-                            # mqtt_send_queue.put(send_msg)
+                            mqtt_send_queue.put(send_msg)
                         else:
                             # ✅️✅️✅️ 所有 box 移动距离都小于阈值 ✅️✅️✅️
                             logger.success("All box move distance is under threshold.")
@@ -1142,7 +1152,7 @@ def main() -> None:
                                 "at": get_now_time(),
                                 "data": send_msg_data,
                             }
-                            # mqtt_send_queue.put(send_msg)
+                            mqtt_send_queue.put(send_msg)
                         # -------------------- send msg -------------------- #
 
                     # ------------------------- 整理检测结果 ------------------------- #
@@ -1222,7 +1232,7 @@ def main() -> None:
                                         "img": ["target_loss0.jpg"],  # 文件名称
                                     },
                                 }
-                                # mqtt_send_queue.put(send_msg)
+                                mqtt_send_queue.put(send_msg)
                             else:
                                 # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
                                 logger.success(
@@ -1311,7 +1321,7 @@ def main() -> None:
                                         "img": ["target_loss1.jpg"],  # 文件名称
                                     },
                                 }
-                                # mqtt_send_queue.put(send_msg)
+                                mqtt_send_queue.put(send_msg)
                             else:
                                 # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
                                 logger.success(
@@ -1371,7 +1381,7 @@ def main() -> None:
         # 测试调整相机
         if i > 5000:
             os._exit(0)
-        logger.warning(f"{i = }")
+        logger.debug(f"{i = }")
         i += 1
 
 
@@ -1794,7 +1804,7 @@ class Receive:
                 },
                 "msgid": "bb6f3eeb2",
             }
-            # mqtt_send_queue.put(send_msg)
+            mqtt_send_queue.put(send_msg)
             logger.success(
                 f"set reference target success, reference_target_id: {reference_target_id}"
             )
@@ -1811,7 +1821,7 @@ class Receive:
                 },
                 "msgid": "bb6f3eeb2",
             }
-            # mqtt_send_queue.put(send_msg)
+            mqtt_send_queue.put(send_msg)
             logger.warning(
                 f"reference target {reference_target} not found in camera0_id2boxstate."
             )
@@ -1860,7 +1870,7 @@ class Receive:
                 },
                 "msgid": "bb6f3eeb2",
             }
-            # mqtt_send_queue.put(send_msg)
+            mqtt_send_queue.put(send_msg)
             logger.success(
                 f"upload image send msg success, image_path: {image_path0}, {image_path1}"
             )
@@ -1879,7 +1889,7 @@ class Receive:
                 },
                 "msgid": "bb6f3eeb2",
             }
-            # mqtt_send_queue.put(send_msg)
+            mqtt_send_queue.put(send_msg)
             get_picture_timeout_process()
 
     @staticmethod
@@ -1992,7 +2002,7 @@ class Receive:
             },
             "msgid": "e37e42c53",
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         logger.success("reboot device")
         time.sleep(5)
         os._exit()
@@ -2037,7 +2047,7 @@ class Receive:
                 },
                 "msgid": "bb6f3eeb2",
             }
-            # mqtt_send_queue.put(send_msg)
+            mqtt_send_queue.put(send_msg)
             logger.success(f"update config file: {new_config_path} success")
 
         except Exception as e:
@@ -2052,7 +2062,7 @@ class Receive:
                 },
                 "msgid": "bb6f3eeb2",
             }
-            # mqtt_send_queue.put(send_msg)
+            mqtt_send_queue.put(send_msg)
             logger.error(f"update config file: {new_config_path} error: {e}")
 
     @staticmethod
@@ -2076,7 +2086,7 @@ class Receive:
             },
             "msgid": "bb6f3eeb2",
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         logger.success(
             f"get config file success, config_path: {save_dir / 'config_runtime.yaml'}"
         )
@@ -2245,7 +2255,7 @@ class Send:
             },
             "msgid": "bb6f3eeb2",
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         need_send_device_deploying_msg = False
         logger.success("send device deploying msg success")
 
@@ -2281,7 +2291,7 @@ class Send:
             },
             "msgid": "bb6f3eeb2",
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         need_send_target_correction_msg = False
         logger.success("target correction success")
 
@@ -2332,7 +2342,7 @@ class Send:
             },
             "msgid": "bb6f3eeb2",
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         need_send_delete_target_msg = False
         logger.success("send delete target msg success")
 
@@ -2383,7 +2393,7 @@ class Send:
             },
             "msgid": "bb6f3eeb2",
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         need_send_set_target_msg = False
         logger.success("send set target msg success")
 
@@ -2479,7 +2489,7 @@ class Send:
             },
             "msgid": "bb6f3eeb2",
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         need_send_get_status_msg = False
         logger.success("send getstatus msg success")
 
@@ -2497,7 +2507,7 @@ class Send:
                 "msg": "device working",
             },
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         logger.success("send working state msg")
         need_send_in_working_state_msg = False
 
@@ -2521,7 +2531,7 @@ class Send:
                 },
             },
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         logger.warning("send temperature alarm msg")
 
     @staticmethod
@@ -2537,7 +2547,7 @@ class Send:
                 "msg": msg,
             },
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         logger.warning("send device error msg")
 
     @staticmethod
@@ -2564,7 +2574,7 @@ class Send:
                 },
             },
         }
-        # mqtt_send_queue.put(send_msg)
+        mqtt_send_queue.put(send_msg)
         logger.success("send temperature change msg success")
 
     @staticmethod
@@ -2592,7 +2602,7 @@ class Send:
             "param": {"control_t": temperature, "camera": f"{camera}"},
             "msgid": 1,
         }
-        # serial_send_queue.put(send_msg)
+        serial_send_queue.put(send_msg)
         logger.success("send temperature control msg success")
         received_temp_control_msg = False
         is_temp_stable = False
@@ -2614,7 +2624,7 @@ class Send:
             "param": adjust_led_level_param,
             "msgid": 1,
         }
-        # serial_send_queue.put(send_msg)
+        serial_send_queue.put(send_msg)
         logger.success("send adjust led level msg success")
 
         while True:

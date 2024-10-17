@@ -2703,7 +2703,7 @@ class Send:
         serial_send_queue.put(send_msg)
         logger.success("send open led level msg success")
 
-        while True:
+        for _ in range(3):
             received_msg: dict = main_queue.get(timeout=10)
             cmd: str = received_msg.get("cmd")
             # 温控板回复补光灯开启命令
@@ -2738,7 +2738,7 @@ class Send:
         serial_send_queue.put(send_msg)
         logger.success("send close led level msg success")
 
-        while True:
+        for _ in range(3):
             received_msg: dict = main_queue.get(timeout=10)
             cmd: str = received_msg.get("cmd")
             # 温控板回复补光灯关闭命令

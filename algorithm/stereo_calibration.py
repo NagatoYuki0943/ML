@@ -24,8 +24,8 @@ class StereoCalibration:
             logger.warning("K or dist_coeffs is None, couldn't undistort image")
             return image
 
-        undistorted_img: np.ndarray = cv2.undistort(image, self.K, self.dist_coeffs)
-        return undistorted_img
+        undistorted_image: np.ndarray = cv2.undistort(image, self.K, self.dist_coeffs)
+        return undistorted_image
 
     def undistort_point(self, point: np.ndarray | list[float]) -> list[float]:
         """对单个点坐标进行畸变矫正

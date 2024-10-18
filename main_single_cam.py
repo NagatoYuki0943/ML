@@ -292,7 +292,7 @@ def main() -> None:
 
         # -------------------- 畸变矫正 -------------------- #
         logger.info("undistort image0 start")
-        undistort_image0 = stereo_calibration.undistort_image(image0)
+        undistorted_image0 = stereo_calibration.undistort_image(image0)
         logger.success("undistort image0 success")
         # -------------------- 畸变矫正 -------------------- #
 
@@ -314,12 +314,12 @@ def main() -> None:
                 "camera0_id2boxstate is None, use find_target instead of find_around_target"
             )
             camera0_id2boxstate, camera0_got_target_number = find_target(
-                undistort_image0, CAMERA_INDEX
+                undistorted_image0, CAMERA_INDEX
             )
         else:
             logger.success("camera0_id2boxstate is not None, use find_around_target")
             camera0_id2boxstate, camera0_got_target_number = find_around_target(
-                undistort_image0, CAMERA_INDEX
+                undistorted_image0, CAMERA_INDEX
             )
         logger.info(f"image0 find target camera0_id2boxstate: {camera0_id2boxstate}")
         logger.info(f"image0 find target number: {camera0_got_target_number}")
@@ -331,7 +331,7 @@ def main() -> None:
                 if camera0_boxestate["box"] is not None
             ]
             # 绘制boxes
-            image0_draw = undistort_image0.copy()
+            image0_draw = undistorted_image0.copy()
             for i in range(len(boxes)):
                 cv2.rectangle(
                     img=image0_draw,
@@ -468,12 +468,12 @@ def main() -> None:
                     _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
 
                     # --------------- 畸变矫正 --------------- #
-                    undistort_image0 = stereo_calibration.undistort_image(image0)
+                    undistorted_image0 = stereo_calibration.undistort_image(image0)
                     # --------------- 畸变矫正 --------------- #
 
                     # --------------- 小区域模板匹配 --------------- #
                     _, camera0_got_target_number = find_around_target(
-                        undistort_image0, CAMERA_INDEX
+                        undistorted_image0, CAMERA_INDEX
                     )
                     if camera0_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
@@ -574,7 +574,7 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            undistort_image0 = stereo_calibration.undistort_image(
+                            undistorted_image0 = stereo_calibration.undistort_image(
                                 image0
                             )
                             # -------------------- 畸变矫正 -------------------- #
@@ -592,7 +592,7 @@ def main() -> None:
                             ) in camera0_id2boxstate.items():
                                 logger.info("camera0 box location start")
                                 camera0_rings_location_result = rings_location(
-                                    undistort_image0,
+                                    undistorted_image0,
                                     box_id,
                                     camera0_boxestate,
                                     image0_timestamp,
@@ -805,13 +805,13 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            undistort_image0 = stereo_calibration.undistort_image(
+                            undistorted_image0 = stereo_calibration.undistort_image(
                                 image0
                             )
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
-                            find_lost_target(undistort_image0, CAMERA_INDEX)
+                            find_lost_target(undistorted_image0, CAMERA_INDEX)
                             target_number = MatchTemplateConfig.getattr("target_number")
                             camera0_got_target_number: int = (
                                 MatchTemplateConfig.getattr("camera0_got_target_number")

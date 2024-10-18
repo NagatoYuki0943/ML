@@ -956,9 +956,17 @@ class Receive:
         elif cmd == "sendadjusttempdata":
             Receive.receive_adjust_temp_data_msg(received_msg)
 
-        # 温控停止消息
-        elif cmd == "stopadjusttemp":
-            Receive.receive_stop_adjust_temp_data(received_msg)
+        # 温度稳定消息
+        elif cmd == "tempstability":
+            Receive.receive_temp_stability_msg(received_msg)
+
+        # 温控停止消息 已经弃用
+        # elif cmd == "stopadjusttemp":
+        #     Receive.receive_stop_adjust_temp_msg(received_msg)
+
+        # 停止温控回复消息
+        elif cmd == "askstoptempcontrol":
+            Receive.receive_ask_stop_temp_control_msg(received_msg)
 
         # 重启终端设备消息
         elif cmd == "reboot":
@@ -1499,12 +1507,12 @@ class Receive:
         Send.send_temperature_change_msg(received_msg.get("param", {}))
 
     @staticmethod
-    def receive_stop_adjust_temp_data(received_msg: dict | None = None):
-        """温控停止消息"""
+    def receive_temp_stability_msg(received_msg: dict | None = None):
+        """温度稳定消息"""
         global is_temp_stable
         global need_send_in_working_state_msg
         # {
-        #     "cmd": "stopadjusttemp",
+        #     "cmd": "tempstability",
         #     "camera": "2",
         #     "times": "2024-09-11T15:45:30",
         #     "param": {
@@ -1514,41 +1522,79 @@ class Receive:
         #     "msgid": 1
         # }
         logger.success(
-            f"received stop adjust temp data: {received_msg.get('param', {})}"
+            f"received temp stability msg: {received_msg.get('param', {})}"
         )
         is_temp_stable = True
         need_send_in_working_state_msg = True
 
+    # @staticmethod
+    # def receive_stop_adjust_temp_msg(received_msg: dict | None = None):
+    #     """温控停止消息 已经弃用"""
+    #     global is_temp_stable
+    #     global need_send_in_working_state_msg
+    #     # {
+    #     #     "cmd": "stopadjusttemp",
+    #     #     "camera": "2",
+    #     #     "times": "2024-09-11T15:45:30",
+    #     #     "param": {
+    #     #         "current_t": 10,
+    #     #         "control_t": 10
+    #     #     },
+    #     #     "msgid": 1
+    #     # }
+    #     logger.success(
+    #         f"received stop adjust temp data: {received_msg.get('param', {})}"
+    #     )
+    #     is_temp_stable = True
+    #     need_send_in_working_state_msg = True
+
     @staticmethod
-    def receive_reboot_msg(received_msg: dict | None = None):
-        """重启终端设备消息"""
+    def receive_ask_stop_temp_control_msg(received_msg: dict | None = None):
+        """停止温控回复消息"""
+
         # {
-        #     "cmd":"reboot",
-        #     "msgid":"bb6f3eeb2",
+        #     "cmd": "askstoptempcontrol",
+        #     "times": "2024-09-11T15:45:30",
+        #     "param":{
+        #         "result": "OK/NOT"
+        #     },
+        #     "msgid": 1
         # }
-        # 重启终端设备响应消息
-        send_msg = {
-            "cmd": "reboot",
-            "body": {
-                "did": MQTTConfig.getattr("did"),
-                "at": get_now_time(),
-                "msg": "reboot succeed",
-            },
-            "msgid": "e37e42c53",
-        }
-        mqtt_send_queue.put(send_msg)
-        logger.success("reboot device")
-        time.sleep(5)
-        os._exit()
+        if received_msg.get("param", {}).get("result", "NOT") == "OK":
+            logger.success("received askstoptempcontrol response OK")
+        else:
+            logger.error("received askstoptempcontrol response NOT OK")
+
+    # @staticmethod
+    # def receive_reboot_msg(received_msg: dict | None = None):
+    #     """重启终端设备消息, MQTT线程处理"""
+    #     # {
+    #     #     "cmd": "reboot",
+    #     #     "msgid": "bb6f3eeb2",
+    #     # }
+    #     # 重启终端设备响应消息
+    #     send_msg = {
+    #         "cmd": "reboot",
+    #         "body": {
+    #             "did": MQTTConfig.getattr("did"),
+    #             "at": get_now_time(),
+    #             "msg": "reboot succeed",
+    #         },
+    #         "msgid": "e37e42c53",
+    #     }
+    #     mqtt_send_queue.put(send_msg)
+    #     logger.success("reboot device")
+    #     time.sleep(5)
+    #     os._exit()
 
     @staticmethod
     def receive_update_config_file_msg(received_msg: dict | None = None):
         """更新配置文件消息"""
         logger.info("received update config file msg")
         # {
-        #     "cmd":"updateconfigfile",
-        #     "body":{
-        #         "path":"results/config_20240919-170300.yaml"
+        #     "cmd": "updateconfigfile",
+        #     "body": {
+        #         "path": "results/config_20240919-170300.yaml"
         #     },
         #     "msgid": "bb6f3eeb2"
         # }
@@ -1603,7 +1649,7 @@ class Receive:
         """查询配置文件消息"""
         logger.info("received send config file msg")
         # {
-        #     "cmd":"getconfigfile",
+        #     "cmd": "getconfigfile",
         #     "msgid": "bb6f3eeb2"
         # }
         # 查询配置文件响应消息
@@ -1699,27 +1745,14 @@ class Send:
         if need_send_get_status_msg:
             Send.send_getstatus_msg()
 
-        # 设备进入工作状态消息
-        # 温度正常
+        # 温度稳定, 设备进入工作状态消息
         if need_send_in_working_state_msg:
             Send.send_in_working_state_msg()
 
-        # 温度异常告警消息
-        if False:
-            Send.send_temperature_alarm_msg()
+        Send.detect_camera_error()
 
-        # 设备异常告警消息
-        if False:
-            Send.send_device_error_msg()
-
-        # 设备温控变化消息
-        if False:
-            Send.send_temperature_change_msg()
-
-        # 温度控制命令
-        if False:
-            Send.send_temperature_control_msg()
-
+    @staticmethod
+    def detect_camera_error():
         # 相机超时错误
         get_picture_timeout_threshold: int = MainConfig.getattr(
             "get_picture_timeout_threshold"
@@ -2121,7 +2154,7 @@ class Send:
         global is_temp_stable
 
         logger.info(
-            f"send temperature control, temperature: {temperature}, camera: {camera}"
+            f"send temperature control msg, temperature: {temperature}, camera: {camera}"
         )
         # {
         #     "cmd":"adjusttempdata",
@@ -2139,6 +2172,30 @@ class Send:
         serial_send_queue.put(send_msg)
         logger.success("send temperature control msg success")
         received_temp_control_msg = False
+        is_temp_stable = False
+
+    @staticmethod
+    def send_stop_temp_control_msg():
+        """停止温度控制命令"""
+        global is_temp_stable
+
+        logger.info(
+            "send stop temperature control msg"
+        )
+        # {
+        #     "cmd":"stoptempcontrol",
+        #     "param":{
+        #         "reserve": 257
+        #     },
+        #     "msgid":1
+        # }
+        send_msg = {
+            "cmd": "stoptempcontrol",
+            "param": {"reserve": 257},
+            "msgid": 1,
+        }
+        serial_send_queue.put(send_msg)
+        logger.success("send stop temperature control msg success")
         is_temp_stable = False
 
     @staticmethod

@@ -253,7 +253,7 @@ class FTPConfig(BaseConfig):
     config_base_url: str = "/7804d2/config"
     max_retries: int = 3
     delay: int = 1
-    pasv_mode: bool = False # 是否使用被动模式连接FTP服务器（4G使用被动模式）
+    pasv_mode: bool = False  # 是否使用被动模式连接FTP服务器（4G使用被动模式）
 
 
 ALL_CONFIGS = [
@@ -271,8 +271,15 @@ ALL_CONFIGS = [
 ]
 
 
-def load_stereo_calibration_config(config_path: Path = "stereo_calibration.yaml"):
+def load_stereo_calibration_config(config_path: str | Path = "stereo_calibration.yaml"):
     """加载畸变矫正配置"""
+    config_path = Path(config_path)
+    if not config_path.exists():
+        logger.warning(
+            f"Stereo calibration config file {config_path} not found, coundn't load config."
+        )
+        return
+
     with open(config_path, "r") as file:
         class2data = yaml.full_load(file)
     for config in [StereoCalibrationConfig, DualStereoCalibrationConfig]:

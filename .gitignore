@@ -4,6 +4,7 @@ __pycache__/
 
 results/
 logs/
+stereo_calibration.yaml
 
 rings_location_draw1.ipynb
 rings_location_draw2.ipynb

@@ -28,6 +28,7 @@ from config import (
     MQTTConfig,
     SerialCommConfig,
     ALL_CONFIGS,
+    load_stereo_calibration_config,
     init_config_from_yaml,
     load_config_from_yaml,
     save_config_to_yaml,
@@ -63,6 +64,10 @@ handler_id = logger.add(
 # ------------------------------ 初始化 ------------------------------ #
 logger.info("init start")
 
+# -------------------- 载入畸变矫正 -------------------- #
+load_stereo_calibration_config()
+# -------------------- 载入畸变矫正 -------------------- #
+
 # -------------------- 基础 -------------------- #
 # 主线程消息队列
 main_queue = queue.Queue()
@@ -70,10 +75,6 @@ image0_timestamp: str
 image0: np.ndarray
 image0_metadata: dict
 # -------------------- 基础 -------------------- #
-
-# -------------------- 运行时配置 -------------------- #
-
-# -------------------- 运行时配置 -------------------- #
 
 # -------------------- 初始化相机 -------------------- #
 logger.info("开始初始化相机")
@@ -93,13 +94,8 @@ logger.success("初始化相机完成")
 # -------------------- 畸变矫正 -------------------- #
 logger.info("开始初始化畸变矫正")
 stereo_calibration = StereoCalibration(
-    StereoCalibrationConfig.getattr("camera_matrix_left"),
-    StereoCalibrationConfig.getattr("camera_matrix_right"),
-    StereoCalibrationConfig.getattr("distortion_coefficients_left"),
-    StereoCalibrationConfig.getattr("distortion_coefficients_right"),
-    StereoCalibrationConfig.getattr("R"),
-    StereoCalibrationConfig.getattr("T"),
-    StereoCalibrationConfig.getattr("pixel_width_mm"),
+    StereoCalibrationConfig.getattr("K"),
+    StereoCalibrationConfig.getattr("dist_coeffs"),
 )
 logger.success("初始化畸变矫正完成")
 # -------------------- 畸变矫正 -------------------- #

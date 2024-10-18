@@ -110,45 +110,27 @@ class StereoCalibrationConfig(BaseConfig):
     """畸变矫正配置"""
 
     lock = Lock()
-    camera_matrix_left = [
-        [7.44937603e03, 0.00000000e00, 1.79056889e03],
-        [0.00000000e00, 7.45022891e03, 1.26665786e03],
-        [0.00000000e00, 0.00000000e00, 1.00000000e00],
-    ]
-    camera_matrix_right = [
-        [7.46471035e03, 0.00000000e00, 1.81985040e03],
-        [0.00000000e00, 7.46415680e03, 1.38081032e03],
-        [0.00000000e00, 0.00000000e00, 1.00000000e00],
-    ]
-    distortion_coefficients_left = [
-        [
-            -4.44924086e-01,
-            6.27814725e-01,
-            -1.80510014e-03,
-            -8.97545764e-04,
-            -1.84473439e01,
-        ]
-    ]
-    distortion_coefficients_right = [
-        [
-            -4.07660445e-01,
-            -2.23391154e00,
-            -1.09115383e-03,
-            -3.04516347e-03,
-            7.45504877e01,
-        ]
-    ]
-    R = [
-        [0.97743098, 0.00689964, 0.21114231],
-        [-0.00564446, 0.99996264, -0.00654684],
-        [-0.2111796, 0.0052073, 0.97743341],
-    ]
-    T = [[-476.53571438], [4.78988367], [49.50495583]]
+    K: list[list[float]] | None = None  # 内参矩阵
+    dist_coeffs: list[list[float]] | None = None  # 畸变系数
+
+
+@dataclass
+class DualStereoCalibrationConfig(BaseConfig):
+    """双目畸变矫正配置"""
+
+    lock = Lock()
+    camera_matrix_left: list[list[float]] | None = None
+    camera_matrix_right: list[list[float]] | None = None
+    distortion_coefficients_left: list[list[float]] | None = None
+    distortion_coefficients_right: list[list[float]] | None = None
+    R: list[list[float]] | None = None
+    T: list[list[float]] | None = None
     # 给定的传感器尺寸和图像分辨率
-    sensor_width_mm = 6.413  # 传感器宽度，以毫米为单位
-    image_width_pixels = 3840  # 图像宽度，以像素为单位
+    sensor_width_mm: float | None = None  # 传感器宽度，以毫米为单位
+    image_width_pixels: int | None = None  # 图像宽度，以像素为单位
     # 计算每个像素的宽度（以毫米为单位）
-    pixel_width_mm = sensor_width_mm / image_width_pixels
+    pixel_width_mm: float | None = None
+    # pixel_width_mm: float = sensor_width_mm / image_width_pixels
 
 
 def get_reference_target_ids():
@@ -279,6 +261,7 @@ ALL_CONFIGS = [
     CameraConfig,
     AdjustCameraConfig,
     StereoCalibrationConfig,
+    DualStereoCalibrationConfig,
     MatchTemplateConfig,
     RingsLocationConfig,
     TemperatureConfig,
@@ -286,6 +269,22 @@ ALL_CONFIGS = [
     MQTTConfig,
     FTPConfig,
 ]
+
+
+def load_stereo_calibration_config(config_path: Path = "stereo_calibration.yaml"):
+    """加载畸变矫正配置"""
+    with open(config_path, "r") as file:
+        class2data = yaml.full_load(file)
+    for config in [StereoCalibrationConfig, DualStereoCalibrationConfig]:
+        if config.__name__ in class2data:
+            data = class2data[config.__name__]
+            for key, value in data.items():
+                if hasattr(config, key):
+                    logger.info(
+                        f"Setting {config.__name__}.{key}: from `{getattr(config, key)}` to `{value}`."
+                    )
+                    config.setattr(key, value)
+    logger.success(f"load stereo calibration config from {config_path}")
 
 
 def save_config_to_yaml(
@@ -360,6 +359,7 @@ def init_config_from_yaml(
 
 
 if __name__ == "__main__":
+    load_stereo_calibration_config()
     save_config_to_yaml(ALL_CONFIGS, MainConfig.original_config_path)
     load_config_from_yaml(ALL_CONFIGS, MainConfig.original_config_path)
     init_config_from_yaml(ALL_CONFIGS, MainConfig.original_config_path)

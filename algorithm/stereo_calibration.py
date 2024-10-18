@@ -1,181 +1,110 @@
-from loguru import logger
-import os
 import cv2
 import numpy as np
-import pandas as pd
-from PIL import Image
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 
 class StereoCalibration:
     def __init__(
         self,
-        camera_matrix_left: np.ndarray,
-        camera_matrix_right: np.ndarray,
-        distortion_coefficients_left: np.ndarray,
-        distortion_coefficients_right: np.ndarray,
-        R: np.ndarray,
-        T: np.ndarray,
-        pixel_width_mm: float,
+        K: np.ndarray | list[list[float]],
+        dist_coeffs: np.ndarray | list[list[float]],
     ):
-        self.camera_matrix_left = camera_matrix_left
-        self.camera_matrix_right = camera_matrix_right
-        self.distortion_coefficients_left = distortion_coefficients_left
-        self.distortion_coefficients_right = distortion_coefficients_right
-        self.R = R
-        self.T = T
-        self.pixel_width_mm = pixel_width_mm
+        """初始化图像矫正器
 
-    def rectify_images(self, left_image_path, right_image_path):
-        image_left = left_image_path
-        image_right =right_image_path
-        image_size = (image_left.shape[1], image_left.shape[0])
+        Args:
+            K (np.ndarray | list[list[float]]): 相机内参矩阵 (3x3)
+            dist_coeffs (np.ndarray | list[list[float]]): 畸变系数 (k1, k2, p1, p2, k3)
+        """
+        self.K = np.array(K)
+        self.dist_coeffs = np.array(dist_coeffs)
 
-        # 使用 cv2.undistort 进行畸变矫正
-        undistorted_left = cv2.undistort(image_left, self.camera_matrix_left, self.distortion_coefficients_left)
-        undistorted_right = cv2.undistort(image_right, self.camera_matrix_right, self.distortion_coefficients_right)
-        focal_length_pixels_R = self.camera_matrix_right[0, 0]
-        focal_length_pixels_L = self.camera_matrix_left[0, 0]
-        # logger.info(f"Focal length (in pixels): {focal_length_pixels}")
-        # 给定的传感器尺寸和图像分辨率
-        # sensor_width_mm = 6.413  # 传感器宽度，以毫米为单位
-        # image_width_pixels = 3840  # 图像宽度，以像素为单位
+    def undistort_image(self, image: np.ndarray) -> np.ndarray:
+        """执行图像畸变矫正"""
+        undistorted_img = cv2.undistort(image, self.K, self.dist_coeffs)
+        return undistorted_img
 
-        # 计算每个像素的宽度（以毫米为单位）
-        # pixel_width_mm = sensor_width_mm / image_width_pixels
+    # def undistort_point(self, u, v):
+    #     """
+    #     对单个点坐标进行畸变矫正
+    #     :param u: 原始点的x坐标
+    #     :param v: 原始点的y坐标
+    #     :return: 矫正后的点坐标 (u_corrected, v_corrected)
+    #     """
+    #     # 将点转换为符合输入格式的数组
+    #     distorted_point = np.array([[[u, v]]], dtype="float32")
 
-        # 将焦距从像素转换为毫米
-        focal_length_mm_R = focal_length_pixels_R * self.pixel_width_mm
-        logger.info("R origin focal",focal_length_mm_R)
-        focal_length_mm_L = focal_length_pixels_L * self.pixel_width_mm
-        logger.info("R origin focal", focal_length_mm_L)
-        # 获取立体校正参数
-        R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
-            self.camera_matrix_left, None,
-            self.camera_matrix_right, None,
-            image_size, self.R, self.T)
+    #     # 执行点的畸变矫正
+    #     undistorted_point = cv2.undistortPoints(
+    #         distorted_point, self.K, self.dist_coeffs, P=self.K
+    #     )
 
-        # 计算校正映射
-        map1_left, map2_left = cv2.initUndistortRectifyMap(
-            self.camera_matrix_left, None, R1, P1, image_size, cv2.CV_32FC1)
-        map1_right, map2_right = cv2.initUndistortRectifyMap(
-            self.camera_matrix_right, None, R2, P2, image_size, cv2.CV_32FC1)
+    #     # 返回矫正后的点坐标
+    #     u_corrected, v_corrected = undistorted_point[0][0]
+    #     return u_corrected, v_corrected
 
-        # 应用校正映射
-        rectified_image_left = cv2.remap(undistorted_left, map1_left, map2_left, cv2.INTER_LINEAR)
-        rectified_image_right = cv2.remap(undistorted_right, map1_right, map2_right, cv2.INTER_LINEAR)
+    def undistort_point(self, xy: np.ndarray | list[float]) -> np.ndarray:
+        """对单个点坐标进行畸变矫正
 
-        return rectified_image_left, rectified_image_right, R1, R2, P1, P2, Q, roi1, roi2, undistorted_left, undistorted_right
+        Args:
+            xy (np.ndarray | list[float]): 需要矫正的坐标
 
-    def find_corners(self, rectified_image, chessboard_size=(11, 8)):
-        gray_image = cv2.cvtColor(rectified_image, cv2.COLOR_BGR2GRAY)
-        ret, corners = cv2.findChessboardCornersSB(gray_image, chessboard_size, None)
-        if ret:
-            corners = corners.reshape(-1, 2)
-        return ret, corners
+        Returns:
+            ndarray: 矫正后的坐标
+        """
+        # 将点转换为符合输入格式的数组
+        # distorted_point = np.array([[xy]])
+        distorted_point = np.array(xy)
 
-    def save_corners_to_csv(self, corners, file_path):
-        df = pd.DataFrame(corners, columns=['x', 'y'])
-        df.to_csv(file_path, index=False)
+        # 执行点的畸变矫正
+        undistorted_point = cv2.undistortPoints(
+            distorted_point, self.K, self.dist_coeffs, P=self.K
+        )
 
-    def undistort_points(self, points, camera_matrix, R, P):
+        # 返回矫正后的点坐标
+        xy_corrected: np.ndarray = undistorted_point[0][0]
+        return xy_corrected.tolist()
 
-        points = points.reshape(-1, 2)
-        #logger.info(R)
-        #logger.info(P)
-        rectified_points = []
-        for point in points:
-            new_point = cv2.undistortPoints(np.array([[point]]), camera_matrix, None, R=R, P=P)
-            x, y = new_point.ravel()
-            rectified_points.append([x, y])
-        return rectified_points
 
-    def get_stereo_parameters(self, P1, P2):
-        # 焦距是投影矩阵中的元素
-        focal_length_pixels = P1[0, 0]
-        # logger.info(f"Focal length (in pixels): {focal_length_pixels}")
+if __name__ == "__main__":
+    # 相机内参矩阵 (K) 和畸变系数 (dist_coeffs)
+    K = np.array(
+        [
+            [5.19269425e03, 0.00000000e00, 2.02199831e03],
+            [0.00000000e00, 5.19320469e03, 1.56584753e03],
+            [0.00000000e00, 0.00000000e00, 1.00000000e00],
+        ]
+    )
 
-        # 基线距离可以从 P2 的第四列第三个元素计算得到
-        baseline = -P2[0, 3] / P2[0, 0]
-        logger.info(f"Baseline (in meters): {baseline}")
+    dist_coeffs = np.array(
+        [
+            [
+                -8.41673780e-02,
+                -9.15387560e-02,
+                9.50935715e-04,
+                9.70130486e-05,
+                1.48280474e00,
+            ]
+        ]
+    )  # 畸变系数
 
-        # 给定的传感器尺寸和图像分辨率
-        # sensor_width_mm = 6.413  # 传感器宽度，以毫米为单位
-        # image_width_pixels = 3840  # 图像宽度，以像素为单位
+    # 创建ImageUndistorter对象
+    undistorter = StereoCalibration(K, dist_coeffs)
 
-        # 计算每个像素的宽度（以毫米为单位）
-        # pixel_width_mm = sensor_width_mm / image_width_pixels
+    # 输入图像路径
+    image_path = "../results/image0_default.jpg"
+    image = cv2.imread(image_path)
 
-        # 将焦距从像素转换为毫米
-        focal_length_mm = focal_length_pixels * self.pixel_width_mm
-        logger.info(f"Focal length (in millimeters): {focal_length_mm:.2f} mm")
+    # 输出图像路径
+    output_path = "../results/image0_undistorted.jpg"
 
-        return focal_length_pixels, baseline
+    # 调用函数进行图像畸变矫正
+    undistorted_image = undistorter.undistort_image(image)
 
-    def pixel_to_world(self, P1, P2, left_points, right_points):
-        left_world_points = []
-        right_world_points = []
-        disparities = []
-        depths = []
+    cv2.imwrite(output_path, undistorted_image)
 
-        # 获取焦距和基线距离
-        focal_length, baseline = self.get_stereo_parameters(P1, P2)
+    # 这里进行模板匹配中心点识别
+    # 输入需要矫正的点坐标
+    xy = [1000.0, 1000.0]
 
-        # 将点转换为 NumPy 数组并转置
-        left_points_array = np.array(left_points).reshape(-1, 2).T
-        right_points_array = np.array(right_points).reshape(-1, 2).T
-
-        # 将点转换为齐次坐标
-        points4D = cv2.triangulatePoints(P1, P2, left_points_array, right_points_array)
-
-        # 转换为非齐次坐标
-        points3D = points4D[:3] / points4D[3]
-
-        for i in range(points3D.shape[1]):
-            left_point = left_points[i]
-            right_point = right_points[i]
-            disparity = left_point[0] - right_point[0]
-            if disparity == 0:
-                continue
-            disparities.append(disparity)
-
-            # 根据视差计算深度
-            depth = (focal_length * baseline) / disparity
-            depths.append(depth)
-
-            left_world_point = points3D[:, i]
-            left_world_points.append(left_world_point[:3])
-
-            # Note: Right world points are the same as left in this context,
-            # as triangulatePoints returns a single 3D point for each pair of 2D points.
-            right_world_points.append(left_world_point[:3])
-
-        avg_disparity = np.mean(disparities) if disparities else 0
-        avg_depth = np.mean(depths) if depths else 0
-
-        return np.array(left_world_points), np.array(right_world_points), avg_disparity, avg_depth, depths,focal_length
-
-    def draw_combined_image(self, rectified_image_left, rectified_image_right, output_path):
-        #logger.info(rectified_image_left.shape)
-        height, width = rectified_image_left.shape
-
-        # Convert grayscale images to 3-channel images
-        rectified_image_left_3ch = cv2.cvtColor(rectified_image_left, cv2.COLOR_GRAY2BGR)
-        rectified_image_right_3ch = cv2.cvtColor(rectified_image_right, cv2.COLOR_GRAY2BGR)
-
-        combined_image = np.zeros((height, width * 2, 3), dtype=np.uint8)
-        combined_image[:, :width] = rectified_image_left_3ch
-        combined_image[:, width:] = rectified_image_right_3ch
-
-        combined_image_pil = Image.fromarray(cv2.cvtColor(combined_image, cv2.COLOR_BGR2RGB))
-
-        fig, ax = plt.subplots(figsize=(15, 10))
-        ax.imshow(combined_image_pil)
-        for i in range(1, 20):
-            y = i * height // 20
-            ax.axhline(y=y, color='r', linestyle='-')
-
-        plt.axis('off')
-        plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
-        plt.close(fig)
+    # 畸变矫正后的坐标点
+    xy_corrected = undistorter.undistort_point(xy)
+    print(f"矫正后的点坐标为: {xy_corrected}")

@@ -12,6 +12,7 @@ from .match_template import (
 )
 from .rings_location_algo import *
 from .stereo_calibration import StereoCalibration
+from .dual_stereo_calibration import DualStereoCalibration
 from .pixel2real import pixel_num2object_distance, pixel_num2object_size
 from .raspberry_mqtt import RaspberryMQTT
 from .raspberry_serial_port import RaspberrySerialPort
@@ -30,6 +31,7 @@ __all__ = [
     "multi_scale_match_template",
     "multi_target_multi_scale_match_template",
     "StereoCalibration",
+    "DualStereoCalibration",
     "pixel_num2object_distance",
     "pixel_num2object_size",
     "RaspberryMQTT",

@@ -67,6 +67,7 @@ class CameraConfig(BaseConfig):
     """相机配置"""
 
     lock = Lock()
+    image_shape: tuple[int, int] = (3040, 4056)  # 图像尺寸 (h, w)
     pixel_size: float = 1.55  # 像素大小 um
     focus: float = 8  # 焦距 mm
     low_res_ratio: float = 0.5  # 相机拍摄低分辨率比率

@@ -291,9 +291,9 @@ def main() -> None:
         # -------------------- 取图 -------------------- #
 
         # -------------------- 畸变矫正 -------------------- #
-        logger.info("rectify image0 start")
-        rectified_image0 = image0
-        logger.success("rectify image0 success")
+        logger.info("undistort image0 start")
+        undistort_image0 = stereo_calibration.undistort_image(image0)
+        logger.success("undistort image0 success")
         # -------------------- 畸变矫正 -------------------- #
 
         # -------------------- 模板匹配 -------------------- #
@@ -314,12 +314,12 @@ def main() -> None:
                 "camera0_id2boxstate is None, use find_target instead of find_around_target"
             )
             camera0_id2boxstate, camera0_got_target_number = find_target(
-                rectified_image0, CAMERA_INDEX
+                undistort_image0, CAMERA_INDEX
             )
         else:
             logger.success("camera0_id2boxstate is not None, use find_around_target")
             camera0_id2boxstate, camera0_got_target_number = find_around_target(
-                rectified_image0, CAMERA_INDEX
+                undistort_image0, CAMERA_INDEX
             )
         logger.info(f"image0 find target camera0_id2boxstate: {camera0_id2boxstate}")
         logger.info(f"image0 find target number: {camera0_got_target_number}")
@@ -331,8 +331,7 @@ def main() -> None:
                 if camera0_boxestate["box"] is not None
             ]
             # 绘制boxes
-            image0_draw = image0.copy()
-            # image0_draw = rectified_image0.copy()
+            image0_draw = undistort_image0.copy()
             for i in range(len(boxes)):
                 cv2.rectangle(
                     img=image0_draw,
@@ -469,12 +468,12 @@ def main() -> None:
                     _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
 
                     # --------------- 畸变矫正 --------------- #
-                    rectified_image0 = image0
+                    undistort_image0 = stereo_calibration.undistort_image(image0)
                     # --------------- 畸变矫正 --------------- #
 
                     # --------------- 小区域模板匹配 --------------- #
                     _, camera0_got_target_number = find_around_target(
-                        rectified_image0, CAMERA_INDEX
+                        undistort_image0, CAMERA_INDEX
                     )
                     if camera0_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
@@ -575,7 +574,9 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            rectified_image0 = image0
+                            undistort_image0 = stereo_calibration.undistort_image(
+                                image0
+                            )
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 检测 -------------------- #
@@ -591,7 +592,7 @@ def main() -> None:
                             ) in camera0_id2boxstate.items():
                                 logger.info("camera0 box location start")
                                 camera0_rings_location_result = rings_location(
-                                    rectified_image0,
+                                    undistort_image0,
                                     box_id,
                                     camera0_boxestate,
                                     image0_timestamp,
@@ -623,6 +624,20 @@ def main() -> None:
                     # ------------------------- 整理检测结果 ------------------------- #
                     logger.info("last cycle, try to compare and save results")
                     logger.success(f"{camera0_cycle_results = }")
+
+                    # -------------------- 畸变矫正坐标 -------------------- #
+                    logger.info("use stereo calibration to undistort centers")
+                    for box_id, result in camera0_cycle_results.items():
+                        _center = result["center"]
+                        if _center is not None:
+                            camera0_cycle_results[box_id]["center"] = (
+                                stereo_calibration.undistort_point(_center)
+                            )
+                    logger.success(
+                        f"after undistort results: {camera0_cycle_results = }"
+                    )
+                    # -------------------- 畸变矫正坐标 -------------------- #
+
                     # 保存到文件
                     save_to_jsonl(
                         {
@@ -790,11 +805,13 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            rectified_image0 = image0
+                            undistort_image0 = stereo_calibration.undistort_image(
+                                image0
+                            )
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
-                            find_lost_target(rectified_image0, CAMERA_INDEX)
+                            find_lost_target(undistort_image0, CAMERA_INDEX)
                             target_number = MatchTemplateConfig.getattr("target_number")
                             camera0_got_target_number: int = (
                                 MatchTemplateConfig.getattr("camera0_got_target_number")
@@ -1521,9 +1538,7 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success(
-            f"received temp stability msg: {received_msg.get('param', {})}"
-        )
+        logger.success(f"received temp stability msg: {received_msg.get('param', {})}")
         is_temp_stable = True
         need_send_in_working_state_msg = True
 
@@ -2179,9 +2194,7 @@ class Send:
         """停止温度控制命令"""
         global is_temp_stable
 
-        logger.info(
-            "send stop temperature control msg"
-        )
+        logger.info("send stop temperature control msg")
         # {
         #     "cmd":"stoptempcontrol",
         #     "param":{
@@ -2208,7 +2221,9 @@ class Send:
             logger.warning("adjust led level less than 1, set to 1")
         if adjust_led_level_param["level"] > max_led_level:
             adjust_led_level_param["level"] = max_led_level
-            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
+            logger.warning(
+                f"adjust led level greater than {max_led_level}, set to {max_led_level}"
+            )
         # {
         #     "cmd": "adjustLEDlevel",
         #     "param": {
@@ -2235,7 +2250,9 @@ class Send:
             logger.warning("adjust led level less than 1, set to 1")
         if led_level > max_led_level:
             led_level = max_led_level
-            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
+            logger.warning(
+                f"adjust led level greater than {max_led_level}, set to {max_led_level}"
+            )
         # {
         #     "cmd": "openLED",
         #     "param": {
@@ -2260,9 +2277,9 @@ class Send:
         send_msg = {
             "cmd": "closeLED",
             "param": {
-                "reserve": 257, #保留参数，暂时没用，赋值为257
+                "reserve": 257,  # 保留参数，暂时没用，赋值为257
             },
-            "msgid": 1
+            "msgid": 1,
         }
         serial_send_queue.put(send_msg)
         logger.success("send close led level msg success")

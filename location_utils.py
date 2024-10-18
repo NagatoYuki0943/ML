@@ -47,7 +47,7 @@ def rings_location(
         target = image[y1:y2, x1:x2]
 
         logger.info(f"box {box_id} rings location start")
-        result = adaptive_threshold_rings_location(
+        rings_location_result = adaptive_threshold_rings_location(
             target,
             f"camera0--image--{image_timestamp}--{box_id}",
             iters,
@@ -62,21 +62,21 @@ def rings_location(
             save_detect_results,
             gradient_threshold_percent,
         )
-        logger.success(f"{result = }")
-        result["metadata"] = image_metadata
+        logger.success(f"{rings_location_result = }")
+        rings_location_result["metadata"] = image_metadata
         # 保存到文件
-        save_to_jsonl(result, camera_result_save_path)
+        save_to_jsonl(rings_location_result, camera_result_save_path)
         logger.success(f"box {box_id} rings location success")
 
         center = [
-            float(result["center_x_mean"] + box[0]),
-            float(result["center_y_mean"] + box[1]),
+            float(rings_location_result["center_x_mean"] + box[0]),
+            float(rings_location_result["center_y_mean"] + box[1]),
         ]
         if np.any(np.isnan(center)):
             center = None
             logger.warning(f"box {box_id} center is nan")
 
-        radii: list[float] = [float(radius) for radius in result["radii"]]
+        radii: list[float] = [float(radius) for radius in rings_location_result["radii"]]
         if np.any(np.isnan(radii)):
             radii = None
 

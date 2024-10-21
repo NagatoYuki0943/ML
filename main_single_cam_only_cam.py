@@ -953,8 +953,6 @@ def main() -> None:
         time.sleep(main_sleep_interval / 1000)
 
         # 测试调整相机
-        if i > 5000:
-            os._exit(0)
         logger.debug(f"{i = }")
         i += 1
 

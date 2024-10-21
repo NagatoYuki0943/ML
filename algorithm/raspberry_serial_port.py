@@ -151,7 +151,5 @@ class RaspberrySerialPort:
         param = command_data.get('param', {})
         msgid = command_data.get('msgid', "unknown")
         param_str = json.dumps(param, separators=(',', ':')).strip()
-        command_message = f"$cmd={cmd}&param{param_str}&msgid={msgid}"
-        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        command_data['times'] = time
+        command_message = f"$cmd={cmd}&param={param_str}&msgid={msgid}"
         return command_message

@@ -109,10 +109,10 @@ class DualStereoCalibration:
         )
 
         # 使用 cv2.undistort 进行畸变矫正
-        undistorted_left: np.ndarray = cv2.undistort(
+        undistorted_image_left: np.ndarray = cv2.undistort(
             image_left, self.camera_matrix_left, self.distortion_coefficients_left
         )
-        undistorted_right: np.ndarray = cv2.undistort(
+        undistorted_image_right: np.ndarray = cv2.undistort(
             image_right, self.camera_matrix_right, self.distortion_coefficients_right
         )
 
@@ -126,17 +126,17 @@ class DualStereoCalibration:
 
         # 应用校正映射
         rectified_image_left = cv2.remap(
-            undistorted_left, map1_left, map2_left, cv2.INTER_LINEAR
+            undistorted_image_left, map1_left, map2_left, cv2.INTER_LINEAR
         )
         rectified_image_right = cv2.remap(
-            undistorted_right, map1_right, map2_right, cv2.INTER_LINEAR
+            undistorted_image_right, map1_right, map2_right, cv2.INTER_LINEAR
         )
 
         return (
+            undistorted_image_left,
+            undistorted_image_right,
             rectified_image_left,
             rectified_image_right,
-            undistorted_left,
-            undistorted_right,
             R1,
             R2,
             P1,
@@ -402,15 +402,15 @@ if __name__ == "__main__":
     print(right_image.shape)
 
     # # 输出图像路径
-    left_output_path = "../results/2circles-6_5-3-500pixel_left.jpg"
-    right_output_path1 = "../results/2circles-6_5-3-500pixel_right.jpg"
+    left_output_path = "../results/2circles-6_5-3-500pixel_left0.jpg"
+    right_output_path1 = "../results/2circles-6_5-3-500pixel_right0.jpg"
 
     # # 调用函数进行图像畸变矫正
     (
+        undistorted_image_left,
+        undistorted_image_right,
         rectified_image_left,
         rectified_image_right,
-        undistorted_left,
-        undistorted_right,
         R1,
         R2,
         P1,
@@ -420,8 +420,8 @@ if __name__ == "__main__":
         roi2,
     ) = dual_stereo_calibration.undistort_images(left_image, right_image)
 
-    cv2.imwrite(left_output_path, rectified_image_left)
-    cv2.imwrite(right_output_path1, rectified_image_right)
+    cv2.imwrite(left_output_path, undistorted_image_left)
+    cv2.imwrite(right_output_path1, undistorted_image_right)
 
     # 这里进行模板匹配中心点识别
     # 输入需要矫正的点坐标

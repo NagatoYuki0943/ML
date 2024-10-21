@@ -284,8 +284,8 @@ if __name__ == "__main__":
     print(right_image.shape)
 
     # # 输出图像路径
-    left_output_path = "../results/2circles-6_5-3-500pixel_left.jpg"
-    right_output_path1 = "../results/2circles-6_5-3-500pixel_right.jpg"
+    left_output_path = "../results/2circles-6_5-3-500pixel_left1.jpg"
+    right_output_path1 = "../results/2circles-6_5-3-500pixel_right1.jpg"
 
     # 调用函数进行图像畸变矫正
     left_undistorted_image, left_rectified_image = (

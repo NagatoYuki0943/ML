@@ -502,8 +502,6 @@ def main() -> None:
     #     time.sleep(main_sleep_interval / 1000)
 
     #     # 测试调整相机
-    #     if i > 5000:
-    #         break
     #     logger.warning(f"{i = }")
     #     i += 1
 

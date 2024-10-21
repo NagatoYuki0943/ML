@@ -643,6 +643,8 @@ def main() -> None:
                         {
                             "camera0": camera0_cycle_results,
                             "temperature": temperature_data,
+                            "is_temp_stable": is_temp_stable,
+                            "time": get_now_time(),
                         },
                         history_save_path,
                     )

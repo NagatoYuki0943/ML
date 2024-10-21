@@ -333,9 +333,9 @@ def main() -> None:
         # -------------------- 取图 -------------------- #
 
         # -------------------- 畸变矫正 -------------------- #
-        logger.info("rectify image0 start")
-        rectified_image0 = image0
-        logger.success("rectify image0 success")
+        logger.info("undistort image0 start")
+        undistorted_image0 = image0
+        logger.success("undistort image0 success")
         # -------------------- 畸变矫正 -------------------- #
 
         # -------------------- 模板匹配 -------------------- #
@@ -356,12 +356,12 @@ def main() -> None:
                 "camera0_id2boxstate is None, use find_target instead of find_around_target"
             )
             camera0_id2boxstate, camera0_got_target_number = find_target(
-                rectified_image0, 0
+                undistorted_image0, 0
             )
         else:
             logger.success("camera0_id2boxstate is not None, use find_around_target")
             camera0_id2boxstate, camera0_got_target_number = find_around_target(
-                rectified_image0, 0
+                undistorted_image0, 0
             )
         logger.info(f"image0 find target camera0_id2boxstate: {camera0_id2boxstate}")
         logger.info(f"image0 find target number: {camera0_got_target_number}")
@@ -373,8 +373,7 @@ def main() -> None:
                 if camera0_boxestate["box"] is not None
             ]
             # 绘制boxes
-            image0_draw = image0.copy()
-            # image0_draw = rectified_image0.copy()
+            image0_draw = undistorted_image0.copy()
             for i in range(len(boxes)):
                 cv2.rectangle(
                     img=image0_draw,
@@ -406,9 +405,9 @@ def main() -> None:
         # -------------------- 取图 -------------------- #
 
         # -------------------- 畸变矫正 -------------------- #
-        logger.info("rectify image1 start")
-        rectified_image1 = image1
-        logger.success("rectify image1 success")
+        logger.info("undistort image1 start")
+        undistorted_image1 = image1
+        logger.success("undistort image1 success")
         # -------------------- 畸变矫正 -------------------- #
 
         # -------------------- 模板匹配 -------------------- #
@@ -429,12 +428,12 @@ def main() -> None:
                 "camera1_id2boxstate is None, use find_target instead of find_around_target"
             )
             camera1_id2boxstate, camera1_got_target_number = find_target(
-                rectified_image1, 1
+                undistorted_image1, 1
             )
         else:
             logger.success("camera1_id2boxstate is not None, use find_around_target")
             camera1_id2boxstate, camera1_got_target_number = find_around_target(
-                rectified_image1, 1
+                undistorted_image1, 1
             )
         logger.info(f"image1 find target camera1_id2boxstate: {camera1_id2boxstate}")
         logger.info(f"image1 find target number: {camera1_got_target_number}")
@@ -446,8 +445,7 @@ def main() -> None:
                 if camera1_boxestate["box"] is not None
             ]
             # 绘制boxes
-            image1_draw = image1.copy()
-            # image0_draw = rectified_image0.copy()
+            image1_draw = undistorted_image1.copy()
             for i in range(len(boxes)):
                 cv2.rectangle(
                     img=image1_draw,
@@ -597,12 +595,12 @@ def main() -> None:
                     _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
 
                     # --------------- 畸变矫正 --------------- #
-                    rectified_image0 = image0
+                    undistorted_image0 = image0
                     # --------------- 畸变矫正 --------------- #
 
                     # --------------- 小区域模板匹配 --------------- #
                     _, camera0_got_target_number = find_around_target(
-                        rectified_image0, 0
+                        undistorted_image0, 0
                     )
                     if camera0_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
@@ -651,12 +649,12 @@ def main() -> None:
                     _, image1, _ = camera1_queue.get(timeout=get_picture_timeout)
 
                     # --------------- 畸变矫正 --------------- #
-                    rectified_image1 = image1
+                    undistorted_image1 = image1
                     # --------------- 畸变矫正 --------------- #
 
                     # --------------- 小区域模板匹配 --------------- #
                     _, camera1_got_target_number = find_around_target(
-                        rectified_image1, 1
+                        undistorted_image1, 1
                     )
                     if camera1_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
@@ -760,7 +758,7 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            rectified_image0 = image0
+                            undistorted_image0 = image0
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 检测 -------------------- #
@@ -776,7 +774,7 @@ def main() -> None:
                             ) in camera0_id2boxstate.items():
                                 logger.info("camera0 box location start")
                                 camera0_rings_location_result = rings_location(
-                                    rectified_image0,
+                                    undistorted_image0,
                                     box_id,
                                     camera0_boxestate,
                                     image0_timestamp,
@@ -809,7 +807,7 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            rectified_image1 = image1
+                            undistorted_image1 = image1
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 检测 -------------------- #
@@ -825,7 +823,7 @@ def main() -> None:
                             ) in camera1_id2boxstate.items():
                                 logger.info("camera1 box location start")
                                 camera1_rings_location_result = rings_location(
-                                    rectified_image1,
+                                    undistorted_image1,
                                     box_id,
                                     camera1_boxestate,
                                     image1_timestamp,
@@ -855,15 +853,6 @@ def main() -> None:
                     logger.info("last cycle, try to compare and save results")
                     logger.success(f"{camera0_cycle_results = }")
                     logger.success(f"{camera1_cycle_results = }")
-                    # 保存到文件
-                    save_to_jsonl(
-                        {
-                            "camera0": camera0_cycle_results,
-                            "camera1": camera1_cycle_results,
-                            "temperature": temperature_data,
-                        },
-                        history_save_path,
-                    )
 
                     # 防止值不存在
                     send_msg_data = {}
@@ -931,6 +920,39 @@ def main() -> None:
                             RingsLocationConfig.setattr(
                                 "camera1_standard_results", camera1_standard_results
                             )
+
+                            camera0_fake_move_result = {
+                                k: [0, 0] for k in camera0_standard_results.keys()
+                            }
+                            camera1_fake_move_result = {
+                                k: [0, 0] for k in camera1_standard_results.keys()
+                            }
+
+                            # -------------------- 保存到文件 -------------------- #
+                            save_to_jsonl(
+                                {
+                                    "camera0": {
+                                        "cycle_results": camera0_standard_results,
+                                        "pixel_move_result": camera0_fake_move_result,
+                                        "pixel_move_result_without_ref": camera0_fake_move_result,
+                                        "real_move_result": camera0_fake_move_result,
+                                        "real_move_result_without_ref": camera0_fake_move_result,
+                                    },
+                                    "camera1": {
+                                        "cycle_results": camera1_standard_results,
+                                        "pixel_move_result": camera1_fake_move_result,
+                                        "pixel_move_result_without_ref": camera1_fake_move_result,
+                                        "real_move_result": camera1_fake_move_result,
+                                        "real_move_result_without_ref": camera1_fake_move_result,
+                                    },
+                                    "temperature": temperature_data,
+                                    "is_temp_stable": is_temp_stable,
+                                    "time": get_now_time(),
+                                },
+                                history_save_path,
+                            )
+                            # -------------------- 保存到文件 -------------------- #
+
                             # 发送初始坐标数据结果
                             # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                             logger.success("send init data message.")
@@ -986,8 +1008,11 @@ def main() -> None:
 
                         # 计算距离
                         (
-                            camera0_distance_result,
-                            camera0_over_distance_ids,
+                            camera0_pixel_move_result,
+                            camera0_pixel_move_result_without_ref,
+                            camera0_real_move_result,
+                            camera0_real_move_result_without_ref,
+                            camera0_over_threshold_ids,
                             camera0_reference_target_id2offset,
                         ) = calc_move_distance(
                             camera0_standard_results,
@@ -1000,10 +1025,10 @@ def main() -> None:
                             camera0_reference_target_id2offset,
                         )
                         logger.info(
-                            f"camera0_distance_result: {camera0_distance_result}"
+                            f"camera0_real_move_result: {camera0_real_move_result}"
                         )
                         logger.info(
-                            f"camera0_over_distance_ids: {camera0_over_distance_ids}"
+                            f"camera0_over_threshold_ids: {camera0_over_threshold_ids}"
                         )
                         # -------------------- camera0 compare results -------------------- #
 
@@ -1017,8 +1042,11 @@ def main() -> None:
 
                         # 计算距离
                         (
-                            camera1_distance_result,
-                            camera1_over_distance_ids,
+                            camera1_pixel_move_result,
+                            camera1_pixel_move_result_without_ref,
+                            camera1_real_move_result,
+                            camera1_real_move_result_without_ref,
+                            camera1_over_threshold_ids,
                             camera1_reference_target_id2offset,
                         ) = calc_move_distance(
                             camera1_standard_results,
@@ -1031,23 +1059,47 @@ def main() -> None:
                             camera1_reference_target_id2offset,
                         )
                         logger.info(
-                            f"camera1_distance_result: {camera1_distance_result}"
+                            f"camera1_real_move_result: {camera1_real_move_result}"
                         )
                         logger.info(
-                            f"camera1_over_distance_ids: {camera1_over_distance_ids}"
+                            f"camera1_over_threshold_ids: {camera1_over_threshold_ids}"
                         )
                         # -------------------- camera1 compare results -------------------- #
 
-                        # -------------------- send msg -------------------- #
+                        # -------------------- 保存到文件 -------------------- #
+                        save_to_jsonl(
+                            {
+                                "camera0": {
+                                    "cycle_results": camera0_cycle_results,
+                                    "pixel_move_result": camera0_pixel_move_result,
+                                    "pixel_move_result_without_ref": camera0_pixel_move_result_without_ref,
+                                    "real_move_result": camera0_real_move_result,
+                                    "real_move_result_without_ref": camera0_real_move_result_without_ref,
+                                },
+                                "camera1": {
+                                    "cycle_results": camera1_cycle_results,
+                                    "pixel_move_result": camera1_pixel_move_result,
+                                    "pixel_move_result_without_ref": camera1_pixel_move_result_without_ref,
+                                    "real_move_result": camera1_real_move_result,
+                                    "real_move_result_without_ref": camera1_real_move_result_without_ref,
+                                },
+                                "temperature": temperature_data,
+                                "is_temp_stable": is_temp_stable,
+                                "time": get_now_time(),
+                            },
+                            history_save_path,
+                        )
+                        # -------------------- 保存到文件 -------------------- #
 
+                        # -------------------- send msg -------------------- #
                         send_msg_data = deepcopy(temperature_data)
                         camera0_send_msg_data = {
                             f"L1_SJ_{k+1}": {"X": v[0], "Y": v[1]}
-                            for k, v in camera0_distance_result.items()
+                            for k, v in camera0_real_move_result.items()
                         }
                         camera1_send_msg_data = {
                             f"L1_SJ_{k+1}": {"X": v[0], "Y": v[1]}
-                            for k, v in camera1_distance_result.items()
+                            for k, v in camera1_real_move_result.items()
                         }
                         src_data = {
                             "left_cam": camera0_send_msg_data
@@ -1086,10 +1138,10 @@ def main() -> None:
                         }
                         logger.info(f"z_move: {z_move}")
                         # 计算 z 轴是否超出阈值
-                        z_over_distance_ids = []
+                        z_over_threshold_ids = []
                         for k, v in z_move.items():
                             if abs(v) > z_move_threshold:
-                                z_over_distance_ids.append(int(k.split("_")[-1]) - 1)
+                                z_over_threshold_ids.append(int(k.split("_")[-1]) - 1)
                                 logger.warning(
                                     f"box {k} z move distance is over threshold {z_move_threshold}."
                                 )
@@ -1102,18 +1154,18 @@ def main() -> None:
                         logger.info(f"send_msg_data: {send_msg_data}")
 
                         # 超出阈值id
-                        over_distance_ids = (
-                            deepcopy(camera0_over_distance_ids)
+                        over_threshold_ids = (
+                            deepcopy(camera0_over_threshold_ids)
                             if main_camera_index == 0
-                            else deepcopy(camera1_over_distance_ids)
+                            else deepcopy(camera1_over_threshold_ids)
                         )
                         # 添加 z 轴超出阈值 id
-                        for z_over_distance_id in z_over_distance_ids:
-                            over_distance_ids.add(z_over_distance_id)
-                        if len(over_distance_ids) > 0:
+                        for z_over_distance_id in z_over_threshold_ids:
+                            over_threshold_ids.add(z_over_distance_id)
+                        if len(over_threshold_ids) > 0:
                             # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
                             logger.warning(
-                                f"box {over_distance_ids} move distance is over threshold."
+                                f"box {over_threshold_ids} move distance is over threshold."
                             )
 
                             # 保存位移的图片
@@ -1132,7 +1184,7 @@ def main() -> None:
                                     "type": "displacement",
                                     "at": get_now_time(),
                                     "number": [
-                                        i + 1 for i in over_distance_ids
+                                        i + 1 for i in over_threshold_ids
                                     ],  # 表示异常的靶标编号
                                     "data": send_msg_data,
                                     "path": [
@@ -1183,11 +1235,11 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            rectified_image0 = image0
+                            undistorted_image0 = image0
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
-                            find_lost_target(rectified_image0, 0)
+                            find_lost_target(undistorted_image0, 0)
                             target_number = MatchTemplateConfig.getattr("target_number")
                             camera0_got_target_number = MatchTemplateConfig.getattr(
                                 "camera0_got_target_number"
@@ -1272,11 +1324,11 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            rectified_image1 = image1
+                            undistorted_image1 = image1
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
-                            find_lost_target(rectified_image1, 1)
+                            find_lost_target(undistorted_image1, 1)
                             target_number = MatchTemplateConfig.getattr("target_number")
                             camera1_got_target_number = MatchTemplateConfig.getattr(
                                 "camera1_got_target_number"
@@ -2012,9 +2064,7 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success(
-            f"received temp stability msg: {received_msg.get('param', {})}"
-        )
+        logger.success(f"received temp stability msg: {received_msg.get('param', {})}")
         is_temp_stable = True
         need_send_in_working_state_msg = True
 
@@ -2722,9 +2772,7 @@ class Send:
         """停止温度控制命令"""
         global is_temp_stable
 
-        logger.info(
-            "send stop temperature control msg"
-        )
+        logger.info("send stop temperature control msg")
         # {
         #     "cmd":"stoptempcontrol",
         #     "param":{
@@ -2751,7 +2799,9 @@ class Send:
             logger.warning("adjust led level less than 1, set to 1")
         if adjust_led_level_param["level"] > max_led_level:
             adjust_led_level_param["level"] = max_led_level
-            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
+            logger.warning(
+                f"adjust led level greater than {max_led_level}, set to {max_led_level}"
+            )
         # {
         #     "cmd": "adjustLEDlevel",
         #     "param": {
@@ -2778,7 +2828,9 @@ class Send:
             logger.warning("adjust led level less than 1, set to 1")
         if led_level > max_led_level:
             led_level = max_led_level
-            logger.warning(f"adjust led level greater than {max_led_level}, set to {max_led_level}")
+            logger.warning(
+                f"adjust led level greater than {max_led_level}, set to {max_led_level}"
+            )
         # {
         #     "cmd": "openLED",
         #     "param": {
@@ -2803,9 +2855,9 @@ class Send:
         send_msg = {
             "cmd": "closeLED",
             "param": {
-                "reserve": 257, #保留参数，暂时没用，赋值为257
+                "reserve": 257,  # 保留参数，暂时没用，赋值为257
             },
-            "msgid": 1
+            "msgid": 1,
         }
         serial_send_queue.put(send_msg)
         logger.success("send close led level msg success")

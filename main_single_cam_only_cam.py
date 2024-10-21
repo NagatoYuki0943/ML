@@ -638,17 +638,6 @@ def main() -> None:
                     )
                     # -------------------- 畸变矫正坐标 -------------------- #
 
-                    # 保存到文件
-                    save_to_jsonl(
-                        {
-                            "camera0": camera0_cycle_results,
-                            "temperature": temperature_data,
-                            "is_temp_stable": is_temp_stable,
-                            "time": get_now_time(),
-                        },
-                        history_save_path,
-                    )
-
                     # 防止值不存在
                     send_msg_data = {}
 
@@ -683,6 +672,29 @@ def main() -> None:
                             RingsLocationConfig.setattr(
                                 "camera0_standard_results", camera0_standard_results
                             )
+
+                            fake_move_result = {
+                                k: [0, 0] for k in camera0_standard_results.keys()
+                            }
+
+                            # -------------------- 保存到文件 -------------------- #
+                            save_to_jsonl(
+                                {
+                                    "camera0": {
+                                        "cycle_results": camera0_standard_results,
+                                        "pixel_move_result": fake_move_result,
+                                        "pixel_move_result_without_ref": fake_move_result,
+                                        "real_move_result": fake_move_result,
+                                        "real_move_result_without_ref": fake_move_result,
+                                    },
+                                    "temperature": temperature_data,
+                                    "is_temp_stable": is_temp_stable,
+                                    "time": get_now_time(),
+                                },
+                                history_save_path,
+                            )
+                            # -------------------- 保存到文件 -------------------- #
+
                             # 发送初始坐标数据结果
                             # ✅️✅️✅️ 正常数据消息 ✅️✅️✅️
                             logger.success("send init data message.")
@@ -713,24 +725,46 @@ def main() -> None:
 
                         # 计算距离
                         (
-                            camera0_distance_result,
-                            camera0_over_distance_ids,
+                            camera0_pixel_move_result,
+                            camera0_pixel_move_result_without_ref,
+                            camera0_real_move_result,
+                            camera0_real_move_result_without_ref,
+                            camera0_over_threshold_ids,
                             camera0_reference_target_id2offset,
                         ) = calc_move_distance(
                             camera0_standard_results,
                             camera0_cycle_results,
                             camera0_reference_target_id2offset,
                         )
+
+                        # -------------------- 保存到文件 -------------------- #
+                        save_to_jsonl(
+                            {
+                                "camera0": {
+                                    "cycle_results": camera0_cycle_results,
+                                    "pixel_move_result": camera0_pixel_move_result,
+                                    "pixel_move_result_without_ref": camera0_pixel_move_result_without_ref,
+                                    "real_move_result": camera0_real_move_result,
+                                    "real_move_result_without_ref": camera0_real_move_result_without_ref,
+                                },
+                                "temperature": temperature_data,
+                                "is_temp_stable": is_temp_stable,
+                                "time": get_now_time(),
+                            },
+                            history_save_path,
+                        )
+                        # -------------------- 保存到文件 -------------------- #
+
                         # 更新参考靶标偏移
                         RingsLocationConfig.setattr(
                             "camera0_reference_target_id2offset",
                             camera0_reference_target_id2offset,
                         )
                         logger.info(
-                            f"camera0_distance_result: {camera0_distance_result}"
+                            f"camera0_real_move_result: {camera0_real_move_result}"
                         )
                         logger.info(
-                            f"camera0_over_distance_ids: {camera0_over_distance_ids}"
+                            f"camera0_over_threshold_ids: {camera0_over_threshold_ids}"
                         )
                         # -------------------- camera0 compare results -------------------- #
 
@@ -739,14 +773,14 @@ def main() -> None:
                         send_msg_data = deepcopy(temperature_data)
                         _send_msg_data = {
                             f"L1_SJ_{k+1}": {"X": v[0], "Y": v[1]}
-                            for k, v in camera0_distance_result.items()
+                            for k, v in camera0_real_move_result.items()
                         }
                         send_msg_data.update(_send_msg_data)
                         logger.info(f"send_msg_data: {send_msg_data}")
-                        if len(camera0_over_distance_ids) > 0:
+                        if len(camera0_over_threshold_ids) > 0:
                             # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
                             logger.warning(
-                                f"box {camera0_over_distance_ids} move distance is over threshold."
+                                f"box {camera0_over_threshold_ids} move distance is over threshold."
                             )
 
                             # 保存位移的图片
@@ -763,7 +797,7 @@ def main() -> None:
                                     "type": "displacement",
                                     "at": get_now_time(),
                                     "number": [
-                                        i + 1 for i in camera0_over_distance_ids
+                                        i + 1 for i in camera0_over_threshold_ids
                                     ],  # 表示异常的靶标编号
                                     "data": send_msg_data,
                                     "path": [str(image_path)],  # 图片本地路径

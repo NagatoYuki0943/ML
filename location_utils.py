@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Any
 import numpy as np
 from loguru import logger
@@ -76,7 +77,9 @@ def rings_location(
             center = None
             logger.warning(f"box {box_id} center is nan")
 
-        radii: list[float] = [float(radius) for radius in rings_location_result["radii"]]
+        radii: list[float] = [
+            float(radius) for radius in rings_location_result["radii"]
+        ]
         if np.any(np.isnan(radii)):
             radii = None
 
@@ -157,7 +160,7 @@ def calc_move_distance(
     standard_results: dict,
     cycle_results: dict,
     reference_target_id2offset: dict[int, tuple[float, float]] | None = None,
-) -> tuple[dict, set, dict[int, tuple[float, float]] | None]:
+) -> tuple[dict, dict, dict, dict, set, dict[int, tuple[float, float]] | None]:
     """计算移动距离"""
     defalut_error_distance: float = MainConfig.getattr("defalut_error_distance")
 
@@ -181,7 +184,8 @@ def calc_move_distance(
     logger.info(f"cycle_centers: {cycle_centers}")
 
     # 计算移动距离
-    distance_result = {}
+    pixel_move_result = {}
+    real_move_result = {}
     for res_k in standard_results.keys():
         if (
             res_k in cycle_centers.keys()
@@ -220,27 +224,39 @@ def calc_move_distance(
             logger.info(
                 f"box {res_k} move {pixel_distance_y = } pixel, {real_distance_y = } mm, distance = {standard_result_distance[res_k]} mm"
             )
-            distance_result[res_k] = (
+            pixel_move_result[res_k] = (
+                pixel_distance_x,
+                pixel_distance_y,
+            )
+            real_move_result[res_k] = (
                 real_distance_x,
                 real_distance_y,
             )
         else:
             # box没找到将移动距离设置为 一个很大的数
-            distance_result[res_k] = (
+            pixel_move_result[res_k] = (
+                defalut_error_distance,
+                defalut_error_distance,
+            )
+            real_move_result[res_k] = (
                 defalut_error_distance,
                 defalut_error_distance,
             )
             logger.error(f"box {res_k} not found in cycle_centers.")
 
+    pixel_move_result_without_ref = deepcopy(pixel_move_result)
+    real_move_result_without_ref = deepcopy(real_move_result)
+
     # TODO: 参考靶标进行滤波处理
     if reference_target_id2offset is not None:
         ref_id: int = int(list(reference_target_id2offset.keys())[0])
-        if ref_id in distance_result.keys():
+        if ref_id in real_move_result.keys():
             # 找到参考靶标
-            ref_distance_x, ref_distance_y = distance_result[ref_id]
+            ref_pixel_distance_x, ref_pixel_distance_y = pixel_move_result[ref_id]
+            ref_real_distance_x, ref_real_distance_y = real_move_result[ref_id]
             if (
-                abs(ref_distance_x) >= defalut_error_distance
-                or abs(ref_distance_y) >= defalut_error_distance
+                abs(ref_real_distance_x) >= defalut_error_distance
+                or abs(ref_real_distance_y) >= defalut_error_distance
             ):
                 # 参考靶标出错
                 logger.warning(
@@ -249,53 +265,88 @@ def calc_move_distance(
             else:
                 # 参考靶标正常
                 # 更新参考靶标的偏移值
-                reference_target_id2offset = {ref_id: [ref_distance_x, ref_distance_y]}
+                reference_target_id2offset = {
+                    ref_id: [ref_real_distance_x, ref_real_distance_y]
+                }
                 logger.info(f"use reference box {ref_id} to calibrate other targets.")
+
+                # 计算像素偏移
                 for idx, (
-                    distance_x,
-                    distance_y,
-                ) in distance_result.items():
+                    pixel_distance_x,
+                    pixel_distance_y,
+                ) in pixel_move_result.items():
                     if idx != ref_id:
-                        new_distance_x = round(distance_x - ref_distance_x, ndigits)
-                        new_distance_y = round(distance_y - ref_distance_y, ndigits)
-                        distance_result[idx] = (
-                            new_distance_x,
-                            new_distance_y,
+                        new_pixel_distance_x = (
+                            pixel_distance_x - ref_pixel_distance_x
+                        )
+                        new_pixel_distance_y = (
+                            pixel_distance_y - ref_pixel_distance_y
+                        )
+                        pixel_move_result[idx] = (
+                            new_pixel_distance_x,
+                            new_pixel_distance_y,
                         )
                         logger.info(
-                            f"box {idx} after reference, move {new_distance_x = } mm, {new_distance_y = } mm"
+                            f"box {idx} after reference, move {new_pixel_distance_x = } pixel, {new_pixel_distance_y = } pixel"
+                        )
+
+                # 计算真实偏移
+                for idx, (
+                    real_distance_x,
+                    real_distance_y,
+                ) in real_move_result.items():
+                    if idx != ref_id:
+                        new_real_distance_x = round(
+                            real_distance_x - ref_real_distance_x, ndigits
+                        )
+                        new_real_distance_y = round(
+                            real_distance_y - ref_real_distance_y, ndigits
+                        )
+                        real_move_result[idx] = (
+                            new_real_distance_x,
+                            new_real_distance_y,
+                        )
+                        logger.info(
+                            f"box {idx} after reference, move {new_real_distance_x = } mm, {new_real_distance_y = } mm"
                         )
         else:
             logger.warning(
-                f"reference box {ref_id} not found in distance_result, can't calibrate other targets."
+                f"reference box {ref_id} not found in real_move_result, can't calibrate other targets."
             )
     else:
         logger.warning("no reference box set, can't calibrate other targets.")
 
     # 超出距离的 box idx
-    over_distance_ids = set()
+    over_threshold_ids = set()
     for idx, (
-        distance_x,
-        distance_y,
-    ) in distance_result.items():
-        if abs(distance_x) > x_move_threshold:
-            over_distance_ids.add(idx)
+        real_distance_x,
+        real_distance_y,
+    ) in real_move_result.items():
+        if abs(real_distance_x) > x_move_threshold:
+            over_threshold_ids.add(idx)
             logger.warning(
-                f"box {idx} x move distance {distance_x} mm is over threshold {x_move_threshold} mm."
+                f"box {idx} x move distance {real_distance_x} mm is over threshold {x_move_threshold} mm."
             )
         else:
             logger.info(
-                f"box {idx} x move distance {distance_x} mm is under threshold {x_move_threshold} mm."
+                f"box {idx} x move distance {real_distance_x} mm is under threshold {x_move_threshold} mm."
             )
 
-        if abs(distance_y) > y_move_threshold:
-            over_distance_ids.add(idx)
+        if abs(real_distance_y) > y_move_threshold:
+            over_threshold_ids.add(idx)
             logger.warning(
-                f"box {idx} y move distance {distance_y} mm is over threshold {y_move_threshold} mm."
+                f"box {idx} y move distance {real_distance_y} mm is over threshold {y_move_threshold} mm."
             )
         else:
             logger.info(
-                f"box {idx} y move distance {distance_y} mm is under threshold {y_move_threshold} mm."
+                f"box {idx} y move distance {real_distance_y} mm is under threshold {y_move_threshold} mm."
             )
 
-    return distance_result, over_distance_ids, reference_target_id2offset
+    return (
+        pixel_move_result,
+        pixel_move_result_without_ref,
+        real_move_result,
+        real_move_result_without_ref,
+        over_threshold_ids,
+        reference_target_id2offset,
+    )

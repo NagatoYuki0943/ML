@@ -1436,7 +1436,7 @@ def main() -> None:
         time.sleep(main_sleep_interval / 1000)
 
         # 保存查看的图片
-        if i % 3600 == 0:
+        if i % 1000 == 0:
             save_check_image(image0, "camera0")
             save_check_image(image1, "camera1")
 

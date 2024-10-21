@@ -220,7 +220,7 @@ def main() -> None:
     #         color = (255, 0, 0),
     #         thickness = 3
     #     )
-    # plt.figure(figsize=(10, 10))
+    # plt.figure(figsize=(40, 40))
     # plt.imshow(left_image_draw, cmap='gray')
     # plt.savefig(save_dir / "left_image_match_template.png")
     # plt.close()
@@ -243,7 +243,7 @@ def main() -> None:
     #         color = (255, 0, 0),
     #         thickness = 3
     #     )
-    # plt.figure(figsize=(10, 10))
+    # plt.figure(figsize=(40, 40))
     # plt.imshow(right_image_draw, cmap='gray')
     # plt.savefig(save_dir / "right_image_match_template.png")
     # plt.close()

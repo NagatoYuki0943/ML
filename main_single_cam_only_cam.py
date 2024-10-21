@@ -628,7 +628,7 @@ def main() -> None:
                     # -------------------- 畸变矫正坐标 -------------------- #
                     logger.info("use stereo calibration to undistort centers")
                     for box_id, result in camera0_cycle_results.items():
-                        _center = result["center"]
+                        _center: list[float] | None = result["center"]
                         if _center is not None:
                             camera0_cycle_results[box_id]["center"] = (
                                 stereo_calibration.undistort_point(_center)

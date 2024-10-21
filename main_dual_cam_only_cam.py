@@ -2731,7 +2731,7 @@ class Send:
                 "data": {
                     "L3_WK_1": data.get("parctical_t", 0),  # 内仓实际温度
                     "control_t": data.get("control_t", 0),  # 目标温度
-                    "control_way": data.get("control_t", "warm"),
+                    "control_way": data.get("control_way", "warm"),
                     "pwm_data": data.get("pwm_data", 10),
                 },
             },

@@ -382,7 +382,7 @@ def main() -> None:
                     color=(255, 0, 0),
                     thickness=3,
                 )
-            plt.figure(figsize=(10, 10))
+            plt.figure(figsize=(40, 40))
             plt.imshow(image0_draw, cmap="gray")
             plt.savefig(save_dir / "image0_match_template.png")
             plt.close()
@@ -454,7 +454,7 @@ def main() -> None:
                     color=(255, 0, 0),
                     thickness=3,
                 )
-            plt.figure(figsize=(10, 10))
+            plt.figure(figsize=(40, 40))
             plt.imshow(image1_draw, cmap="gray")
             plt.savefig(save_dir / "image1_match_template.png")
             plt.close()

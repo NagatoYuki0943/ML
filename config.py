@@ -216,7 +216,7 @@ class SerialCommConfig(BaseConfig):
     """串口通讯模块配置"""
 
     # 串口配置
-    camera0_ser_port: str = "/dev/ttyAMA1"
+    camera0_ser_port: str = "/dev/ttyAMA2"
     camera1_ser_port: str = None
     baudrate: int = 115200
     BUFFER_SIZE: int = 2048

@@ -1489,9 +1489,9 @@ class Receive:
         #     "msgid": 1
         # }
         if received_msg.get("param", {}).get("result", "NOT") == "OK":
-            logger.success(f"received {received_msg.get("camera", '')} askadjusttempdata response OK")
+            logger.success(f"received {received_msg.get('camera', '')} askadjusttempdata response OK")
         else:
-            logger.error(f"received {received_msg.get("camera", '')} askadjusttempdata response NOT OK")
+            logger.error(f"received {received_msg.get('camera', '')} askadjusttempdata response NOT OK")
         received_temp_control_msg = True
 
     @staticmethod
@@ -1616,9 +1616,9 @@ class Receive:
         #     "msgid": 1
         # }
         if received_msg.get("param", {}).get("result", "NOT") == "OK":
-            logger.success(f"received {received_msg.get("camera", '')} askstoptempcontrol response OK")
+            logger.success(f"received {received_msg.get('camera', '')} askstoptempcontrol response OK")
         else:
-            logger.error(f"received {received_msg.get("camera", '')} askstoptempcontrol response NOT OK")
+            logger.error(f"received {received_msg.get('camera', '')} askstoptempcontrol response NOT OK")
 
     # @staticmethod
     # def receive_reboot_msg(received_msg: dict | None = None):

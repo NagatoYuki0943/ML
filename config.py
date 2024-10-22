@@ -92,7 +92,7 @@ class AdjustCameraConfig(BaseConfig):
     """调整相机配置"""
 
     lock = Lock()
-    mean_light_suitable_range: tuple[float, float] = (60, 160)  # (100, 160)
+    mean_light_suitable_range: tuple[float, float] = (60, 220)  # (100, 160)
     suitable_ignore_ratio: float = 0.1  # 忽略 mean_light_suitable_range 最低和最高范围的百分比 [0, 100] -> [10, 90]
     exposure_time_range: tuple[int, int] = (114, 1_000_000)  # 曝光时间范围 us
     adjust_exposure_time_base_step: int = 100  # 曝光调整基础步长 us

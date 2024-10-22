@@ -254,7 +254,7 @@ class FTPConfig(BaseConfig):
     config_base_url: str = "/7804d2/config"
     max_retries: int = 3
     delay: int = 1
-    pasv_mode: bool = False  # 是否使用被动模式连接FTP服务器（4G使用被动模式）
+    pasv_mode: bool = True  # 是否使用被动模式连接FTP服务器（4G使用被动模式）
 
 
 ALL_CONFIGS = [

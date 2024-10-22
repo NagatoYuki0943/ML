@@ -45,6 +45,7 @@ def mqtt_send(
     ftp = ftp_object_create()
     while True:
         message = queue.get()
+        logger.info(f"Main thread sending: {message}")
         while not client.connection_flag:
             if queue.full():
                 logger.warning(f"MQTT send queue is full, delete message {message}")

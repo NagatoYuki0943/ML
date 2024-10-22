@@ -39,7 +39,13 @@ from adjust_camera import (
     adjust_exposure_full_res,
     adjust_exposure_low_res,  # 调整分辨率需要一段时间才能获取调整后的图片分辨率
 )
-from location_utils import rings_location, init_standard_results, calc_move_distance
+from location_utils import (
+    rings_location,
+    init_standard_results,
+    calc_move_distance,
+    calc_z_distance,
+    compare_z_distance,
+)
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import (
@@ -75,6 +81,7 @@ main_queue = queue.Queue()
 image0_timestamp: str
 image0: np.ndarray
 image0_metadata: dict
+camera_left_index: int = CameraConfig.getattr("camera_left_index")
 # -------------------- 基础 -------------------- #
 
 # -------------------- 初始化相机 -------------------- #
@@ -335,7 +342,9 @@ def main() -> None:
 
         # -------------------- 畸变矫正 -------------------- #
         logger.info("undistort image0 start")
-        undistorted_image0 = image0
+        undistorted_image0, _ = dual_stereo_calibration.undistort_image(
+            image0, "left" if camera_left_index == 0 else "right"
+        )
         logger.success("undistort image0 success")
         # -------------------- 畸变矫正 -------------------- #
 
@@ -407,7 +416,9 @@ def main() -> None:
 
         # -------------------- 畸变矫正 -------------------- #
         logger.info("undistort image1 start")
-        undistorted_image1 = image1
+        undistorted_image1, _ = dual_stereo_calibration.undistort_image(
+            image1, "right" if camera_left_index == 0 else "left"
+        )
         logger.success("undistort image1 success")
         # -------------------- 畸变矫正 -------------------- #
 
@@ -495,6 +506,8 @@ def main() -> None:
         _cycle_current_time_period = int(
             cycle_current_time * 1000 // cycle_time_interval
         )
+        main_camera_index: int = CameraConfig.getattr("main_camera_index")
+
         # 进入周期
         # 条件为 当前时间周期大于等于前一个时间周期 或者 周期已经开始运行
         if (
@@ -597,7 +610,9 @@ def main() -> None:
                     _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
 
                     # --------------- 畸变矫正 --------------- #
-                    undistorted_image0 = image0
+                    undistorted_image0, _ = dual_stereo_calibration.undistort_image(
+                        image0, "left" if camera_left_index == 0 else "right"
+                    )
                     # --------------- 畸变矫正 --------------- #
 
                     # --------------- 小区域模板匹配 --------------- #
@@ -651,7 +666,9 @@ def main() -> None:
                     _, image1, _ = camera1_queue.get(timeout=get_picture_timeout)
 
                     # --------------- 畸变矫正 --------------- #
-                    undistorted_image1 = image1
+                    undistorted_image1, _ = dual_stereo_calibration.undistort_image(
+                        image1, "right" if camera_left_index == 0 else "left"
+                    )
                     # --------------- 畸变矫正 --------------- #
 
                     # --------------- 小区域模板匹配 --------------- #
@@ -760,7 +777,9 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            undistorted_image0 = image0
+                            undistorted_image0, _ = dual_stereo_calibration.undistort_image(
+                                image0, "left" if camera_left_index == 0 else "right"
+                            )
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 检测 -------------------- #
@@ -809,7 +828,9 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            undistorted_image1 = image1
+                            undistorted_image1, _ = dual_stereo_calibration.undistort_image(
+                                image1, "right" if camera_left_index == 0 else "left"
+                            )
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 检测 -------------------- #
@@ -861,8 +882,6 @@ def main() -> None:
 
                     target_number: int = MatchTemplateConfig.getattr("target_number")
 
-                    main_camera_index: int = CameraConfig.getattr("main_camera_index")
-                    camera_left_index: int = CameraConfig.getattr("camera_left_index")
                     camera0_standard_results: dict | None = RingsLocationConfig.getattr(
                         "camera0_standard_results"
                     )
@@ -930,6 +949,22 @@ def main() -> None:
                                 k: [0, 0] for k in camera1_standard_results.keys()
                             }
 
+                            # -------------------- 求Z轴距离 -------------------- #
+                            standard_z_distance: dict = calc_z_distance(
+                                camera0_standard_results
+                                if camera_left_index == 0
+                                else camera1_standard_results,
+                                camera1_standard_results
+                                if camera_left_index == 0
+                                else camera0_standard_results,
+                                dual_stereo_calibration,
+                            )
+                            z_move_distance, _ = compare_z_distance(
+                                standard_z_distance, standard_z_distance
+                            )
+                            logger.info(f"z_move_distance: {z_move_distance}")
+                            # -------------------- 求Z轴距离 -------------------- #
+
                             # -------------------- 保存到文件 -------------------- #
                             save_to_jsonl(
                                 {
@@ -947,6 +982,8 @@ def main() -> None:
                                         "real_move_result": camera1_fake_move_result,
                                         "real_move_result_without_ref": camera1_fake_move_result,
                                     },
+                                    "z_distance": standard_z_distance,
+                                    "z_move_distance": z_move_distance,
                                     "temperature": temperature_data,
                                     "is_temp_stable": is_temp_stable,
                                     "time": get_now_time(),
@@ -1068,6 +1105,32 @@ def main() -> None:
                         )
                         # -------------------- camera1 compare results -------------------- #
 
+                        # -------------------- 求Z轴距离 -------------------- #
+                        standard_z_distance: dict = calc_z_distance(
+                            camera0_standard_results
+                            if camera_left_index == 0
+                            else camera1_standard_results,
+                            camera1_standard_results
+                            if camera_left_index == 0
+                            else camera0_standard_results,
+                            dual_stereo_calibration,
+                        )
+                        cycle_z_distance: dict = calc_z_distance(
+                            camera0_cycle_results
+                            if camera_left_index == 0
+                            else camera1_cycle_results,
+                            camera1_cycle_results
+                            if camera_left_index == 0
+                            else camera0_cycle_results,
+                            dual_stereo_calibration,
+                        )
+                        z_move_distance, z_over_threshold_ids = compare_z_distance(
+                            cycle_z_distance, standard_z_distance
+                        )
+                        logger.info(f"z_move_distance: {z_move_distance}")
+                        logger.info(f"z_over_threshold_ids: {z_over_threshold_ids}")
+                        # -------------------- 求Z轴距离 -------------------- #
+
                         # -------------------- 保存到文件 -------------------- #
                         save_to_jsonl(
                             {
@@ -1085,6 +1148,8 @@ def main() -> None:
                                     "real_move_result": camera1_real_move_result,
                                     "real_move_result_without_ref": camera1_real_move_result_without_ref,
                                 },
+                                "z_distance": cycle_z_distance,
+                                "z_move_distance": z_move_distance,
                                 "temperature": temperature_data,
                                 "is_temp_stable": is_temp_stable,
                                 "time": get_now_time(),
@@ -1117,39 +1182,10 @@ def main() -> None:
                             if main_camera_index == 0
                             else deepcopy(camera1_send_msg_data)
                         )
-                        # TODO: 求 Z 轴的变化, 临时使用主相机的检测距离计算
-                        if main_camera_index == 0:
-                            temp_standard_results = camera0_standard_results
-                            temp_cycle_results = camera0_cycle_results
-                        else:
-                            temp_standard_results = camera1_standard_results
-                            temp_cycle_results = camera1_cycle_results
-                        ndigits: int = RingsLocationConfig.getattr("ndigits")
-                        z_move = {
-                            f"L1_SJ_{k+1}": round(
-                                temp_cycle_results[k]["distance"]
-                                - temp_standard_results[k]["distance"],
-                                ndigits,
-                            )
-                            if (
-                                temp_cycle_results[k]["distance"] is not None
-                                and temp_standard_results[k]["distance"] is not None
-                            )
-                            else defalut_error_distance
-                            for k in temp_standard_results.keys()
-                        }
-                        logger.info(f"z_move: {z_move}")
-                        # 计算 z 轴是否超出阈值
-                        z_over_threshold_ids = []
-                        for k, v in z_move.items():
-                            if abs(v) > z_move_threshold:
-                                z_over_threshold_ids.append(int(k.split("_")[-1]) - 1)
-                                logger.warning(
-                                    f"box {k} z move distance is over threshold {z_move_threshold}."
-                                )
 
                         _send_msg_data = {
-                            k: {**v, "Z": z_move[k]} for k, v in _send_msg_data.items()
+                            k: {**v, "Z": z_move_distance[int(k.split("_")[-1]) - 1]}
+                            for k, v in _send_msg_data.items()
                         }
                         _send_msg_data["src_data"] = src_data
                         send_msg_data.update(_send_msg_data)
@@ -1237,7 +1273,9 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            undistorted_image0 = image0
+                            undistorted_image0, _ = dual_stereo_calibration.undistort_image(
+                                image0, "left" if camera_left_index == 0 else "right"
+                            )
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
@@ -1326,7 +1364,9 @@ def main() -> None:
                             )
 
                             # -------------------- 畸变矫正 -------------------- #
-                            undistorted_image1 = image1
+                            undistorted_image1, _ = dual_stereo_calibration.undistort_image(
+                                image1, "right" if camera_left_index == 0 else "left"
+                            )
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
@@ -1982,9 +2022,13 @@ class Receive:
         #     "msgid": 1
         # }
         if received_msg.get("param", {}).get("result", "NOT") == "OK":
-            logger.success(f"received {received_msg.get('camera', '')} askadjusttempdata response OK")
+            logger.success(
+                f"received {received_msg.get('camera', '')} askadjusttempdata response OK"
+            )
         else:
-            logger.error(f"received {received_msg.get('camera', '')} askadjusttempdata response NOT OK")
+            logger.error(
+                f"received {received_msg.get('camera', '')} askadjusttempdata response NOT OK"
+            )
         received_temp_control_msg = True
 
     @staticmethod
@@ -2071,7 +2115,9 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success(f"received camera: {received_msg.get('camera', '')} temp stability msg: {received_msg.get('param', {})}")
+        logger.success(
+            f"received camera: {received_msg.get('camera', '')} temp stability msg: {received_msg.get('param', {})}"
+        )
         is_temp_stable = True
         need_send_in_working_state_msg = True
 
@@ -2110,9 +2156,13 @@ class Receive:
         #     "msgid": 1
         # }
         if received_msg.get("param", {}).get("result", "NOT") == "OK":
-            logger.success(f"received {received_msg.get('camera', '')} askstoptempcontrol response OK")
+            logger.success(
+                f"received {received_msg.get('camera', '')} askstoptempcontrol response OK"
+            )
         else:
-            logger.error(f"received {received_msg.get('camera', '')} askstoptempcontrol response NOT OK")
+            logger.error(
+                f"received {received_msg.get('camera', '')} askstoptempcontrol response NOT OK"
+            )
 
     # @staticmethod
     # def receive_reboot_msg(received_msg: dict | None = None):
@@ -2772,7 +2822,9 @@ class Send:
             "msgid": 1,
         }
         serial_send_queue.put(send_msg)
-        logger.success(f"send camera: {camera}, temperature: {temperature}, temperature control msg success")
+        logger.success(
+            f"send camera: {camera}, temperature: {temperature}, temperature control msg success"
+        )
         received_temp_control_msg = False
         is_temp_stable = False
 

@@ -48,6 +48,7 @@ from utils import (
     get_now_time,
     save_image,
     get_picture_timeout_process,
+    save_check_image,
 )
 from fake_queue import FakeQueue
 
@@ -1434,7 +1435,11 @@ def main() -> None:
         main_sleep_interval: int = MainConfig.getattr("main_sleep_interval")
         time.sleep(main_sleep_interval / 1000)
 
-        # 测试调整相机
+        # 保存查看的图片
+        if i % 3600 == 0:
+            save_check_image(image0, "camera0")
+            save_check_image(image1, "camera1")
+
         logger.debug(f"{i = }")
         i += 1
 

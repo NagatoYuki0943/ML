@@ -432,6 +432,7 @@ def main() -> None:
                                     "already is the lowest flash, close flash"
                                 )
                                 Send.send_close_led_msg()
+                                break
                             else:
                                 # 降低补光灯亮度
                                 led_level -= 1
@@ -441,7 +442,7 @@ def main() -> None:
                                 logger.warning(
                                     "already is the highest flash, can't adjust flash"
                                 )
-                                continue
+                                break
                             else:
                                 # 增加补光灯亮度
                                 led_level += 1

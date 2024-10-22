@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from loguru import logger
+from typing import Any
 
 from config import MainConfig
 
@@ -94,6 +95,24 @@ def save_image(image: np.ndarray, file_path: str | Path):
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     cv2.imwrite(str(object=file_path), image)
+
+
+def save_check_image(image: np.ndarray | None, suffix: Any = "camera0") -> None:
+    if not isinstance(image, np.ndarray):
+        return
+
+    base_path = Path(f"results/check_image")
+    base_path.mkdir(exist_ok=True, parents=True)
+
+    now = datetime.now()
+    hour = now.hour
+    for file in base_path.glob(f"*-{hour}-{suffix}.png"):
+        file.unlink()
+
+    stem = now.strftime("%Y%m%d-%H")
+    file_path = base_path / f"{stem}-{suffix}.png"
+    save_image(image, file_path)
+    logger.info(f"save check image to {file_path}")
 
 
 def get_picture_timeout_process():

@@ -7,6 +7,7 @@ from algorithm import (
     adaptive_threshold_rings_location,
     pixel_num2object_distance,
     pixel_num2object_size,
+    DualStereoCalibration,
 )
 from config import (
     MainConfig,
@@ -164,8 +165,8 @@ def calc_move_distance(
     """计算移动距离"""
     defalut_error_distance: float = MainConfig.getattr("defalut_error_distance")
 
-    x_move_threshold = RingsLocationConfig.getattr("x_move_threshold")
-    y_move_threshold = RingsLocationConfig.getattr("y_move_threshold")
+    x_move_threshold: float = RingsLocationConfig.getattr("x_move_threshold")
+    y_move_threshold: float = RingsLocationConfig.getattr("y_move_threshold")
     ndigits: int = RingsLocationConfig.getattr("ndigits")
 
     standard_result_centers = {
@@ -276,10 +277,10 @@ def calc_move_distance(
                     pixel_distance_y,
                 ) in pixel_move_result.items():
                     if idx != ref_id:
-                        new_pixel_distance_x = (
+                        new_pixel_distance_x: float = (
                             pixel_distance_x - ref_pixel_distance_x
                         )
-                        new_pixel_distance_y = (
+                        new_pixel_distance_y: float = (
                             pixel_distance_y - ref_pixel_distance_y
                         )
                         pixel_move_result[idx] = (
@@ -296,10 +297,10 @@ def calc_move_distance(
                     real_distance_y,
                 ) in real_move_result.items():
                     if idx != ref_id:
-                        new_real_distance_x = round(
+                        new_real_distance_x: float = round(
                             real_distance_x - ref_real_distance_x, ndigits
                         )
-                        new_real_distance_y = round(
+                        new_real_distance_y: float = round(
                             real_distance_y - ref_real_distance_y, ndigits
                         )
                         real_move_result[idx] = (
@@ -350,3 +351,65 @@ def calc_move_distance(
         over_threshold_ids,
         reference_target_id2offset,
     )
+
+
+def calc_z_distance(
+    left_camera_result: dict,
+    right_camera_result: dict,
+    dual_stereo_calibration: DualStereoCalibration,
+) -> dict:
+    left_camera_centers = {
+        k: result["center"] for k, result in left_camera_result.items()
+    }
+    right_camera_centers = {
+        k: result["center"] for k, result in right_camera_result.items()
+    }
+
+    z_distance = {}
+    for k in left_camera_centers.keys():
+        if (
+            k in right_camera_centers.keys()
+            and left_camera_centers[k] is not None
+            and right_camera_centers[k] is not None
+        ):
+            left_center: list[float] = left_camera_centers[k]
+            right_center: list[float] = right_camera_centers[k]
+            avg_disparity, avg_depth, depths, focal_length_mm = (
+                dual_stereo_calibration.pixel_to_world(left_center, right_center)
+            )
+            z_distance[k] = avg_depth
+
+        else:
+            z_distance[k] = 0
+
+    return z_distance
+
+
+def compare_z_distance(
+    z_distance1: dict,
+    z_distance2: dict,
+) -> tuple[dict, set]:
+    defalut_error_distance: float = MainConfig.getattr("defalut_error_distance")
+    z_move_threshold: float = RingsLocationConfig.getattr("z_move_threshold")
+    z_move_distance = {}
+    ndigits: int = RingsLocationConfig.getattr("ndigits")
+
+    over_threshold_ids = set()
+    for k in z_distance1.keys():
+        if k in z_distance2.keys():
+            move: float = round(z_distance1[k] - z_distance2[k], ndigits)
+            z_move_distance[k] = move
+            if abs(move) > z_move_threshold:
+                over_threshold_ids.add(k)
+                logger.warning(
+                    f"box {k} z move distance {move} mm is over threshold {z_move_threshold} mm."
+                )
+            else:
+                logger.info(
+                    f"box {k} z move distance {move} mm is under threshold {z_move_threshold} mm."
+                )
+        else:
+            z_move_distance[k] = defalut_error_distance
+            logger.warning(f"box {k} not found in z_distance2.")
+
+    return z_move_distance, over_threshold_ids

@@ -207,6 +207,56 @@ class DualStereoCalibration:
             undistorted_points.append(point_corrected)
         return undistorted_points
 
+    def get_stereo_parameters(
+        self,
+    ) -> tuple[None, None, None] | tuple[float, float, float]:
+        if self.P1 is None or self.P2 is None:
+            return None, None, None
+
+        P1, P2 = self.P1, self.P2
+        focal_length_pixels = P1[0, 0]
+        baseline = -P2[0, 3] / P2[0, 0]
+        pixel_width_mm = self.pixel_width_mm  # 使用 self.pixel_width_mm
+        focal_length_mm = focal_length_pixels * pixel_width_mm
+        return focal_length_pixels, baseline, focal_length_mm
+
+    def pixel_to_world(
+        self,
+        left_points: np.ndarray | list[list[float]] | list[float],
+        right_points: np.ndarray | list[list[float]] | list[float],
+    ) -> tuple[float, float, list[float], float]:
+        focal_length, baseline, focal_length_mm = self.get_stereo_parameters()
+        if focal_length is None or baseline is None or focal_length_mm is None:
+            logger.warning("stereo parameters not set, couldn't calculate depth.")
+            return 0., 0., [], 0.
+
+        left_points = np.array(left_points).reshape(-1, 2)
+        right_points = np.array(right_points).reshape(-1, 2)
+
+        points4D: np.ndarray = cv2.triangulatePoints(
+            self.P1, self.P2, left_points.T, right_points.T
+        )
+        points3D: np.ndarray = points4D[:3] / points4D[3]
+
+        disparities = []
+        depths = []
+        for i in range(points3D.shape[1]):
+            left_point = left_points[i]
+            right_point = right_points[i]
+            disparity = left_point[0] - right_point[0]
+
+            if disparity == 0:
+                continue
+
+            disparities.append(disparity)
+            depth = (focal_length * baseline) / disparity
+            depths.append(depth)
+
+        avg_disparity = float(np.mean(disparities)) if disparities else 0.
+        avg_depth = float(np.mean(depths)) if depths else 0.
+
+        return avg_disparity, avg_depth, depths, focal_length_mm
+
 
 if __name__ == "__main__":
     camera_matrix_left = np.array(
@@ -259,8 +309,10 @@ if __name__ == "__main__":
     T = np.array([[-476.53571438], [4.78988367], [49.50495583]])
     sensor_width_mm = 6.413  # 传感器宽度，以毫米为单位
     image_width_pixels = 3840  # 图像宽度，以像素为单位
+
     # 计算每个像素的宽度（以毫米为单位）
     pixel_width_mm = sensor_width_mm / image_width_pixels
+
     image_size = (500, 500)
 
     # 创建ImageUndistorter对象
@@ -324,6 +376,22 @@ if __name__ == "__main__":
     xy_corrected = dual_stereo_calibration.undistort_points(xy, "left")
     print(f"left 矫正后的点坐标为: {xy_corrected}")
 
+    left_point = [200, 200]
+    right_point = [220, 200]
+    avg_disparity, avg_depth, depths, focal_length_mm = (
+        dual_stereo_calibration.pixel_to_world(left_point, right_point)
+    )
+    print("Average Disparity:", avg_disparity)
+    print("Average Depth:", avg_depth)
+
+    left_points = [[200, 200], [300, 300]]
+    right_points = [[220, 200], [320, 300]]
+    avg_disparity, avg_depth, depths, focal_length_mm = (
+        dual_stereo_calibration.pixel_to_world(left_points, right_points)
+    )
+    print("Average Disparity:", avg_disparity)
+    print("Average Depth:", avg_depth)
+
     print("=" * 100)
     # 测试为None的情况
     dual_stereo_calibration = DualStereoCalibration()
@@ -334,3 +402,19 @@ if __name__ == "__main__":
     xy = [[200.0, 200.0], [400.0, 400.0]]
     xy_corrected = dual_stereo_calibration.undistort_points(xy)
     print(f"矫正后的点坐标为: {xy_corrected}")
+
+    left_point = [200, 200]
+    right_point = [220, 200]
+    avg_disparity, avg_depth, depths, focal_length_mm = (
+        dual_stereo_calibration.pixel_to_world(left_point, right_point)
+    )
+    print("Average Disparity:", avg_disparity)
+    print("Average Depth:", avg_depth)
+
+    left_points = [[200, 200], [300, 300]]
+    right_points = [[220, 200], [320, 300]]
+    avg_disparity, avg_depth, depths, focal_length_mm = (
+        dual_stereo_calibration.pixel_to_world(left_points, right_points)
+    )
+    print("Average Disparity:", avg_disparity)
+    print("Average Depth:", avg_depth)

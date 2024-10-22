@@ -55,7 +55,7 @@ class MainConfig(BaseConfig):
         save_dir / "config_runtime.yaml"
     )  # 运行时 config, 用于保存当前配置
     main_sleep_interval: int = 500  # 主循环 sleep_time ms
-    cycle_time_interval: int = 15000  # 主循环时间 ms
+    cycle_time_interval: int = 60000  # 主循环时间 ms
     get_picture_timeout: int = 10  # 获取图片超时时间 s
     get_picture_timeout_threshold: int = 10  # 获取图片超时数量阈值
     get_picture_timeout_count: int = 0  # 获取图片超时计数

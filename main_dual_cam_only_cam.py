@@ -1266,7 +1266,8 @@ def main() -> None:
                         for z_over_distance_id in z_over_threshold_ids:
                             over_threshold_ids.add(z_over_distance_id)
 
-                        # # -------------------- 移除重复位移告警消息 -------------------- #
+                        # -------------------- 移除重复位移告警消息 -------------------- #
+                        # ⚠️⚠️⚠️ 测试时不开启 ⚠️⚠️⚠️
                         # logger.info(
                         #     f"over_threshold_ids: {over_threshold_ids}"
                         # )
@@ -1291,7 +1292,7 @@ def main() -> None:
                         # logger.info(
                         #     f"over_threshold_ids_reported: {over_threshold_ids_reported}"
                         # )
-                        # # -------------------- 移除重复位移告警消息 -------------------- #
+                        # -------------------- 移除重复位移告警消息 -------------------- #
 
                         # -------------------- send msg -------------------- #
                         if len(over_threshold_ids) > 0:
@@ -1303,8 +1304,8 @@ def main() -> None:
                             # 保存位移的图片
                             image_path0 = save_dir / "target_displacement0.jpg"
                             image_path1 = save_dir / "target_displacement1.jpg"
-                            save_image(image0, image_path0)
-                            save_image(image1, image_path1)
+                            save_image(undistorted_image0, image_path0)
+                            save_image(undistorted_image1, image_path1)
                             logger.info(
                                 f"save `target displacement` image to {image_path0}, {image_path1}"
                             )
@@ -1376,11 +1377,12 @@ def main() -> None:
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
-                            find_lost_target(undistorted_image0, 0)
-                            target_number = MatchTemplateConfig.getattr("target_number")
-                            camera0_got_target_number = MatchTemplateConfig.getattr(
-                                "camera0_got_target_number"
-                            )
+                            # ⚠️⚠️⚠️ 暂时关闭 camera0 模板匹配 ⚠️⚠️⚠️
+                            # find_lost_target(undistorted_image0, 0)
+                            # target_number = MatchTemplateConfig.getattr("target_number")
+                            # camera0_got_target_number = MatchTemplateConfig.getattr(
+                            #     "camera0_got_target_number"
+                            # )
                             # -------------------- 模板匹配 -------------------- #
 
                             if (
@@ -1398,45 +1400,29 @@ def main() -> None:
                                         for i, camera0_boxestate in camera0_id2boxstate.items()
                                         if camera0_boxestate["box"] is None
                                     ]
+                                    loss_ids = set(loss_ids)
                                 else:
-                                    # 假如开始没有任何 box, 则认为丢失的 box idx 为 []
-                                    loss_ids = []
+                                    loss_ids = set()
 
                                 logger.critical(
                                     f"camera0 target number {target_number} is not enough, got {camera0_got_target_number} targets, loss box ids: {loss_ids}."
                                 )
 
-                                # 保存丢失的图片
-                                image_path = save_dir / "target_loss0.jpg"
-                                save_image(image0, image_path)
-                                logger.info(f"save `target loss` image to {image_path}")
-                                # 目标丢失告警消息
-                                send_msg = {
-                                    "cmd": "alarm",
-                                    "body": {
-                                        "did": MQTTConfig.getattr("did"),
-                                        "type": "target_loss",
-                                        "at": get_now_time(),
-                                        "number": [
-                                            i + 1 for i in loss_ids
-                                        ],  # 异常的靶标编号
-                                        "data": send_msg_data,
-                                        "path": [str(image_path)],  # 图片本地路径
-                                        "img": ["target_loss0.jpg"],  # 文件名称
-                                    },
-                                }
-                                mqtt_send_queue.put(send_msg)
+                                camera0_loss_ids = loss_ids
                             else:
                                 # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
+                                camera0_loss_ids = set()
                                 logger.success(
                                     f"camera0 lost target has been found, the target number {target_number} is enough, got {camera0_got_target_number} targets."
                                 )
 
                         except queue.Empty:
+                            camera0_loss_ids = set()
                             get_picture_timeout_process()
 
                     # 目标数量正常
                     else:
+                        camera0_loss_ids = set()
                         logger.success(
                             f"camera0 target number {target_number} is enough, got {camera0_got_target_number} targets."
                         )
@@ -1470,11 +1456,12 @@ def main() -> None:
                             # -------------------- 畸变矫正 -------------------- #
 
                             # -------------------- 模板匹配 -------------------- #
-                            find_lost_target(undistorted_image1, 1)
-                            target_number = MatchTemplateConfig.getattr("target_number")
-                            camera1_got_target_number = MatchTemplateConfig.getattr(
-                                "camera1_got_target_number"
-                            )
+                            # ⚠️⚠️⚠️ 暂时关闭 camera0 模板匹配 ⚠️⚠️⚠️
+                            # find_lost_target(undistorted_image1, 1)
+                            # target_number = MatchTemplateConfig.getattr("target_number")
+                            # camera1_got_target_number = MatchTemplateConfig.getattr(
+                            #     "camera1_got_target_number"
+                            # )
                             # -------------------- 模板匹配 -------------------- #
 
                             if (
@@ -1492,49 +1479,166 @@ def main() -> None:
                                         for i, camera1_boxestate in camera1_id2boxstate.items()
                                         if camera1_boxestate["box"] is None
                                     ]
+                                    loss_ids = set(loss_ids)
                                 else:
-                                    # 假如开始没有任何 box, 则认为丢失的 box idx 为 []
-                                    loss_ids = []
+                                    loss_ids = set()
 
                                 logger.critical(
                                     f"camera1 target number {target_number} is not enough, got {camera1_got_target_number} targets, loss box ids: {loss_ids}."
                                 )
 
-                                # 保存丢失的图片
-                                image_path = save_dir / "target_loss1.jpg"
-                                save_image(image1, image_path)
-                                logger.info(f"save `target loss` image to {image_path}")
-                                # 目标丢失告警消息
-                                send_msg = {
-                                    "cmd": "alarm",
-                                    "body": {
-                                        "did": MQTTConfig.getattr("did"),
-                                        "type": "target_loss",
-                                        "at": get_now_time(),
-                                        "number": [
-                                            i + 1 for i in loss_ids
-                                        ],  # 异常的靶标编号
-                                        "data": send_msg_data,
-                                        "path": [str(image_path)],  # 图片本地路径
-                                        "img": ["target_loss1.jpg"],  # 文件名称
-                                    },
-                                }
-                                mqtt_send_queue.put(send_msg)
+                                camera1_loss_ids = loss_ids
                             else:
+                                camera1_loss_ids = set()
                                 # ✅️✅️✅️ 丢失目标重新找回 ✅️✅️✅️
                                 logger.success(
                                     f"camera1 lost target has been found, the target number {target_number} is enough, got {camera1_got_target_number} targets."
                                 )
 
                         except queue.Empty:
+                            camera1_loss_ids = set()
                             get_picture_timeout_process()
 
                     # 目标数量正常
                     else:
+                        camera1_loss_ids = set()
                         logger.success(
                             f"camera1 target number {target_number} is enough, got {camera1_got_target_number} targets."
                         )
                     # -------------------- camera1 lost box -------------------- #
+
+                    # 求交集
+                    loss_ids = camera0_loss_ids | camera1_loss_ids
+
+                    # -------------------- 移除重复丢失告警消息 -------------------- #
+                    logger.info(f"loss_ids: {loss_ids}")
+                    loss_ids_reported: list | None = RingsLocationConfig.getattr(
+                        "loss_ids_reported"
+                    )
+                    if loss_ids_reported is None:
+                        loss_ids_reported = []
+
+                    for reported_id in loss_ids_reported:
+                        loss_ids.discard(reported_id)
+                    logger.info(f"loss_ids remove has been reported ids: {loss_ids}")
+                    loss_ids_reported = set(loss_ids_reported)
+                    for loss_id in loss_ids:
+                        loss_ids_reported.add(loss_id)
+                    loss_ids_reported = list(loss_ids_reported)
+                    RingsLocationConfig.setattr("loss_ids_reported", loss_ids_reported)
+                    logger.info(f"loss_ids_reported: {loss_ids_reported}")
+                    # -------------------- 移除重复丢失告警消息 -------------------- #
+
+                    if len(loss_ids) > 0:
+                        # ⚠️⚠️⚠️ 暂时关闭 camera0/1 模板匹配, 并修改已有的靶标记录 ⚠️⚠️⚠️
+                        target_number = MatchTemplateConfig.getattr("target_number")
+                        target_number -= len(loss_ids)
+                        MatchTemplateConfig.setattr("target_number", target_number)
+                        MatchTemplateConfig.setattr(
+                            "camera0_got_target_number", target_number
+                        )
+                        MatchTemplateConfig.setattr(
+                            "camera1_got_target_number", target_number
+                        )
+
+                        camera0_id2boxstate: dict[int, dict] | None = (
+                            MatchTemplateConfig.getattr("camera0_id2boxstate")
+                        )
+                        camera1_id2boxstate: dict[int, dict] | None = (
+                            MatchTemplateConfig.getattr("camera1_id2boxstate")
+                        )
+                        if (
+                            camera0_id2boxstate is not None
+                            and camera1_id2boxstate is not None
+                        ):
+                            for loss_id in loss_ids:
+                                camera0_id2boxstate.pop(loss_id, None)
+                                camera1_id2boxstate.pop(loss_id, None)
+                        MatchTemplateConfig.setattr(
+                            "camera0_id2boxstate", camera0_id2boxstate
+                        )
+                        MatchTemplateConfig.setattr(
+                            "camera1_id2boxstate", camera1_id2boxstate
+                        )
+
+                        camera0_standard_results: dict | None = (
+                            RingsLocationConfig.getattr("camera0_standard_results")
+                        )
+                        camera1_standard_results: dict | None = (
+                            RingsLocationConfig.getattr("camera1_standard_results")
+                        )
+                        if (
+                            camera0_standard_results is not None
+                            and camera1_standard_results is not None
+                        ):
+                            for loss_id in loss_ids:
+                                camera0_standard_results.pop(loss_id, None)
+                                camera1_standard_results.pop(loss_id, None)
+                        RingsLocationConfig.setattr(
+                            "camera0_standard_results", camera0_standard_results
+                        )
+                        RingsLocationConfig.setattr(
+                            "camera1_standard_results", camera1_standard_results
+                        )
+
+                        camera0_reference_target_id2offset: (
+                            dict[int, tuple[float, float]] | None
+                        ) = RingsLocationConfig.getattr(
+                            "camera0_reference_target_id2offset"
+                        )
+                        if camera0_reference_target_id2offset is not None:
+                            reference_target_id: int = int(
+                                list(camera0_reference_target_id2offset.keys())[0]
+                            )
+                            if reference_target_id in loss_ids:
+                                RingsLocationConfig.setattr(
+                                    "camera0_reference_target_id2offset",
+                                    None,
+                                )
+
+                        camera1_reference_target_id2offset: (
+                            dict[int, tuple[float, float]] | None
+                        ) = RingsLocationConfig.getattr(
+                            "camera1_reference_target_id2offset"
+                        )
+                        if camera1_reference_target_id2offset is not None:
+                            reference_target_id: int = int(
+                                list(camera1_reference_target_id2offset.keys())[0]
+                            )
+                            if reference_target_id in loss_ids:
+                                RingsLocationConfig.setattr(
+                                    "camera1_reference_target_id2offset",
+                                    None,
+                                )
+                        # ⚠️⚠️⚠️ 暂时关闭 camera0/1 模板匹配, 并修改已有的靶标记录 ⚠️⚠️⚠️
+
+                        # 保存丢失的图片
+                        image_path0 = save_dir / "target_loss0.jpg"
+                        image_path1 = save_dir / "target_loss1.jpg"
+                        save_image(undistorted_image0, image_path0)
+                        save_image(undistorted_image1, image_path1)
+                        logger.info(f"save `target loss` image to {image_path0}")
+                        # 目标丢失告警消息
+                        send_msg = {
+                            "cmd": "alarm",
+                            "body": {
+                                "did": MQTTConfig.getattr("did"),
+                                "type": "target_loss",
+                                "at": get_now_time(),
+                                "number": [i + 1 for i in loss_ids],  # 异常的靶标编号
+                                "data": send_msg_data,
+                                "path": [
+                                    str(image_path0),
+                                    str(image_path1),
+                                ],  # 图片本地路径
+                                "img": [
+                                    "target_loss0.jpg",
+                                    "target_loss1.jpg",
+                                ],  # 文件名称
+                            },
+                        }
+                        mqtt_send_queue.put(send_msg)
+
                     # ------------------------- 检查是否丢失目标 ------------------------- #
 
                     # ------------------------- 结束周期 ------------------------- #

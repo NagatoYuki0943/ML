@@ -137,7 +137,7 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
         raise ValueError(f"camera_index should be 0 or 1, but got {camera_index}")
 
     # 如果没有目标，则直接全图查找
-    if id2boxstate is None:
+    if id2boxstate is None or len(id2boxstate) == 0:
         logger.warning(f"camera {camera_index} id2boxstate is None, use find_target")
         return find_target(image, camera_index)
 
@@ -372,7 +372,7 @@ def find_lost_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, in
         raise ValueError(f"camera_index should be 0 or 1, but got {camera_index}")
 
     # 如果没有目标，则直接全图查找
-    if id2boxstate is None:
+    if id2boxstate is None or len(id2boxstate) == 0:
         logger.warning(f"camera {camera_index} id2boxstate is None, use find_target")
         return find_target(image, camera_index)
 

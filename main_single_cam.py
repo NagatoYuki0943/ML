@@ -43,6 +43,7 @@ from location_utils import rings_location, init_standard_results, calc_move_dist
 from serial_communication import serial_receive, serial_send
 from mqtt_communication import mqtt_receive, mqtt_send
 from utils import (
+    clear_queue,
     drop_excessive_queue_items,
     save_to_jsonl,
     get_now_time,
@@ -436,6 +437,9 @@ def main() -> None:
                     # 如果上一次使用了补光灯，那这一次也使用补光灯
                     if use_flash:
                         Send.send_open_led_level_msg(led_level)
+                        # 等待闪光灯开启
+                        time.sleep(0.1)
+                        clear_queue(camera0_queue)
 
                     # 调整曝光
                     camera0_id2boxstate: dict[int, dict] | None = (

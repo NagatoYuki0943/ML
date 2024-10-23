@@ -792,12 +792,7 @@ def main() -> None:
                         logger.info(
                             f"camera0_real_move_result: {camera0_real_move_result}"
                         )
-                        logger.info(
-                            f"camera0_over_threshold_ids: {camera0_over_threshold_ids}"
-                        )
                         # -------------------- camera0 compare results -------------------- #
-
-                        # -------------------- send msg -------------------- #
 
                         send_msg_data = deepcopy(temperature_data)
                         _send_msg_data = {
@@ -806,6 +801,35 @@ def main() -> None:
                         }
                         send_msg_data.update(_send_msg_data)
                         logger.info(f"send_msg_data: {send_msg_data}")
+
+                        # # -------------------- 移除重复位移告警消息 -------------------- #
+                        # logger.info(
+                        #     f"camera0_over_threshold_ids: {camera0_over_threshold_ids}"
+                        # )
+                        # over_threshold_ids_reported: list | None = RingsLocationConfig.getattr(
+                        #     "over_threshold_ids_reported"
+                        # )
+                        # if over_threshold_ids_reported is None:
+                        #     over_threshold_ids_reported = []
+
+                        # for reported_id in over_threshold_ids_reported:
+                        #     camera0_over_threshold_ids.discard(reported_id)
+                        # logger.info(
+                        #     f"camera0_over_threshold_ids remove has been reported ids: {camera0_over_threshold_ids}"
+                        # )
+                        # over_threshold_ids_reported = set(over_threshold_ids_reported)
+                        # for ov_id in camera0_over_threshold_ids:
+                        #     over_threshold_ids_reported.add(ov_id)
+                        # over_threshold_ids_reported = list(over_threshold_ids_reported)
+                        # RingsLocationConfig.setattr(
+                        #     "over_threshold_ids_reported", over_threshold_ids_reported
+                        # )
+                        # logger.info(
+                        #     f"over_threshold_ids_reported: {over_threshold_ids_reported}"
+                        # )
+                        # # -------------------- 移除重复位移告警消息 -------------------- #
+
+                        # -------------------- send msg -------------------- #
                         if len(camera0_over_threshold_ids) > 0:
                             # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
                             logger.warning(

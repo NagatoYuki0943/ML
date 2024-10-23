@@ -201,6 +201,7 @@ class RingsLocationConfig(BaseConfig):
     camera0_standard_results: dict | None = None  # camera0 标准结果
     camera1_standard_results: dict | None = None  # camera1 标准结果
     ndigits: int = 4  # 保留小数位数
+    over_threshold_ids_reported: list[int] | None = None  # 发送过告警信息的超过阈值的靶标 id 集合
 
 
 @dataclass

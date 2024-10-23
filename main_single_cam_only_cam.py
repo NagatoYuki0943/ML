@@ -334,12 +334,39 @@ def main() -> None:
             # 绘制boxes
             image0_draw = undistorted_image0.copy()
             for i in range(len(boxes)):
+                xmin, ymin, xmax, ymax = boxes[i]
                 cv2.rectangle(
                     img=image0_draw,
-                    pt1=(boxes[i][0], boxes[i][1]),
-                    pt2=(boxes[i][2], boxes[i][3]),
-                    color=(255, 0, 0),
+                    pt1=(xmin, ymin),
+                    pt2=(xmax, ymax),
+                    color=(255, 255, 255),
                     thickness=3,
+                )
+                # 文字
+                label = str(i)
+                w, h = cv2.getTextSize(label, 0, fontScale=1, thickness=1)[
+                    0
+                ]  # text width, height
+
+                # 添加文字背景
+                cv2.rectangle(
+                    image0_draw,
+                    (xmin, ymin - 40 if ymin > 40 else ymin + h + 20),
+                    (xmin + w, ymin),
+                    (255, 255, 255),
+                    cv2.FILLED,
+                )
+
+                # 添加文字
+                cv2.putText(
+                    img=image0_draw,
+                    text=label,
+                    org=(xmin, ymin - 10 if ymin > 40 else ymin + h + 10),
+                    fontFace=0,
+                    fontScale=1,
+                    color=(0, 0, 0),
+                    thickness=1,
+                    lineType=cv2.LINE_AA,
                 )
             plt.figure(figsize=(40, 40))
             plt.imshow(image0_draw, cmap="gray")
@@ -1492,9 +1519,13 @@ class Receive:
         #     "msgid": 1
         # }
         if received_msg.get("param", {}).get("result", "NOT") == "OK":
-            logger.success(f"received {received_msg.get('camera', '')} askadjusttempdata response OK")
+            logger.success(
+                f"received {received_msg.get('camera', '')} askadjusttempdata response OK"
+            )
         else:
-            logger.error(f"received {received_msg.get('camera', '')} askadjusttempdata response NOT OK")
+            logger.error(
+                f"received {received_msg.get('camera', '')} askadjusttempdata response NOT OK"
+            )
         received_temp_control_msg = True
 
     @staticmethod
@@ -1580,7 +1611,9 @@ class Receive:
         #     },
         #     "msgid": 1
         # }
-        logger.success(f"received camera: {received_msg.get('camera', '')} temp stability msg: {received_msg.get('param', {})}")
+        logger.success(
+            f"received camera: {received_msg.get('camera', '')} temp stability msg: {received_msg.get('param', {})}"
+        )
         is_temp_stable = True
         need_send_in_working_state_msg = True
 
@@ -1619,9 +1652,13 @@ class Receive:
         #     "msgid": 1
         # }
         if received_msg.get("param", {}).get("result", "NOT") == "OK":
-            logger.success(f"received {received_msg.get('camera', '')} askstoptempcontrol response OK")
+            logger.success(
+                f"received {received_msg.get('camera', '')} askstoptempcontrol response OK"
+            )
         else:
-            logger.error(f"received {received_msg.get('camera', '')} askstoptempcontrol response NOT OK")
+            logger.error(
+                f"received {received_msg.get('camera', '')} askstoptempcontrol response NOT OK"
+            )
 
     # @staticmethod
     # def receive_reboot_msg(received_msg: dict | None = None):
@@ -2229,7 +2266,9 @@ class Send:
             "msgid": 1,
         }
         serial_send_queue.put(send_msg)
-        logger.success(f"send camera: {camera}, temperature: {temperature}, temperature control msg success")
+        logger.success(
+            f"send camera: {camera}, temperature: {temperature}, temperature control msg success"
+        )
         received_temp_control_msg = False
         is_temp_stable = False
 

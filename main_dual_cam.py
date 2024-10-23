@@ -385,12 +385,39 @@ def main() -> None:
             # 绘制boxes
             image0_draw = undistorted_image0.copy()
             for i in range(len(boxes)):
+                xmin, ymin, xmax, ymax = boxes[i]
                 cv2.rectangle(
                     img=image0_draw,
-                    pt1=(boxes[i][0], boxes[i][1]),
-                    pt2=(boxes[i][2], boxes[i][3]),
-                    color=(255, 0, 0),
+                    pt1=(xmin, ymin),
+                    pt2=(xmax, ymax),
+                    color=(255, 255, 255),
                     thickness=3,
+                )
+                # 文字
+                label = str(i)
+                w, h = cv2.getTextSize(label, 0, fontScale=1, thickness=1)[
+                    0
+                ]  # text width, height
+
+                # 添加文字背景
+                cv2.rectangle(
+                    image0_draw,
+                    (xmin, ymin - 40 if ymin > 40 else ymin + h + 20),
+                    (xmin + w, ymin),
+                    (255, 255, 255),
+                    cv2.FILLED,
+                )
+
+                # 添加文字
+                cv2.putText(
+                    img=image0_draw,
+                    text=label,
+                    org=(xmin, ymin - 10 if ymin > 40 else ymin + h + 10),
+                    fontFace=0,
+                    fontScale=1,
+                    color=(0, 0, 0),
+                    thickness=1,
+                    lineType=cv2.LINE_AA,
                 )
             plt.figure(figsize=(40, 40))
             plt.imshow(image0_draw, cmap="gray")
@@ -459,12 +486,39 @@ def main() -> None:
             # 绘制boxes
             image1_draw = undistorted_image1.copy()
             for i in range(len(boxes)):
+                xmin, ymin, xmax, ymax = boxes[i]
                 cv2.rectangle(
                     img=image1_draw,
-                    pt1=(boxes[i][0], boxes[i][1]),
-                    pt2=(boxes[i][2], boxes[i][3]),
-                    color=(255, 0, 0),
+                    pt1=(xmin, ymin),
+                    pt2=(xmax, ymax),
+                    color=(255, 255, 255),
                     thickness=3,
+                )
+                # 文字
+                label = str(i)
+                w, h = cv2.getTextSize(label, 0, fontScale=1, thickness=1)[
+                    0
+                ]  # text width, height
+
+                # 添加文字背景
+                cv2.rectangle(
+                    image1_draw,
+                    (xmin, ymin - 40 if ymin > 40 else ymin + h + 20),
+                    (xmin + w, ymin),
+                    (255, 255, 255),
+                    cv2.FILLED,
+                )
+
+                # 添加文字
+                cv2.putText(
+                    img=image1_draw,
+                    text=label,
+                    org=(xmin, ymin - 10 if ymin > 40 else ymin + h + 10),
+                    fontFace=0,
+                    fontScale=1,
+                    color=(0, 0, 0),
+                    thickness=1,
+                    lineType=cv2.LINE_AA,
                 )
             plt.figure(figsize=(40, 40))
             plt.imshow(image1_draw, cmap="gray")

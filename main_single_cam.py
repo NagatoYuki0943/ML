@@ -2352,7 +2352,7 @@ class Send:
     @staticmethod
     def send_open_led_level_msg(led_level: int = 1):
         """补光灯开启命令"""
-        logger.info(f"send open led level : {led_level}")
+        logger.info(f"send open led level: {led_level}")
         max_led_level: int = AdjustCameraConfig.getattr("max_led_level")
         if led_level < 1:
             led_level = 1

@@ -464,6 +464,7 @@ def main() -> None:
                             else:
                                 # 降低补光灯亮度
                                 led_level -= 1
+                                logger.info(f"reduce flash level to {led_level}")
                         else:
                             # 已经是最高的补光灯
                             if led_level >= max_led_level:
@@ -474,6 +475,7 @@ def main() -> None:
                             else:
                                 # 增加补光灯亮度
                                 led_level += 1
+                                logger.info(f"increase flash level to {led_level}")
                     else:
                         logger.success("no need adjust flash, exit adjust exposure")
                         break

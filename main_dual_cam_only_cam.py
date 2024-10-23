@@ -576,7 +576,8 @@ def main() -> None:
                 # 周期结果重置
                 camera0_cycle_results = {}
                 camera1_cycle_results = {}
-
+                cycle_overthreshold_images = []
+                cycle_loss_images = []
                 # ------------------------- 调整全图曝光 ------------------------- #
                 # --------------- camera0 --------------- #
                 logger.info("full image0 ajust exposure start")
@@ -676,9 +677,15 @@ def main() -> None:
                     # --------------- 畸变矫正 --------------- #
 
                     # --------------- 小区域模板匹配 --------------- #
-                    _, camera0_got_target_number = find_around_target(
+                    camera0_id2boxstate, camera0_got_target_number = find_around_target(
                         undistorted_image0, 0
                     )
+
+                    # 保存丢失box图片
+                    camera0_boxes_is_none = [boxstate["box"] is None for boxstate in camera0_id2boxstate.values()]
+                    if any(camera0_boxes_is_none):
+                        cycle_loss_images.append(undistorted_image0)
+
                     if camera0_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
                         logger.warning(
@@ -732,9 +739,15 @@ def main() -> None:
                     # --------------- 畸变矫正 --------------- #
 
                     # --------------- 小区域模板匹配 --------------- #
-                    _, camera1_got_target_number = find_around_target(
+                    camera1_id2boxstate, camera1_got_target_number = find_around_target(
                         undistorted_image1, 1
                     )
+
+                    # 保存丢失box图片
+                    camera1_boxes_is_none = [boxstate["box"] is None for boxstate in camera1_id2boxstate.values()]
+                    if any(camera1_boxes_is_none):
+                        cycle_loss_images.append(undistorted_image1)
+
                     if camera1_got_target_number == 0:
                         # ⚠️⚠️⚠️ 本次循环没有找到目标 ⚠️⚠️⚠️
                         logger.warning(
@@ -852,6 +865,8 @@ def main() -> None:
                             logger.info(
                                 f"cycle_loop_count: {cycle_loop_count}, camera0, {exposure_time = }, {camera0_id2boxstate = }"
                             )
+
+                            image_saved = False
                             for (
                                 box_id,
                                 camera0_boxestate,
@@ -870,6 +885,11 @@ def main() -> None:
                                 logger.info(
                                     f"camera0 ring location result: {camera0_rings_location_result}"
                                 )
+
+                                # 保存检测失败的图片
+                                if camera0_rings_location_result["center"] is None and not image_saved:
+                                    cycle_overthreshold_images.append(undistorted_image0)
+                                    image_saved = True
                             # -------------------- 检测 -------------------- #
 
                             # 没有发生错误, 周期内循环计数加1
@@ -906,6 +926,8 @@ def main() -> None:
                             logger.info(
                                 f"cycle_loop_count: {cycle_loop_count}, camera1, {exposure_time = }, {camera1_id2boxstate = }"
                             )
+
+                            image_saved = False
                             for (
                                 box_id,
                                 camera1_boxestate,
@@ -924,6 +946,11 @@ def main() -> None:
                                 logger.info(
                                     f"camera1 ring location result: {camera1_rings_location_result}"
                                 )
+
+                                # 保存检测失败的图片
+                                if camera1_rings_location_result["center"] is None and not image_saved:
+                                    cycle_overthreshold_images.append(undistorted_image1)
+                                    image_saved = True
                             # -------------------- 检测 -------------------- #
 
                             # 没有发生错误, 周期内循环计数加1
@@ -1301,14 +1328,20 @@ def main() -> None:
                                 f"box {over_threshold_ids} move distance is over threshold."
                             )
 
-                            # 保存位移的图片
-                            image_path0 = save_dir / "target_displacement0.jpg"
-                            image_path1 = save_dir / "target_displacement1.jpg"
-                            save_image(undistorted_image0, image_path0)
-                            save_image(undistorted_image1, image_path1)
-                            logger.info(
-                                f"save `target displacement` image to {image_path0}, {image_path1}"
-                            )
+                            img = []
+                            path = []
+                            # 至少添加2张图片
+                            cycle_overthreshold_images.append(undistorted_image0)
+                            cycle_overthreshold_images.append(undistorted_image1)
+                            for i, ov_image in enumerate(cycle_overthreshold_images):
+                                image_name = f"target_displacement_{i}.jpg"
+                                image_path = str(save_dir / image_name)
+                                img.append(image_name)
+                                path.append(image_path)
+                                save_image(ov_image, image_path)
+                                logger.info(
+                                    f"save `target displacement` image to {image_path}"
+                                )
                             # 位移告警消息
                             send_msg = {
                                 "cmd": "alarm",
@@ -1320,14 +1353,8 @@ def main() -> None:
                                         i + 1 for i in over_threshold_ids
                                     ],  # 表示异常的靶标编号
                                     "data": send_msg_data,
-                                    "path": [
-                                        str(image_path0),
-                                        str(image_path1),
-                                    ],  # 图片本地路径
-                                    "img": [
-                                        "target_displacement0.jpg",
-                                        "target_displacement1.jpg",
-                                    ],  # 文件名称
+                                    "path": path,  # 图片本地路径
+                                    "img": img,  # 文件名称
                                 },
                             }
                             mqtt_send_queue.put(send_msg)
@@ -1612,12 +1639,17 @@ def main() -> None:
                                 )
                         # ⚠️⚠️⚠️ 暂时关闭 camera0/1 模板匹配, 并修改已有的靶标记录 ⚠️⚠️⚠️
 
-                        # 保存丢失的图片
-                        image_path0 = save_dir / "target_loss0.jpg"
-                        image_path1 = save_dir / "target_loss1.jpg"
-                        save_image(undistorted_image0, image_path0)
-                        save_image(undistorted_image1, image_path1)
-                        logger.info(f"save `target loss` image to {image_path0}")
+                        img = []
+                        path = []
+                        for i, loss_image in enumerate(cycle_loss_images):
+                            image_name = f"target_loss{i}.jpg"
+                            image_path = str(save_dir / image_name)
+                            img.append(image_name)
+                            path.append(image_path)
+                            save_image(loss_image, image_path)
+                            logger.info(
+                                f"save `target loss` image to {image_path}"
+                            )
                         # 目标丢失告警消息
                         send_msg = {
                             "cmd": "alarm",
@@ -1627,14 +1659,8 @@ def main() -> None:
                                 "at": get_now_time(),
                                 "number": [i + 1 for i in loss_ids],  # 异常的靶标编号
                                 "data": send_msg_data,
-                                "path": [
-                                    str(image_path0),
-                                    str(image_path1),
-                                ],  # 图片本地路径
-                                "img": [
-                                    "target_loss0.jpg",
-                                    "target_loss1.jpg",
-                                ],  # 文件名称
+                                "path": path,  # 图片本地路径
+                                "img": img,  # 文件名称
                             },
                         }
                         mqtt_send_queue.put(send_msg)

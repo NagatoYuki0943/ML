@@ -81,8 +81,8 @@ class CameraConfig(BaseConfig):
     capture_mode: Literal["preview", "low", "full"] = "full"  # 相机拍照模式
     queue_maxsize: int = 5  # 相机拍照队列最大长度
     main_camera_index: int = 0  # 主相机 index
-    camera_left_index: int = 0  # 左侧相机 index
-    camera_right_index: int = 1  # 右侧相机 index
+    left_camera_index: int = 0  # 左侧相机 index
+    right_camera_index: int = 1  # 右侧相机 index
     output_format: Literal["rgb", "gray"] = "gray"  # 输出格式
     has_filter_plate: bool = True  # 是否有滤镜板
 
@@ -205,7 +205,7 @@ class RingsLocationConfig(BaseConfig):
 
 @dataclass
 class TemperatureConfig(BaseConfig):
-    """临时配置"""
+    """温度配置"""
 
     lock = Lock()
     target_temperature: float = 45.0

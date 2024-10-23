@@ -74,7 +74,7 @@ def main() -> None:
     camera1_thread.start()
 
     # 确定左右相机 index
-    if CameraConfig.camera_left_index == 0:
+    if CameraConfig.left_camera_index == 0:
         left_camera_thread = camera0_thread
         right_camera_thread = camera1_thread
     else:

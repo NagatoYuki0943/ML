@@ -1212,7 +1212,6 @@ def main() -> None:
                         )
                         # -------------------- 保存到文件 -------------------- #
 
-                        # -------------------- send msg -------------------- #
                         send_msg_data = deepcopy(temperature_data)
                         camera0_send_msg_data = {
                             f"L1_SJ_{k+1}": {"X": v[0], "Y": v[1]}
@@ -1254,6 +1253,35 @@ def main() -> None:
                         # 添加 z 轴超出阈值 id
                         for z_over_distance_id in z_over_threshold_ids:
                             over_threshold_ids.add(z_over_distance_id)
+
+                        # # -------------------- 移除重复位移告警消息 -------------------- #
+                        # logger.info(
+                        #     f"over_threshold_ids: {over_threshold_ids}"
+                        # )
+                        # over_threshold_ids_reported: list | None = RingsLocationConfig.getattr(
+                        #     "over_threshold_ids_reported"
+                        # )
+                        # if over_threshold_ids_reported is None:
+                        #     over_threshold_ids_reported = []
+
+                        # for reported_id in over_threshold_ids_reported:
+                        #     over_threshold_ids.discard(reported_id)
+                        # logger.info(
+                        #     f"over_threshold_ids remove has been reported ids: {over_threshold_ids}"
+                        # )
+                        # over_threshold_ids_reported = set(over_threshold_ids_reported)
+                        # for ov_id in over_threshold_ids:
+                        #     over_threshold_ids_reported.add(ov_id)
+                        # over_threshold_ids_reported = list(over_threshold_ids_reported)
+                        # RingsLocationConfig.setattr(
+                        #     "over_threshold_ids_reported", over_threshold_ids_reported
+                        # )
+                        # logger.info(
+                        #     f"over_threshold_ids_reported: {over_threshold_ids_reported}"
+                        # )
+                        # # -------------------- 移除重复位移告警消息 -------------------- #
+
+                        # -------------------- send msg -------------------- #
                         if len(over_threshold_ids) > 0:
                             # ⚠️⚠️⚠️ 有box移动距离超过阈值 ⚠️⚠️⚠️
                             logger.warning(

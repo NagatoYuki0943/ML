@@ -81,7 +81,7 @@ main_queue = queue.Queue()
 image0_timestamp: str
 image0: np.ndarray
 image0_metadata: dict
-camera_left_index: int = CameraConfig.getattr("camera_left_index")
+left_camera_index: int = CameraConfig.getattr("left_camera_index")
 # -------------------- 基础 -------------------- #
 
 # -------------------- 初始化相机 -------------------- #
@@ -343,7 +343,7 @@ def main() -> None:
         # -------------------- 畸变矫正 -------------------- #
         logger.info("undistort image0 start")
         undistorted_image0, _ = dual_stereo_calibration.undistort_image(
-            image0, "left" if camera_left_index == 0 else "right"
+            image0, "left" if left_camera_index == 0 else "right"
         )
         logger.success("undistort image0 success")
         # -------------------- 畸变矫正 -------------------- #
@@ -417,7 +417,7 @@ def main() -> None:
         # -------------------- 畸变矫正 -------------------- #
         logger.info("undistort image1 start")
         undistorted_image1, _ = dual_stereo_calibration.undistort_image(
-            image1, "right" if camera_left_index == 0 else "left"
+            image1, "right" if left_camera_index == 0 else "left"
         )
         logger.success("undistort image1 success")
         # -------------------- 畸变矫正 -------------------- #
@@ -611,7 +611,7 @@ def main() -> None:
 
                     # --------------- 畸变矫正 --------------- #
                     undistorted_image0, _ = dual_stereo_calibration.undistort_image(
-                        image0, "left" if camera_left_index == 0 else "right"
+                        image0, "left" if left_camera_index == 0 else "right"
                     )
                     # --------------- 畸变矫正 --------------- #
 
@@ -667,7 +667,7 @@ def main() -> None:
 
                     # --------------- 畸变矫正 --------------- #
                     undistorted_image1, _ = dual_stereo_calibration.undistort_image(
-                        image1, "right" if camera_left_index == 0 else "left"
+                        image1, "right" if left_camera_index == 0 else "left"
                     )
                     # --------------- 畸变矫正 --------------- #
 
@@ -778,7 +778,7 @@ def main() -> None:
 
                             # -------------------- 畸变矫正 -------------------- #
                             undistorted_image0, _ = dual_stereo_calibration.undistort_image(
-                                image0, "left" if camera_left_index == 0 else "right"
+                                image0, "left" if left_camera_index == 0 else "right"
                             )
                             # -------------------- 畸变矫正 -------------------- #
 
@@ -829,7 +829,7 @@ def main() -> None:
 
                             # -------------------- 畸变矫正 -------------------- #
                             undistorted_image1, _ = dual_stereo_calibration.undistort_image(
-                                image1, "right" if camera_left_index == 0 else "left"
+                                image1, "right" if left_camera_index == 0 else "left"
                             )
                             # -------------------- 畸变矫正 -------------------- #
 
@@ -952,10 +952,10 @@ def main() -> None:
                             # -------------------- 求Z轴距离 -------------------- #
                             standard_z_distance: dict = calc_z_distance(
                                 camera0_standard_results
-                                if camera_left_index == 0
+                                if left_camera_index == 0
                                 else camera1_standard_results,
                                 camera1_standard_results
-                                if camera_left_index == 0
+                                if left_camera_index == 0
                                 else camera0_standard_results,
                                 dual_stereo_calibration,
                             )
@@ -1006,10 +1006,10 @@ def main() -> None:
                             }
                             src_data = {
                                 "left_cam": camera0_send_msg_data
-                                if camera_left_index == 0
+                                if left_camera_index == 0
                                 else camera1_send_msg_data,
                                 "right_cam": camera1_send_msg_data
-                                if camera_left_index == 0
+                                if left_camera_index == 0
                                 else camera0_send_msg_data,
                             }
 
@@ -1108,19 +1108,19 @@ def main() -> None:
                         # -------------------- 求Z轴距离 -------------------- #
                         standard_z_distance: dict = calc_z_distance(
                             camera0_standard_results
-                            if camera_left_index == 0
+                            if left_camera_index == 0
                             else camera1_standard_results,
                             camera1_standard_results
-                            if camera_left_index == 0
+                            if left_camera_index == 0
                             else camera0_standard_results,
                             dual_stereo_calibration,
                         )
                         cycle_z_distance: dict = calc_z_distance(
                             camera0_cycle_results
-                            if camera_left_index == 0
+                            if left_camera_index == 0
                             else camera1_cycle_results,
                             camera1_cycle_results
-                            if camera_left_index == 0
+                            if left_camera_index == 0
                             else camera0_cycle_results,
                             dual_stereo_calibration,
                         )
@@ -1170,10 +1170,10 @@ def main() -> None:
                         }
                         src_data = {
                             "left_cam": camera0_send_msg_data
-                            if camera_left_index == 0
+                            if left_camera_index == 0
                             else camera1_send_msg_data,
                             "right_cam": camera1_send_msg_data
-                            if camera_left_index == 0
+                            if left_camera_index == 0
                             else camera0_send_msg_data,
                         }
 
@@ -1274,7 +1274,7 @@ def main() -> None:
 
                             # -------------------- 畸变矫正 -------------------- #
                             undistorted_image0, _ = dual_stereo_calibration.undistort_image(
-                                image0, "left" if camera_left_index == 0 else "right"
+                                image0, "left" if left_camera_index == 0 else "right"
                             )
                             # -------------------- 畸变矫正 -------------------- #
 
@@ -1365,7 +1365,7 @@ def main() -> None:
 
                             # -------------------- 畸变矫正 -------------------- #
                             undistorted_image1, _ = dual_stereo_calibration.undistort_image(
-                                image1, "right" if camera_left_index == 0 else "left"
+                                image1, "right" if left_camera_index == 0 else "left"
                             )
                             # -------------------- 畸变矫正 -------------------- #
 
@@ -2424,7 +2424,7 @@ class Send:
             get_picture_timeout_process()
 
         main_camera_index: int = CameraConfig.getattr("main_camera_index")
-        camera_left_index: int = CameraConfig.getattr("camera_left_index")
+        left_camera_index: int = CameraConfig.getattr("left_camera_index")
         camera0_data = Send.get_xyz(camera0_cycle_results)
         camera1_data = Send.get_xyz(camera1_cycle_results)
         # TODO: 求 Z 轴距离
@@ -2438,8 +2438,8 @@ class Send:
             v.pop("Z", None)
 
         src_data = {
-            "left_cam": camera0_data if camera_left_index == 0 else camera1_data,
-            "right_cam": camera1_data if camera_left_index == 0 else camera0_data,
+            "left_cam": camera0_data if left_camera_index == 0 else camera1_data,
+            "right_cam": camera1_data if left_camera_index == 0 else camera0_data,
         }
         _data["src_data"] = src_data
         logger.info(f"send device deploying data: {_data}")

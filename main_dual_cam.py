@@ -2061,14 +2061,20 @@ class Receive:
         try:
             image0_timestamp, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
             image1_timestamp, image1, _ = camera1_queue.get(timeout=get_picture_timeout)
+            undistorted_image0, _ = dual_stereo_calibration.undistort_image(
+                image0, "left" if left_camera_index == 0 else "right"
+            )
+            undistorted_image1, _ = dual_stereo_calibration.undistort_image(
+                image1, "right" if left_camera_index == 0 else "left"
+            )
             logger.info(
                 f"`upload image` get image success, image_timestamp: {image0_timestamp}, {image1_timestamp}"
             )
             # 保存图片
             image_path0 = save_dir / "upload_image0.jpg"
             image_path1 = save_dir / "upload_image1.jpg"
-            save_image(image0, image_path0)
-            save_image(image1, image_path1)
+            save_image(undistorted_image0, image_path0)
+            save_image(undistorted_image1, image_path1)
             logger.info(
                 f"save `upload image` success, save image to {image_path0}, {image_path1}"
             )
@@ -2509,10 +2515,16 @@ class Send:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
             _, image1, _ = camera1_queue.get(timeout=get_picture_timeout)
+            undistorted_image0, _ = dual_stereo_calibration.undistort_image(
+                image0, "left" if left_camera_index == 0 else "right"
+            )
+            undistorted_image1, _ = dual_stereo_calibration.undistort_image(
+                image1, "right" if left_camera_index == 0 else "left"
+            )
             image_path0 = save_dir / "deploy0.jpg"
             image_path1 = save_dir / "deploy1.jpg"
-            save_image(image0, image_path0)
-            save_image(image1, image_path1)
+            save_image(undistorted_image0, image_path0)
+            save_image(undistorted_image1, image_path1)
             logger.info(
                 f"save `deploying image` success, save image to {image_path0}, {image_path1}"
             )
@@ -2629,8 +2641,11 @@ class Send:
         try:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
+            undistorted_image0, _ = dual_stereo_calibration.undistort_image(
+                image0, "left" if left_camera_index == 0 else "right"
+            )
             image_path = save_dir / "delete_target.jpg"
-            save_image(image0, image_path)
+            save_image(undistorted_image0, image_path)
             logger.info(f"save `delete target` success, save image to {image_path}")
             path = str(image_path)
             img = "delete_target.jpg"
@@ -2680,8 +2695,11 @@ class Send:
         try:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
+            undistorted_image0, _ = dual_stereo_calibration.undistort_image(
+                image0, "left" if left_camera_index == 0 else "right"
+            )
             image_path = save_dir / "set_target.jpg"
-            save_image(image0, image_path)
+            save_image(undistorted_image0, image_path)
             logger.info(f"save `set target` success, save image to {image_path}")
             path = str(image_path)
             img = "set_target.jpg"

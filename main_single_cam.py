@@ -1494,12 +1494,13 @@ class Receive:
         # }
         try:
             image0_timestamp, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
+            undistorted_image0 = stereo_calibration.undistort_image(image0)
             logger.info(
                 f"`upload image` get image success, image_timestamp: {image0_timestamp}"
             )
             # 保存图片
             image_path = save_dir / "upload_image.jpg"
-            save_image(image0, image_path)
+            save_image(undistorted_image0, image_path)
             logger.info(f"save `upload image` success, save image to {image_path}")
 
             # 现场图像查询响应消息
@@ -1933,8 +1934,9 @@ class Send:
         try:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
+            undistorted_image0 = stereo_calibration.undistort_image(image0)
             image_path = save_dir / "deploy.jpg"
-            save_image(image0, image_path)
+            save_image(undistorted_image0, image_path)
             logger.info(f"save `deploying image` success, save image to {image_path}")
             path = [str(image_path)]
             img = ["deploy.jpg"]
@@ -2022,8 +2024,9 @@ class Send:
         try:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
+            undistorted_image0 = stereo_calibration.undistort_image(image0)
             image_path = save_dir / "delete_target.jpg"
-            save_image(image0, image_path)
+            save_image(undistorted_image0, image_path)
             logger.info(f"save `delete target` success, save image to {image_path}")
             path = str(image_path)
             img = "delete_target.jpg"
@@ -2073,8 +2076,9 @@ class Send:
         try:
             # 获取照片
             _, image0, _ = camera0_queue.get(timeout=get_picture_timeout)
+            undistorted_image0 = stereo_calibration.undistort_image(image0)
             image_path = save_dir / "set_target.jpg"
-            save_image(image0, image_path)
+            save_image(undistorted_image0, image_path)
             logger.info(f"save `set target` success, save image to {image_path}")
             path = str(image_path)
             img = "set_target.jpg"

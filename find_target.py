@@ -266,10 +266,10 @@ def find_around_target(image: np.ndarray, camera_index: int = 0) -> tuple[dict, 
                 new_ratio, new_score, new_box = match_results[0]
                 new_x1, new_y1, new_x2, new_y2 = new_box.tolist()
                 new_box = [
-                    box_x1 + new_x1,
-                    box_y1 + new_y1,
-                    box_x1 + new_x2,
-                    box_y1 + new_y2,
+                    box_x1_dilate + new_x1,
+                    box_y1_dilate + new_y1,
+                    box_x1_dilate + new_x2,
+                    box_y1_dilate + new_y2,
                 ]
                 new_id2boxstate[i] = {
                     "ratio": float(new_ratio),

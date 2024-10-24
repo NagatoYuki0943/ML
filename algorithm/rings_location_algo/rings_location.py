@@ -144,7 +144,7 @@ def rings_location(
     fit_rings = []
     ignore_rings = []
     for i, group_circle in enumerate(group_rings):
-        # logger.info(f"split ring: {i}, pixel numbers = {group_circle.shape[0]}")
+        logger.info(f"split ring: {i}, pixel numbers = {group_circle.shape[0]}")
         (
             center_x,
             center_y,

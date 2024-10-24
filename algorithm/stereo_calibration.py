@@ -24,6 +24,7 @@ class StereoCalibration:
             logger.warning("K or dist_coeffs is None, couldn't undistort image")
             return image
 
+        logger.debug("undistorting image")
         undistorted_image: np.ndarray = cv2.undistort(image, self.K, self.dist_coeffs)
         return undistorted_image
 
@@ -43,6 +44,7 @@ class StereoCalibration:
             logger.warning("K or dist_coeffs is None, couldn't undistort point")
             return point.tolist()
 
+        logger.debug("undistorting point")
         # 执行点的畸变矫正
         undistorted_point: np.ndarray = cv2.undistortPoints(
             point, self.K, self.dist_coeffs, P=self.K
@@ -67,6 +69,7 @@ class StereoCalibration:
             logger.warning("K or dist_coeffs is None, couldn't undistort point")
             return points.tolist()
 
+        logger.debug("undistorting points")
         undistorted_points = []
         for point in points:
             undistorted_point: np.ndarray = cv2.undistortPoints(

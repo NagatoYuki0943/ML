@@ -108,6 +108,7 @@ class DualStereoCalibration:
             logger.warning("camera matrices not set, couldn't undistort images.")
             return image, image
 
+        logger.debug(f"undistorting image with {camera} camera")
         if camera == "left":
             # 使用 cv2.undistort 进行畸变矫正
             undistorted_image: np.ndarray = cv2.undistort(
@@ -155,6 +156,7 @@ class DualStereoCalibration:
             logger.warning("camera matrices not set, couldn't undistort points.")
             return point.tolist()
 
+        logger.debug(f"undistorting point with {camera} camera")
         if camera == "left":
             undistorted_point: np.ndarray = cv2.undistortPoints(
                 point, self.camera_matrix_left, None, R=self.R1, P=self.P1
@@ -193,6 +195,7 @@ class DualStereoCalibration:
             logger.warning("camera matrices not set, couldn't undistort points.")
             return points.tolist()
 
+        logger.debug(f"undistorting points with {camera} camera")
         undistorted_points = []
         for point in points:
             if camera == "left":
@@ -230,6 +233,7 @@ class DualStereoCalibration:
             logger.warning("stereo parameters not set, couldn't calculate depth.")
             return 0., 0., [], 0.
 
+        logger.debug("calculating depth")
         left_points = np.array(left_points).reshape(-1, 2)
         right_points = np.array(right_points).reshape(-1, 2)
 

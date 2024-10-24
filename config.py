@@ -211,6 +211,8 @@ class TemperatureConfig(BaseConfig):
 
     lock = Lock()
     target_temperature: float = 45.0
+    temperature_up_threshold: float = 65.0
+    temperature_down_threshold: float = 0.0
 
 
 @dataclass

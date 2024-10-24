@@ -1721,6 +1721,18 @@ class Receive:
             Send.send_temperature_control_msg(target_temperature, CAMERA_INDEX)
             need_send_temp_control_msg = False
 
+        # TODO: 高温之后停止温控
+        temperature_up_threshold: float = TemperatureConfig.getattr("temperature_up_threshold")
+        exterior_air_t: float = _temperature_data.get("exterior_air_t", 45)
+        sensor1_t: float = _temperature_data.get("sensor1_t", 45)
+        sensor2_t: float = _temperature_data.get("sensor2_t", 45)
+        sensor3_t: float = _temperature_data.get("sensor3_t", 45)
+        temperatures = [inside_air_t, exterior_air_t, sensor1_t, sensor2_t, sensor3_t]
+        if any(t >= temperature_up_threshold for t in temperatures):
+            logger.critical("sensor temperature is too high, send stop temperature control msg.")
+            Send.send_stop_temp_control_msg(0)
+            need_send_temp_control_msg = True
+
     @staticmethod
     def receive_adjust_temp_data_msg(received_msg: dict | None = None):
         """温度调节过程数据"""

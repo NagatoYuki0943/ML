@@ -1333,8 +1333,8 @@ def main() -> None:
                             # 至少添加2张图片
                             cycle_overthreshold_images.append(undistorted_image0)
                             cycle_overthreshold_images.append(undistorted_image1)
-                            for i, ov_image in enumerate(cycle_overthreshold_images):
-                                image_name = f"target_displacement_{i}.jpg"
+                            for ov_i, ov_image in enumerate(cycle_overthreshold_images):
+                                image_name = f"target_displacement_{ov_i}.jpg"
                                 image_path = str(save_dir / image_name)
                                 img.append(image_name)
                                 path.append(image_path)
@@ -1641,8 +1641,8 @@ def main() -> None:
 
                         img = []
                         path = []
-                        for i, loss_image in enumerate(cycle_loss_images):
-                            image_name = f"target_loss{i}.jpg"
+                        for loss_i, loss_image in enumerate(cycle_loss_images):
+                            image_name = f"target_loss{loss_i}.jpg"
                             image_path = str(save_dir / image_name)
                             img.append(image_name)
                             path.append(image_path)

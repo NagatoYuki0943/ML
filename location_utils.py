@@ -88,7 +88,7 @@ def rings_location(
         distance: float = 0
         if radii is not None:
             distance = pixel_num2object_distance(
-                radii[-1] * 2,  # 半径转为直径
+                max(radii) * 2,  # 半径转为直径
                 CameraConfig.getattr("pixel_size"),
                 CameraConfig.getattr("focus"),
                 MatchTemplateConfig.getattr("template_circles_size")[0],

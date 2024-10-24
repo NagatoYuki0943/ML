@@ -867,6 +867,9 @@ def main() -> None:
                             )
                             # -------------------- 畸变矫正 -------------------- #
 
+                            # 用来检查位移偏移的图片
+                            cycle_overthreshold_images.append(undistorted_image0)
+
                             # -------------------- 检测 -------------------- #
                             camera0_id2boxstate = exposure2camera0_id2boxstate[
                                 exposure_time
@@ -875,7 +878,6 @@ def main() -> None:
                                 f"cycle_loop_count: {cycle_loop_count}, camera0, {exposure_time = }, {camera0_id2boxstate = }"
                             )
 
-                            image_saved = False
                             for (
                                 box_id,
                                 camera0_boxestate,
@@ -894,11 +896,6 @@ def main() -> None:
                                 logger.info(
                                     f"camera0 ring location result: {camera0_rings_location_result}"
                                 )
-
-                                # 保存检测失败的图片
-                                if camera0_rings_location_result["center"] is None and not image_saved:
-                                    cycle_overthreshold_images.append(undistorted_image0)
-                                    image_saved = True
                             # -------------------- 检测 -------------------- #
 
                             # 没有发生错误, 周期内循环计数加1
@@ -928,6 +925,9 @@ def main() -> None:
                             )
                             # -------------------- 畸变矫正 -------------------- #
 
+                            # 用来检查位移偏移的图片
+                            cycle_overthreshold_images.append(undistorted_image1)
+
                             # -------------------- 检测 -------------------- #
                             camera1_id2boxstate = exposure2camera1_id2boxstate[
                                 exposure_time
@@ -936,7 +936,6 @@ def main() -> None:
                                 f"cycle_loop_count: {cycle_loop_count}, camera1, {exposure_time = }, {camera1_id2boxstate = }"
                             )
 
-                            image_saved = False
                             for (
                                 box_id,
                                 camera1_boxestate,
@@ -955,11 +954,6 @@ def main() -> None:
                                 logger.info(
                                     f"camera1 ring location result: {camera1_rings_location_result}"
                                 )
-
-                                # 保存检测失败的图片
-                                if camera1_rings_location_result["center"] is None and not image_saved:
-                                    cycle_overthreshold_images.append(undistorted_image1)
-                                    image_saved = True
                             # -------------------- 检测 -------------------- #
 
                             # 没有发生错误, 周期内循环计数加1
@@ -1339,9 +1333,6 @@ def main() -> None:
 
                             img = []
                             path = []
-                            # 至少添加2张图片
-                            cycle_overthreshold_images.append(undistorted_image0)
-                            cycle_overthreshold_images.append(undistorted_image1)
                             for ov_i, ov_image in enumerate(cycle_overthreshold_images):
                                 image_name = f"target_displacement_{ov_i}.jpg"
                                 image_path = str(save_dir / image_name)

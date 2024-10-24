@@ -295,6 +295,9 @@ def main() -> None:
         # -------------------- 畸变矫正 -------------------- #
         logger.info("undistort image0 start")
         undistorted_image0 = stereo_calibration.undistort_image(image0)
+        image_path = save_dir / "image0_undistorted.jpg"
+        save_image(undistorted_image0, image_path)
+        logger.info(f"save `image0 undistorted` image to {image_path}")
         logger.success("undistort image0 success")
         # -------------------- 畸变矫正 -------------------- #
 

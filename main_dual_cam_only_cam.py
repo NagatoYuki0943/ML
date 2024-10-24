@@ -346,6 +346,9 @@ def main() -> None:
         undistorted_image0, _ = dual_stereo_calibration.undistort_image(
             image0, "left" if left_camera_index == 0 else "right"
         )
+        image_path = save_dir / "image0_undistorted.jpg"
+        save_image(undistorted_image0, image_path)
+        logger.info(f"save `image0 undistorted` image to {image_path}")
         logger.success("undistort image0 success")
         # -------------------- 畸变矫正 -------------------- #
 
@@ -447,6 +450,9 @@ def main() -> None:
         undistorted_image1, _ = dual_stereo_calibration.undistort_image(
             image1, "right" if left_camera_index == 0 else "left"
         )
+        image_path = save_dir / "image1_undistorted.jpg"
+        save_image(undistorted_image1, image_path)
+        logger.info(f"save `image1 undistorted` image to {image_path}")
         logger.success("undistort image1 success")
         # -------------------- 畸变矫正 -------------------- #
 

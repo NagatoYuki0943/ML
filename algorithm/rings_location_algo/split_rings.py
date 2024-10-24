@@ -80,7 +80,7 @@ def split_rings(
     # 输出分组结果
     for i, group_index in enumerate(group_indexes):
         if len(group_index) < min_group_size:
-            # logger.info(f"ignore {len(group_index)} points")
+            logger.info(f"ignore {len(group_index)} points")
             continue
         group_rings.append(points[group_index])
     return group_rings

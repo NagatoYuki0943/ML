@@ -248,6 +248,9 @@ logger.success("init end")
 def main() -> None:
     global camera0_cycle_results
 
+    # XXX: 发送开启闪光灯消息
+    Send.send_open_led_level_msg(5)
+
     # -------------------- 控温 -------------------- #
     # target_temperature: float = TemperatureConfig.getattr("target_temperature")
     # Send.send_temperature_control_msg(target_temperature, CAMERA_INDEX)
@@ -402,7 +405,7 @@ def main() -> None:
 
     # 是否使用补光灯
     use_flash = False
-    led_level = 1
+    led_level = 5
     # -------------------- 初始化周期内变量 -------------------- #
 
     while True:
@@ -1710,7 +1713,7 @@ class Receive:
         }
         # logger.info(f"received temp data transform to temperature_data: {temperature_data}")
 
-        # TODO: 临时温度保护措施
+        # XXX: 临时温度保护措施
         # 只有 inside_air_t 小于控制的温度时才控温
         target_temperature: float = TemperatureConfig.getattr("target_temperature")
         inside_air_t: float = _temperature_data.get("inside_air_t", 100)
@@ -1721,7 +1724,7 @@ class Receive:
             Send.send_temperature_control_msg(target_temperature, CAMERA_INDEX)
             need_send_temp_control_msg = False
 
-        # TODO: 高温之后停止温控
+        # XXX: 高温之后停止温控
         temperature_up_threshold: float = TemperatureConfig.getattr("temperature_up_threshold")
         exterior_air_t: float = _temperature_data.get("exterior_air_t", 45)
         sensor1_t: float = _temperature_data.get("sensor1_t", 45)

@@ -28,18 +28,19 @@ btn = dict[str, Any]
 
 def chat_stream_with_image(
     query: str,
-    history: Sequence
-    | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+    history: Sequence | None = None,
     max_new_tokens: int = 1024,
     temperature: float = 0.8,
     top_p: float = 0.8,
     top_k: int = 40,
-    image: Image.Image | None = None,
+    image: Image.Image | str | None = None,
     state_session_id: int = 0,
-) -> Generator[tuple[Sequence, Image.Image | None, btn, btn, btn, btn], None, None]:
-    history = [] if history is None else list(history)
-
+) -> Generator[tuple[Sequence, btn, btn, btn, btn], None, None]:
     logger.info(f"{state_session_id = }")
+
+    history = [] if history is None else list(history)
+    logger.debug(f"old history: {history}")
+
     logger.info(
         {
             "max_new_tokens": max_new_tokens,
@@ -49,26 +50,14 @@ def chat_stream_with_image(
         }
     )
 
-    if query is None or len(query.strip()) < 1:
-        yield history, image, enable_btn, enable_btn, enable_btn, enable_btn
+    if (query is None or len(query.strip()) < 1) and (image is None):
+        yield history, enable_btn, enable_btn, enable_btn, enable_btn
         return
     query = query.strip()
     logger.info(f"query: {query}")
 
-    logger.info(f"{image = }")
-
-    yield (
-        history + [[query, None]],
-        None,
-        disable_btn,
-        disable_btn,
-        disable_btn,
-        disable_btn,
-    )
-
-    use_image: bool = False
+    logger.info(f"image: {image}")
     if isinstance(image, Image.Image):
-        use_image = True
         image = image.convert("RGB")
 
         logger.info({"height": image.height, "width": image.width, "mode": image.mode})
@@ -85,118 +74,127 @@ def chat_stream_with_image(
 
         image_path = save_path / f"{hash_image(image)}.png"
         image.save(image_path)
+    elif isinstance(image, str):
+        image_path = image
 
-    if use_image:
-        yield (
-            history + [[(image_path, "alt_text"), None], [query, None]],
-            image,
-            disable_btn,
-            disable_btn,
-            disable_btn,
-            disable_btn,
-        )
-    else:
-        yield (
-            history + [[query, None]],
-            image,
-            disable_btn,
-            disable_btn,
-            disable_btn,
-            disable_btn,
-        )
+    if image:
+        history += [
+            {
+                "role": "user",
+                "content": {
+                    "type": "image_url",
+                    # path for gradio
+                    "path": str(image_path),
+                    # useless for gradio
+                    "image_url": {
+                        "url": str(image_path),
+                    },
+                },
+            }
+        ]
+    if query is not None and len(query) > 0:
+        history += [
+            {
+                "role": "user",
+                "content": query,
+            }
+        ]
+    yield (
+        history,
+        disable_btn,
+        disable_btn,
+        disable_btn,
+        disable_btn,
+    )
 
     time.sleep(1)
     number: np.ndarray = np.random.randint(1, 100, 20)
     logger.info(f"response: {number}")
-    if not use_image:
-        logger.info(f"history: {history + [[query, str(number)]]}")
-    else:
-        logger.info(
-            f"history: {history + [[(image_path, "alt_text"), None], [query, str(number)]]}"
-        )
+    logger.info(f"new history: {history}")
 
+    _history = history
     for i in range(len(number)):
         time.sleep(0.1)
-        logger.info(number[i])
-        if not use_image:
-            yield (
-                history + [[query, str(number[: i + 1])]],
-                image,
-                disable_btn,
-                disable_btn,
-                disable_btn,
-                disable_btn,
-            )
-        else:
-            # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
-            yield (
-                history
-                + [[(image_path, "alt_text"), None], [query, str(number[: i + 1])]],
-                image,
-                disable_btn,
-                disable_btn,
-                disable_btn,
-                disable_btn,
-            )
+        logger.info(f"number[{i}] = {number[i]}")
+        _history = history + [
+            {
+                "role": "assistant",
+                "content": str(number[: i + 1]),
+            },
+        ]
+        yield (
+            _history,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+        )
 
-    if not use_image:
-        yield (
-            history + [[query, str(number)]],
-            image,
-            enable_btn,
-            enable_btn,
-            enable_btn,
-            enable_btn,
-        )
-    else:
-        # 在聊天记录中显示图片,需要是图片url或者路径,不能是 Image 对象
-        yield (
-            history
-            + [[(image_path, "alt_text"), None], [query, str(number)]],
-            image,
-            enable_btn,
-            enable_btn,
-            enable_btn,
-            enable_btn,
-        )
+    logger.info(f"new history: {_history}")
+    yield (
+        _history,
+        enable_btn,
+        enable_btn,
+        enable_btn,
+        enable_btn,
+    )
 
 
 def regenerate(
-    history: Sequence
-    | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+    history: Sequence | None = None,
     max_new_tokens: int = 1024,
     temperature: float = 0.8,
     top_p: float = 0.8,
     top_k: int = 40,
-    image: Image.Image | None = None,
     state_session_id: int = 0,
-) -> Generator[tuple[Sequence, Image.Image | None, btn, btn, btn, btn], None, None]:
+) -> Generator[tuple[Sequence, btn, btn, btn, btn], None, None]:
     history = [] if history is None else list(history)
 
-    # 重新生成时要把最后的query和response弹出,重用query
-    if len(history) > 0:
-        query, _ = history.pop(-1)
+    content = ""
+    for message in history[::-1]:
+        # 无论如何都删除后面的值
+        history.pop()
+        if message["role"] == "user":
+            content = message["content"]
+            break
+
+    if isinstance(content, str):
+        query = content.strip()
+        image = None
+    elif isinstance(content, tuple) and len(content) > 0:
+        query = ""
+        image = content[0]
+
+    if query or image:
         yield from chat_stream_with_image(
-            query=query,
-            history=history,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            image=image,
-            state_session_id=state_session_id,
+            query,
+            history,
+            max_new_tokens,
+            temperature,
+            top_p,
+            top_k,
+            image,
+            state_session_id,
         )
     else:
         logger.warning("no history, can't regenerate")
-        yield history, image, enable_btn, enable_btn, enable_btn, enable_btn
+        yield history, enable_btn, enable_btn, enable_btn, enable_btn
 
 
-def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
+def undo(history: Sequence | None = None) -> tuple[str, Sequence]:
     """恢复到上一轮对话"""
     history = [] if history is None else list(history)
+
     query = ""
-    if len(history) > 0:
-        query, _ = history.pop(-1)
+    for message in history[::-1]:
+        # 无论如何都删除后面的值
+        history.pop()
+        if message["role"] == "user":
+            content = message["content"]
+            if isinstance(content, str):
+                query = content
+            break
+
     return query, history
 
 
@@ -207,9 +205,7 @@ def main():
 
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
-                gr.Markdown("""<h1><center>🦙 LLaMA 3</center></h1>
-                    <center>🦙 LLaMA 3 Chatbot 💬</center>
-                    """)
+                gr.Markdown("""<h1><center>🦞 Lobster</center></h1>""")
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
 
         with gr.Row():
@@ -225,6 +221,7 @@ def main():
                     with gr.Column(scale=2):
                         # 创建聊天框
                         chatbot = gr.Chatbot(
+                            type="messages",
                             height=500,
                             show_copy_button=True,
                             placeholder="内容由 AI 大模型生成，请仔细甄别。",
@@ -242,14 +239,14 @@ def main():
                         # 创建提交按钮。
                         # variant https://www.gradio.app/docs/button
                         # scale https://www.gradio.app/guides/controlling-layout
-                        submit = gr.Button("💬 Chat", variant="primary", scale=0)
+                        submit_btn = gr.Button("💬 Chat", variant="primary", scale=0)
 
                 with gr.Row():
                     # 创建一个重新生成按钮，用于重新生成当前对话内容。
-                    regen = gr.Button("🔄 Retry", variant="secondary")
-                    undo = gr.Button("↩️ Undo", variant="secondary")
+                    retry_btn = gr.Button("🔄 Retry", variant="secondary")
+                    undo_btn = gr.Button("↩️ Undo", variant="secondary")
                     # 创建一个清除按钮，用于清除聊天机器人组件的内容。
-                    clear = gr.ClearButton(
+                    clear_btn = gr.ClearButton(
                         components=[chatbot, query, image],
                         value="🗑️ Clear",
                         variant="stop",
@@ -301,7 +298,7 @@ def main():
                     image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image, submit, regen, undo, clear],
+                outputs=[chatbot, submit_btn, retry_btn, undo_btn, clear_btn],
             )
 
             # 清空query
@@ -312,7 +309,7 @@ def main():
             )
 
             # 按钮提交
-            submit.click(
+            submit_btn.click(
                 chat_stream_with_image,
                 inputs=[
                     query,
@@ -324,18 +321,18 @@ def main():
                     image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image, submit, regen, undo, clear],
+                outputs=[chatbot, submit_btn, retry_btn, undo_btn, clear_btn],
             )
 
             # 清空query
-            submit.click(
+            submit_btn.click(
                 lambda: gr.Textbox(value=""),
                 inputs=[],
                 outputs=[query],
             )
 
             # 重新生成
-            regen.click(
+            retry_btn.click(
                 regenerate,
                 inputs=[
                     chatbot,
@@ -343,14 +340,13 @@ def main():
                     temperature,
                     top_p,
                     top_k,
-                    image,
                     state_session_id,
                 ],
-                outputs=[chatbot, image, submit, regen, undo, clear],
+                outputs=[chatbot, submit_btn, retry_btn, undo_btn, clear_btn],
             )
 
             # 撤销
-            undo.click(revocery, inputs=[chatbot], outputs=[query, chatbot])
+            undo_btn.click(undo, inputs=[chatbot], outputs=[query, chatbot])
 
         gr.Markdown("""提醒：<br>
         1. 内容由 AI 大模型生成，请仔细甄别。<br>

@@ -7,7 +7,7 @@ https://www.gradio.app/guides/creating-a-chatbot-fast
 import gradio as gr
 
 
-def yes_man(message, history):
+def yes_man(message: str, history: list):
     if message.endswith("?"):
         return "Yes"
     else:
@@ -16,7 +16,7 @@ def yes_man(message, history):
 
 gr.ChatInterface(
     yes_man,
-    chatbot=gr.Chatbot(height=300),
+    chatbot=gr.Chatbot(type="messages", height=300),
     textbox=gr.Textbox(
         placeholder="Ask me a yes or no question", container=False, scale=7
     ),
@@ -25,7 +25,6 @@ gr.ChatInterface(
     theme="soft",
     examples=["Hello", "Am I cool?", "Are tomatoes vegetables?"],
     cache_examples=True,
-    retry_btn="Retry",
-    undo_btn="Delete Previous",
-    clear_btn="Clear",
+    submit_btn="💬 Chat",
+    stop_btn="🚫 Stop",
 ).launch()

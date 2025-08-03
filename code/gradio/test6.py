@@ -70,10 +70,10 @@ with block as demo:
             label="示例图像",
         )
 
-        submit = gr.Button("Predict", variant="primary", scale=0)
+        submit_btn = gr.Button("Predict", variant="primary", scale=0)
 
         # 按钮提交
-        submit.click(predict, inputs=[image], outputs=[output_label])
+        submit_btn.click(predict, inputs=[image], outputs=[output_label])
 
 demo.launch(
     server_name="0.0.0.0",

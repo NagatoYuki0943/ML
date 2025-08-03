@@ -1,4 +1,4 @@
-# https://www.gradio.app/docs/gradio/chatbot
+# https://www.gradio.app/docs/gradio/multimodaltextbox
 
 import gradio as gr
 import time
@@ -11,50 +11,31 @@ def print_like_dislike(x: gr.LikeData):
 
 
 def add_message(history, message):
-    print(message)
-    # {
-    #     'text': 'hello',
-    #     'files': [
-    #         'C:\\Users\\Frostbite\\AppData\\Local\\Temp\\gradio\\91f58cae35f058d5795dad2a32407d02a0805e10\\MMMMMKUN3 2B-1.jpeg',
-    #         'C:\\Users\\Frostbite\\AppData\\Local\\Temp\\gradio\\7b2ef40406377750a86f7b368c760787347f2d9d\\MMMMMKUN3 2B-2.jpeg'
-    #     ]
-    # }
-
-    for file in message["files"]:
-        print(f"file: {file}")
-        history.append([(file,), None])
+    for x in message["files"]:
+        history.append({"role": "user", "content": {"path": x}})
     if message["text"] is not None:
-        history.append([message["text"], None])
-
-    print(f"history: {history}")
-    # history: [
-    #     [('C:\\Users\\Frostbite\\AppData\\Local\\Temp\\gradio\\91f58cae35f058d5795dad2a32407d02a0805e10\\MMMMMKUN3 2B-1.jpeg',), None],
-    #     [('C:\\Users\\Frostbite\\AppData\\Local\\Temp\\gradio\\7b2ef40406377750a86f7b368c760787347f2d9d\\MMMMMKUN3 2B-2.jpeg',), None],
-    #     ['hello', None]
-    # ]
-
+        history.append({"role": "user", "content": message["text"]})
     return history, gr.MultimodalTextbox(value=None, interactive=False)
 
 
-def bot(history):
+def bot(history: list):
     response = "**That's cool!**"
-    # 添加回答
-    history[-1][1] = ""
+    history.append({"role": "assistant", "content": ""})
     for character in response:
-        history[-1][1] += character
-        time.sleep(0.1)
+        history[-1]["content"] += character
+        time.sleep(0.05)
         yield history
 
 
 with gr.Blocks() as demo:
-    chatbot = gr.Chatbot([], elem_id="chatbot", bubble_full_width=False)
+    chatbot = gr.Chatbot(elem_id="chatbot", bubble_full_width=False, type="messages")
 
     chat_input = gr.MultimodalTextbox(
-        file_types=["image"],
-        file_count="multiple",  # 指的是一次上传几张,选择single也可以多次选择
-        placeholder="Enter message or upload file...",
-        label="Prompt",
         interactive=True,
+        file_count="multiple",
+        placeholder="Enter message or upload file...",
+        show_label=False,
+        sources=["microphone", "upload"],
     )
 
     chat_msg = chat_input.submit(
@@ -63,12 +44,7 @@ with gr.Blocks() as demo:
     bot_msg = chat_msg.then(bot, chatbot, chatbot, api_name="bot_response")
     bot_msg.then(lambda: gr.MultimodalTextbox(interactive=True), None, [chat_input])
 
-    chatbot.like(print_like_dislike, None, None)
+    chatbot.like(print_like_dislike, None, None, like_user_message=True)
 
-demo.queue()
-demo.launch(
-    server_name="0.0.0.0",
-    server_port=7860,
-    share=True,
-    max_threads=100,
-)
+if __name__ == "__main__":
+    demo.launch()
